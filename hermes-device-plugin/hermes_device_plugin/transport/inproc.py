@@ -59,6 +59,11 @@ class InprocTransport:
         return InvokeResult(invocation_id=invocation_id, ok=True, data={})
 
     async def cancel(self, invocation_id: str, reason: str) -> None:
+        # Nothing at M0 calls this (ASK is unreachable, nothing times out against a synchronous
+        # stub). docs/m0-plan.md §6.4 says this "returns not_implemented" — but `_handler` maps
+        # a raised NotImplementedError to BRIDGE_UNAVAILABLE, not ErrorCode.NOT_IMPLEMENTED. M1,
+        # when it wires real cancellation, should return the ErrorCode.NOT_IMPLEMENTED result
+        # shape rather than raise, so the code the model sees matches the taxonomy.
         raise NotImplementedError("cancel is not implemented until M1")
 
     async def list_devices(self) -> list[DeviceInfo]:
@@ -71,4 +76,8 @@ class InprocTransport:
         return []
 
     async def resolve_approval(self, invocation_id: str, decision: str, scope: str) -> None:
+        # Same discrepancy as `cancel` above: docs/m0-plan.md §6.4 says "returns
+        # not_implemented", but raising here surfaces as BRIDGE_UNAVAILABLE through `_handler`,
+        # not ErrorCode.NOT_IMPLEMENTED. Unreachable until M3's approval flow exists; M3 should
+        # return the NOT_IMPLEMENTED result shape rather than raise.
         raise NotImplementedError("resolve_approval is not implemented until M3")

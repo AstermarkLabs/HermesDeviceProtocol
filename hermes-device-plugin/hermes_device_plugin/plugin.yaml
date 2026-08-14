@@ -1,0 +1,9 @@
+name: hermes-device
+version: 0.0.0
+description: Hermes Device Protocol capability bridge
+author: Brian
+provides_tools:
+  - device_notifications_send
+  - device_status_get
+  - hdp_echo
+

@@ -1,0 +1,2 @@
+"""HDP message dataclasses scaffold."""
+

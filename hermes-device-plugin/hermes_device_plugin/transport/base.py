@@ -1,0 +1,2 @@
+"""BridgeTransport protocol scaffold."""
+

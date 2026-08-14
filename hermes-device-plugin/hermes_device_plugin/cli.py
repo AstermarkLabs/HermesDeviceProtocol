@@ -1,0 +1,2 @@
+"""`hermes hdp ...` command scaffold."""
+

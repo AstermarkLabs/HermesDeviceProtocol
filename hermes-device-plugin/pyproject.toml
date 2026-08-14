@@ -12,6 +12,9 @@ dependencies = [
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+[tool.uv.sources]
+hdp-proto = { workspace = true }
+
 [tool.hatch.build.targets.wheel]
 packages = ["hermes_device_plugin"]
 

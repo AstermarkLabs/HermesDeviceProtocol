@@ -1,2 +1,1 @@
 """HDP bridge daemon package."""
-

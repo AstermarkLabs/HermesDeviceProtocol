@@ -1,2 +1,1 @@
 """Reference node capability implementations."""
-

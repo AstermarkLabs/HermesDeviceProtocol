@@ -3,7 +3,7 @@ HERMES_HOME_DIR ?= $(HOME)/.hermes
 PLUGIN_PACKAGE_DIR := $(CURDIR)/hermes-device-plugin/hermes_device_plugin
 PLUGIN_LINK := $(HERMES_HOME_DIR)/plugins/hermes-device
 
-.PHONY: dev-install dev-install-profile dev-uninstall test lint fmt typecheck check
+.PHONY: dev-install dev-install-profile dev-uninstall test lint fmt fmt-check typecheck check
 
 dev-install:
 	mkdir -p "$(HERMES_HOME_DIR)/plugins"
@@ -30,8 +30,11 @@ lint:
 fmt:
 	uv run ruff format .
 
+fmt-check:
+	uv run ruff format --check .
+
 typecheck:
 	uv run mypy
 
-check: lint typecheck test
+check: lint fmt-check typecheck test
 

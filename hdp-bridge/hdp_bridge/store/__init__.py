@@ -1,2 +1,1 @@
 """SQLite store helpers."""
-

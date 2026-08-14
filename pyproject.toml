@@ -3,7 +3,12 @@ name = "oracle"
 version = "0.0.0"
 description = "Hermes Device Expansion MVP workspace"
 requires-python = ">=3.11,<3.13"
-dependencies = []
+dependencies = [
+  "hdp-proto",
+  "hermes-device-plugin",
+  "hdp-bridge",
+  "hdp-reference-node",
+]
 
 [dependency-groups]
 dev = [
@@ -22,12 +27,22 @@ members = [
   "hdp-reference-node",
 ]
 
+[tool.uv.sources]
+hdp-proto = { workspace = true }
+hermes-device-plugin = { workspace = true }
+hdp-bridge = { workspace = true }
+hdp-reference-node = { workspace = true }
+
 [tool.ruff]
 line-length = 100
 target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "ASYNC", "S"]
+
+[tool.ruff.lint.per-file-ignores]
+# S101 (assert) is the point of a test file, not a hazard to flag.
+"**/tests/**" = ["S101"]
 
 [tool.mypy]
 python_version = "3.11"
@@ -38,6 +53,7 @@ asyncio_mode = "auto"
 timeout = 30
 testpaths = [
   "tests",
+  "hdp-spec/tests",
   "hermes-device-plugin/tests",
   "hdp-bridge/tests",
   "hdp-reference-node/tests",

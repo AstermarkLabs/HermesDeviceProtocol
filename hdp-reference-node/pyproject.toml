@@ -11,6 +11,9 @@ dependencies = [
 [project.scripts]
 hdp-node = "hdp_reference_node.cli:main"
 
+[tool.uv.sources]
+hdp-proto = { workspace = true }
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

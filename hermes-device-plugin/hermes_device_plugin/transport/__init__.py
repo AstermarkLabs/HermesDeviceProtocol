@@ -1,2 +1,1 @@
 """Bridge transport implementations."""
-

@@ -11,6 +11,9 @@ dependencies = [
 [project.scripts]
 hdp-bridge = "hdp_bridge.cli:main"
 
+[tool.uv.sources]
+hdp-proto = { workspace = true }
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

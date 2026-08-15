@@ -1,7 +1,6 @@
 """The bridge-side pending-invocation table — id → in-flight state.
 
-Named to match the eventual `hdp_bridge/invocations.py` at M2 (design §3, ADR-0004). At M1 this
-backs real ack-timeout / execution-deadline / cancel / mid-call-disconnect handling over a real
+Backs real ack-timeout / execution-deadline / cancel / mid-call-disconnect handling over a real
 socket (hdp-spec/HDP-0.md §7). Two `asyncio.Future`s per entry, not one, because "acked" and
 "resolved" are genuinely separate events with separate timeouts (ack timeout 5s, strictly less
 than the execution deadline) — collapsing them into one future would make it impossible to tell

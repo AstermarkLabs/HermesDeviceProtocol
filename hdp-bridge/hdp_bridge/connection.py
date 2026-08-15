@@ -1,7 +1,4 @@
-"""Per-connection lifecycle for one node's WebSocket — the M1 real-socket counterpart of the
-eventual `hdp_bridge/connection.py` (ADR-0004, design §3). This is the file M0 reserved this
-name for: "server start/stop lives under `HDPRuntime`... the shape M1's aiohttp server lifecycle
-plugs into" (inproc.py's `start()` docstring).
+"""Per-connection lifecycle for one node's WebSocket.
 
 One `NodeConnection` per accepted WebSocket. It owns the handshake (`hello` → `welcome`),
 dispatches every subsequent frame by envelope type, tracks a per-connection malformed-frame
@@ -20,7 +17,7 @@ import json
 import logging
 import time
 from collections import OrderedDict
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Protocol
 
 from aiohttp import WSCloseCode, WSMsgType, web
 from hdp_proto import ids
@@ -37,12 +34,11 @@ from hdp_proto.messages import (
 )
 from hdp_proto.version import HDP_VERSION
 
-from .base import CapabilityInfo, DeviceInfo
+from .types import CapabilityRecord, DeviceRecord
 
 if TYPE_CHECKING:
-    from ._invocations import InvocationsMem
-    from ._registry_mem import RegistryMem
-    from .base import InvokeRequest
+    from .invocations import InvocationsMem
+    from .registry import RegistryMem
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +54,13 @@ direction."""
 _MALFORMED_WINDOW_S = 60.0
 _MALFORMED_LIMIT = 10
 _SEEN_IDS_CAP = 256
+
+
+class _InvokeRequestLike(Protocol):
+    capability: str
+    version: int
+    args: dict[str, Any]
+    deadline_ms: int
 
 
 class NodeConnection:
@@ -93,7 +96,7 @@ class NodeConnection:
 
     # -- outbound -----------------------------------------------------------------------------
 
-    async def send_invoke(self, invocation_id: str, req: InvokeRequest) -> None:
+    async def send_invoke(self, invocation_id: str, req: _InvokeRequestLike) -> None:
         msg = InvokeMsg(
             capability=req.capability,
             version=req.version,
@@ -178,10 +181,10 @@ class NodeConnection:
 
         device_id = ids.new()
         capability_infos = [
-            CapabilityInfo(name=c.name, version=c.version) for c in hello.capabilities
+            CapabilityRecord(name=c.name, version=c.version) for c in hello.capabilities
         ]
         self._registry.register(
-            DeviceInfo(
+            DeviceRecord(
                 device_id=device_id,
                 friendly_name=hello.device_name,
                 platform="unknown",
@@ -210,11 +213,11 @@ class NodeConnection:
         friendly_name = existing.friendly_name if existing else device_id
         platform = existing.platform if existing else "unknown"
         capability_infos = [
-            CapabilityInfo(name=c.name, version=c.version) for c in msg.capabilities
+            CapabilityRecord(name=c.name, version=c.version) for c in msg.capabilities
         ]
         # Full-set replacement (FR-8), not a merge — matches `hello`'s initial registration.
         self._registry.register(
-            DeviceInfo(
+            DeviceRecord(
                 device_id=device_id,
                 friendly_name=friendly_name,
                 platform=platform,

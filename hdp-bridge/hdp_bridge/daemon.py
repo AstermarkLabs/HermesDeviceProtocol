@@ -45,7 +45,15 @@ async def serve(*, stop_event: asyncio.Event | None = None) -> None:
     )
 
     await hdp_server.start()
-    await control.start()
+    try:
+        await control.start()
+    except BaseException:
+        # If control.start() fails (unwritable socket path, permission error, ...), the
+        # already-bound node-facing TCP socket and the `bridge.addr` file it wrote must not
+        # leak — tear down what already succeeded before propagating.
+        await hdp_server.close()
+        raise
+
     pid_path = config.pid_path()
     pid_path.parent.mkdir(parents=True, exist_ok=True)
     pid_path.write_text(str(os.getpid()))

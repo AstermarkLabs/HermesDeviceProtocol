@@ -42,6 +42,7 @@ async def serve(*, stop_event: asyncio.Event | None = None) -> None:
         registry=registry,
         invocations=invocations,
         connections=connections,
+        descriptors=descriptors,
     )
 
     await hdp_server.start()

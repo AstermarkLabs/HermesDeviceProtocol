@@ -20,6 +20,12 @@ from pathlib import Path
 DEFAULT_HDP_BIND_HOST = "127.0.0.1"
 DEFAULT_HDP_BIND_PORT = 8765
 
+ACK_TIMEOUT_S = 5.0
+"""Ack timeout for an invocation, strictly less than any device's execution deadline
+(hdp-spec/HDP-0.md §7). A node that never acks fails fast (`device_offline`) instead of burning
+the full deadline. The daemon-side counterpart of `hermes_device_plugin/config.py`'s constant of
+the same name — `ctl_invoke`'s ack/deadline race now runs here, not in `EmbeddedTransport`."""
+
 
 def hermes_home() -> Path:
     """The active Hermes profile's state root. Read fresh on every call — never cache this."""

@@ -68,3 +68,11 @@ def bridge_addr_path() -> Path:
     start and removes on close, so `hdp-node connect` can discover the bound address without a
     hardcoded port. Read fresh on every call, same discipline as every other accessor here."""
     return hdp_home() / "bridge.addr"
+
+
+def control_socket_path() -> Path:
+    """`$HERMES_HOME/hdp/bridge.sock` — the M2 plugin↔bridge Unix control socket. A near-verbatim
+    duplicate of `hdp_bridge.config.control_socket_path()`: both packages independently know
+    where this path lives, same as both already independently know `bridge.addr`'s path
+    (`hdp_bridge` must never be imported from here, per this plan's Global Constraints)."""
+    return hdp_home() / "bridge.sock"

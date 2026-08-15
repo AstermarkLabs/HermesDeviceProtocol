@@ -1,0 +1,89 @@
+import pytest
+from hdp_proto.capabilities import CapabilityDescriptor
+from hdp_proto.messages import (
+    Ack,
+    CancelMsg,
+    CapabilitiesMsg,
+    ErrorMsg,
+    Heartbeat,
+    Hello,
+    InvokeMsg,
+    ProgressMsg,
+    ResultMsg,
+    RevokeMsg,
+    Welcome,
+)
+
+_DESCRIPTOR = CapabilityDescriptor(
+    name="diagnostics.echo",
+    version=1,
+    input_schema={"type": "object", "properties": {}, "required": []},
+    output_schema={"type": "object", "properties": {}, "required": []},
+)
+
+# (instance, unknown-field key to inject for the tolerance test)
+_CASES = [
+    (
+        Hello(hdp_versions=(0,), device_name="n", capabilities=(_DESCRIPTOR,), credential=None),
+        "extra",
+    ),
+    (Hello(hdp_versions=(0,), device_name="n", capabilities=(), credential="secret"), "extra"),
+    (Welcome(hdp_version=0, device_id="01JB0000000000000000000000"), "extra"),
+    (CapabilitiesMsg(capabilities=(_DESCRIPTOR,)), "extra"),
+    (
+        InvokeMsg(
+            capability="diagnostics.echo", version=1, args={"payload": {}}, deadline_ms=30_000
+        ),
+        "extra",
+    ),
+    (Ack(), "extra"),
+    (ResultMsg(ok=True, data={"payload": {}}, error=None), "extra"),
+    (
+        ResultMsg(
+            ok=False, data=None, error={"code": "bridge_unavailable", "message": "m", "hint": "h"}
+        ),
+        "extra",
+    ),
+    (CancelMsg(reason="timeout"), "extra"),
+    (ProgressMsg(detail={"pct": 50}), "extra"),
+    (Heartbeat(), "extra"),
+    (ErrorMsg(code="bridge_unavailable", message="m", hint="h"), "extra"),
+    (RevokeMsg(reason="credential rotated"), "extra"),
+]
+
+
+@pytest.mark.parametrize("instance,_extra_key", _CASES)
+def test_round_trip(instance, _extra_key):
+    cls = type(instance)
+    wire = instance.to_wire()
+    restored = cls.from_wire(wire)
+    assert restored == instance
+
+
+@pytest.mark.parametrize("instance,extra_key", _CASES)
+def test_from_wire_tolerates_unknown_fields(instance, extra_key):
+    cls = type(instance)
+    wire = instance.to_wire()
+    wire[extra_key] = "ignored"
+    restored = cls.from_wire(wire)
+    assert restored == instance
+
+
+def test_hello_rejects_malformed_hdp_versions():
+    wire = Hello(hdp_versions=(0,), device_name="n", capabilities=(), credential=None).to_wire()
+    wire["hdp_versions"] = "not-a-list"
+    with pytest.raises(ValueError):
+        Hello.from_wire(wire)
+
+
+def test_invoke_msg_rejects_missing_deadline():
+    wire = InvokeMsg(capability="c", version=1, args={}, deadline_ms=1000).to_wire()
+    del wire["deadline_ms"]
+    with pytest.raises(ValueError):
+        InvokeMsg.from_wire(wire)
+
+
+def test_result_msg_rejects_non_bool_ok():
+    wire = {"ok": "yes", "data": None, "error": None}
+    with pytest.raises(ValueError):
+        ResultMsg.from_wire(wire)

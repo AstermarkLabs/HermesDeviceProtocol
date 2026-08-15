@@ -22,7 +22,24 @@ class EnvelopeError(ValueError):
     The one failure mode of this codec. Callers must handle it explicitly; `from_wire` never
     returns `None` on invalid input (docs/m0-plan.md §4.1) — a `None`-on-invalid contract is the
     shape that gets `if env:`-checked and dereferenced two lines later.
+
+    Callers that only need "was this frame valid" can keep catching this base class. Callers that
+    sit on a real connection (M1's `_connection.py`) need to react differently depending on which
+    specific failure occurred (HDP-0.md §5), so the two cases that matter are broken out below as
+    subclasses.
     """
+
+
+class UnsupportedVersionError(EnvelopeError):
+    """The frame's `hdp` field names a version we do not speak. Per HDP-0.md §3, this closes the
+    connection immediately — no `error` reply, no further processing of the frame (specifically:
+    no `credential` field is ever read, parsed, or logged on a version we do not speak)."""
+
+
+class UnknownTypeError(EnvelopeError):
+    """The frame's `type` field is missing or not in `KNOWN_TYPES`. Per HDP-0.md §5, this gets an
+    `error` reply and the connection **stays open** — it counts against the per-connection
+    malformed-frame sliding window, but a single unknown type is not itself fatal."""
 
 
 @dataclass(frozen=True)
@@ -55,14 +72,14 @@ class Envelope:
         hdp = d.get("hdp")
         if hdp != HDP_VERSION:
             # A version we do not speak is closed before any further processing — deliberately
-            # checked first, before there is anything else (e.g. auth) to skip (m1-plan §3.3).
-            raise EnvelopeError(f"unsupported hdp version: {hdp!r}")
+            # checked first, before there is anything else (e.g. auth) to skip (HDP-0.md §3).
+            raise UnsupportedVersionError(f"unsupported hdp version: {hdp!r}")
 
         msg_type = d.get("type")
         if not isinstance(msg_type, str) or msg_type not in KNOWN_TYPES:
-            # Unknown *type* is a rejection; unknown *fields* within a known type are not
-            # (§4.2's tolerance rule, transcribed into HDP-0.md as normative at M1).
-            raise EnvelopeError(f"unknown or missing envelope type: {msg_type!r}")
+            # Unknown *type* is a rejection (connection stays open); unknown *fields* within a
+            # known type are not (HDP-0.md §1/§5's tolerance rule).
+            raise UnknownTypeError(f"unknown or missing envelope type: {msg_type!r}")
 
         frame_id = d.get("id")
         if not isinstance(frame_id, str) or not ids.is_valid(frame_id):

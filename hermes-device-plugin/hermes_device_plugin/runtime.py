@@ -30,7 +30,7 @@ except ImportError:  # pragma: no cover — bare `pytest` runs with no Hermes on
     from ._singleton import lazy_singleton
 
 from .transport.base import BridgeTransport
-from .transport.inproc import InprocTransport
+from .transport.embedded import EmbeddedTransport
 
 T = TypeVar("T")
 
@@ -43,8 +43,9 @@ class HDPRuntime:
 
     def __init__(self) -> None:
         self._ready = threading.Event()
+        self._close_requested = threading.Event()
         self._loop: asyncio.AbstractEventLoop | None = None
-        self.transport: BridgeTransport = InprocTransport()
+        self.transport: BridgeTransport = EmbeddedTransport()
         self._thread = threading.Thread(target=self._run_loop, name=_HDP_THREAD_NAME, daemon=True)
         self._thread.start()
         self._ready.wait()
@@ -55,11 +56,34 @@ class HDPRuntime:
         self._loop = loop
         self._ready.set()
         try:
-            loop.run_until_complete(self.transport.start())
-            loop.run_forever()
+            loop.run_until_complete(self._serve_until_close_requested())
         finally:
             loop.run_until_complete(self.transport.close())
             loop.close()
+
+    async def _serve_until_close_requested(self) -> None:
+        """`await self.transport.start()` runs to completion before anything checks
+        `_close_requested` — deliberately, not incidentally. An earlier version signalled
+        shutdown by calling `loop.stop()` from `close()` (the other thread) via
+        `call_soon_threadsafe`; if that fired while `transport.start()` was still mid-flight (the
+        realistic case when `close()` is called immediately after construction — exactly what
+        tests/conformance/test_runtime_composition.py does every iteration), `run_until_complete`
+        raised `RuntimeError: Event loop stopped before Future completed`, abandoning `start()`'s
+        coroutine in an unknown partial state — sometimes leaving a bound socket whose `AppRunner`
+        was never assigned anywhere `close()` could reach, which is a real fd/thread leak, not a
+        merely slow one. Polling a plain `threading.Event` after `start()` has already returned
+        makes early-`close()` a no-op race instead of an abort: `close()` can set the flag at any
+        time, including before `start()` even begins, and this coroutine simply won't look at it
+        until `start()` is done."""
+        await self.transport.start()
+        # noqa: ASYNC110 — ruff's suggested fix (`asyncio.Event`) isn't safe here: `close()` sets
+        # `_close_requested` from a *different OS thread*, and `asyncio.Event.set()` is not
+        # thread-safe without routing through `call_soon_threadsafe` — which is exactly the
+        # cross-thread scheduling this method exists to avoid depending on (see the docstring
+        # above). A `threading.Event`, polled, is the correct primitive for a flag set from
+        # another thread and read from a coroutine.
+        while not self._close_requested.is_set():  # noqa: ASYNC110
+            await asyncio.sleep(0.05)
 
     @property
     def loop(self) -> asyncio.AbstractEventLoop:
@@ -75,14 +99,15 @@ class HDPRuntime:
         under all three `_run_async` branches)."""
         return asyncio.run_coroutine_threadsafe(coro, self.loop)
 
-    def close(self, *, timeout: float = 5.0) -> None:
+    def close(self, *, timeout: float = 10.0) -> None:
         """Explicit teardown for tests (`lazy_singleton`'s `.reset()` only drops the cached
         instance; it does not stop the thread). Production has no equivalent call site — the HDP
         thread is a daemon thread specifically so a hung transport can never wedge `hermes` on
-        exit (D5, docs/m0-plan.md §6.5)."""
-        loop = self._loop
-        if loop is not None and loop.is_running():
-            loop.call_soon_threadsafe(loop.stop)
+        exit (D5, docs/m0-plan.md §6.5).
+
+        Safe to call at any time, including immediately after construction, before `start()` has
+        even begun — see `_serve_until_close_requested`'s docstring for why that used to matter."""
+        self._close_requested.set()
         self._thread.join(timeout=timeout)
 
 

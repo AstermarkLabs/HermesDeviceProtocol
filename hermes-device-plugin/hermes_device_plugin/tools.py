@@ -49,6 +49,14 @@ def _handler(fn: Callable[..., Awaitable[dict[str, Any]]]) -> Handler:
         try:
             result = await fn(args, **kwargs)
             return json.dumps(result)
+        except NotImplementedError as exc:
+            # A handful of transport operations (`resolve_approval` until M3; `cancel` until it
+            # was implemented at M1) raise this rather than returning a result — see
+            # transport/inproc.py and transport/embedded.py's docstrings. Their `-> None`
+            # signatures can't themselves produce a result-shaped error, so this is the one place
+            # that raise becomes the NOT_IMPLEMENTED shape the model actually sees, instead of
+            # falling through to the broader BRIDGE_UNAVAILABLE catch below.
+            return json.dumps(err(ErrorCode.NOT_IMPLEMENTED, exc))
         # Deliberately broad: FR-1 forbids a handler ever raising, and a narrowed catch here is
         # exactly the hole that requirement closes.
         except Exception as exc:  # noqa: BLE001

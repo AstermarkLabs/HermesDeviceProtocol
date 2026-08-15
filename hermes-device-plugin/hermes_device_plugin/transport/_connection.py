@@ -1,7 +1,298 @@
-"""Named seam for the eventual WebSocket node connection (M1's aiohttp server).
+"""Per-connection lifecycle for one node's WebSocket — the M1 real-socket counterpart of the
+eventual `hdp_bridge/connection.py` (ADR-0004, design §3). This is the file M0 reserved this
+name for: "server start/stop lives under `HDPRuntime`... the shape M1's aiohttp server lifecycle
+plugs into" (inproc.py's `start()` docstring).
 
-Deliberately empty at M0: there is no socket, no server, and no node yet — see `docs/m0-plan.md`
-§6.4. The name is reserved now, matching `hdp_bridge/connection.py`'s eventual M2 filename, so
-M1 writes into a file that already exists rather than inventing the name under time pressure and
-so the M2 extraction (ADR-0004) is `git mv` plus import fixes.
+One `NodeConnection` per accepted WebSocket. It owns the handshake (`hello` → `welcome`),
+dispatches every subsequent frame by envelope type, tracks a per-connection malformed-frame
+sliding window and envelope-id dedupe set (HDP-0.md §1, §5), and on disconnect fails every
+in-flight invocation for its device immediately (HDP-0.md §7's "mid-call disconnect" rule) —
+it must never wait for a deadline to notice the socket is gone.
+
+`registry`, `invocations`, `connections`, and `descriptors` are shared across every connection on
+one `EmbeddedTransport` (embedded.py constructs them once and passes the same objects to every
+`NodeConnection`); this module never constructs its own copies.
 """
+
+from __future__ import annotations
+
+import json
+import logging
+import time
+from collections import OrderedDict
+from typing import TYPE_CHECKING
+
+from aiohttp import WSCloseCode, WSMsgType, web
+from hdp_proto import ids
+from hdp_proto.capabilities import CapabilityDescriptor
+from hdp_proto.envelope import Envelope, EnvelopeError, UnsupportedVersionError
+from hdp_proto.messages import (
+    CancelMsg,
+    CapabilitiesMsg,
+    ErrorMsg,
+    Hello,
+    InvokeMsg,
+    ResultMsg,
+    Welcome,
+)
+from hdp_proto.version import HDP_VERSION
+
+from .base import CapabilityInfo, DeviceInfo
+
+if TYPE_CHECKING:
+    from ._invocations import InvocationsMem
+    from ._registry_mem import RegistryMem
+    from .base import InvokeRequest
+
+logger = logging.getLogger(__name__)
+
+_NODE_TO_BRIDGE_TYPES = frozenset(
+    {"hello", "capabilities", "ack", "result", "progress", "heartbeat", "error"}
+)
+"""The subset of `hdp_proto.version.KNOWN_TYPES` a *node* may legally send. A frame with a
+Bridge→Node-only type (`welcome`, `invoke`, `cancel`, `revoke`) arriving from a node is a known
+message type used in the wrong direction — handled as a malformed frame (HDP-0.md §5), not a
+version/type rejection at the envelope layer, since `Envelope.from_wire` has no notion of
+direction."""
+
+_MALFORMED_WINDOW_S = 60.0
+_MALFORMED_LIMIT = 10
+_SEEN_IDS_CAP = 256
+
+
+class NodeConnection:
+    """Wraps one `aiohttp.web.WebSocketResponse` for the lifetime of one node connection."""
+
+    def __init__(
+        self,
+        ws: web.WebSocketResponse,
+        *,
+        registry: RegistryMem,
+        invocations: InvocationsMem,
+        connections: dict[str, NodeConnection],
+        descriptors: dict[str, dict[str, CapabilityDescriptor]],
+    ) -> None:
+        self._ws = ws
+        self._registry = registry
+        self._invocations = invocations
+        self._connections = connections
+        self._descriptors = descriptors
+        self.device_id: str | None = None
+        self._seen_ids: OrderedDict[str, None] = OrderedDict()
+        self._malformed_times: list[float] = []
+
+    async def run(self) -> None:
+        try:
+            async for msg in self._ws:
+                if msg.type == WSMsgType.TEXT:
+                    await self._handle_frame(msg.data)
+                elif msg.type == WSMsgType.ERROR:
+                    break
+        finally:
+            await self._on_disconnect()
+
+    # -- outbound -----------------------------------------------------------------------------
+
+    async def send_invoke(self, invocation_id: str, req: InvokeRequest) -> None:
+        msg = InvokeMsg(
+            capability=req.capability,
+            version=req.version,
+            args=req.args,
+            deadline_ms=req.deadline_ms,
+        )
+        envelope = Envelope.new("invoke", msg.to_wire(), corr=invocation_id)
+        await self._ws.send_str(json.dumps(envelope.to_wire()))
+
+    async def send_cancel(self, invocation_id: str, reason: str) -> None:
+        """Best-effort — HDP-0.md §7: the caller has already removed the pending-table entry
+        before calling this (FR-30's ordering rule lives in `_invocations.py`'s `expire()`), so a
+        failed send here loses nothing."""
+        msg = CancelMsg(reason=reason)
+        envelope = Envelope.new("cancel", msg.to_wire(), corr=invocation_id)
+        try:
+            await self._ws.send_str(json.dumps(envelope.to_wire()))
+        except ConnectionResetError:
+            pass
+
+    # -- inbound dispatch -----------------------------------------------------------------------
+
+    async def _handle_frame(self, raw: str) -> None:
+        try:
+            data = json.loads(raw)
+        except (TypeError, ValueError) as exc:
+            await self._reject_malformed(f"invalid JSON: {exc}")
+            return
+
+        try:
+            envelope = Envelope.from_wire(data)
+        except UnsupportedVersionError:
+            # HDP-0.md §3: close before any further processing, no `error` reply, no credential
+            # read — a peer on a version we don't speak may not even parse our error envelope.
+            await self._ws.close(
+                code=WSCloseCode.POLICY_VIOLATION, message=b"unsupported hdp version"
+            )
+            return
+        except EnvelopeError as exc:
+            await self._reject_malformed(str(exc))
+            return
+
+        if envelope.id in self._seen_ids:
+            # Envelope-id dedupe backstop (HDP-0.md §1, FR-34) — a duplicate frame (e.g. the
+            # `duplicate-result` fault re-sending the exact same envelope) is silently ignored
+            # here, on top of `InvocationsMem.resolve`'s own pop-once semantics.
+            return
+        self._remember_id(envelope.id)
+
+        if self.device_id is None:
+            if envelope.type != "hello":
+                await self._ws.close(
+                    code=WSCloseCode.PROTOCOL_ERROR, message=b"expected hello first"
+                )
+                return
+            await self._handle_hello(envelope)
+            return
+
+        if envelope.type not in _NODE_TO_BRIDGE_TYPES:
+            await self._reject_malformed(f"unexpected message direction: {envelope.type!r}")
+            return
+
+        handler = {
+            "capabilities": self._handle_capabilities,
+            "ack": self._handle_ack,
+            "result": self._handle_result,
+            "progress": self._handle_progress,
+            "heartbeat": self._handle_heartbeat,
+            "error": self._handle_error,
+        }.get(envelope.type)
+        if handler is None:  # pragma: no cover — "hello" is the only member excluded above
+            await self._reject_malformed(f"unhandled type: {envelope.type!r}")
+            return
+        await handler(envelope)
+
+    async def _handle_hello(self, envelope: Envelope) -> None:
+        try:
+            hello = Hello.from_wire(envelope.payload)
+        except ValueError as exc:
+            await self._reject_malformed(f"malformed hello: {exc}")
+            return
+
+        device_id = ids.new()
+        capability_infos = [
+            CapabilityInfo(name=c.name, version=c.version) for c in hello.capabilities
+        ]
+        self._registry.register(
+            DeviceInfo(
+                device_id=device_id,
+                friendly_name=hello.device_name,
+                platform="unknown",
+                online=True,
+                capabilities=capability_infos,
+            )
+        )
+        self._descriptors[device_id] = {c.name: c for c in hello.capabilities}
+        self._connections[device_id] = self
+        self.device_id = device_id
+
+        welcome = Welcome(hdp_version=int(HDP_VERSION), device_id=device_id)
+        reply = Envelope.new("welcome", welcome.to_wire())
+        await self._ws.send_str(json.dumps(reply.to_wire()))
+
+    async def _handle_capabilities(self, envelope: Envelope) -> None:
+        try:
+            msg = CapabilitiesMsg.from_wire(envelope.payload)
+        except ValueError as exc:
+            await self._reject_malformed(f"malformed capabilities: {exc}")
+            return
+        device_id = self.device_id
+        if device_id is None:  # pragma: no cover — guaranteed by _handle_frame's dispatch gate
+            raise RuntimeError("_handle_capabilities reached before device_id was assigned")
+        existing = self._registry.get(device_id)
+        friendly_name = existing.friendly_name if existing else device_id
+        platform = existing.platform if existing else "unknown"
+        capability_infos = [
+            CapabilityInfo(name=c.name, version=c.version) for c in msg.capabilities
+        ]
+        # Full-set replacement (FR-8), not a merge — matches `hello`'s initial registration.
+        self._registry.register(
+            DeviceInfo(
+                device_id=device_id,
+                friendly_name=friendly_name,
+                platform=platform,
+                online=True,
+                capabilities=capability_infos,
+            )
+        )
+        self._descriptors[device_id] = {c.name: c for c in msg.capabilities}
+
+    async def _handle_ack(self, envelope: Envelope) -> None:
+        if envelope.corr is None:
+            await self._reject_malformed("ack missing corr")
+            return
+        self._invocations.mark_acked(envelope.corr)
+
+    async def _handle_result(self, envelope: Envelope) -> None:
+        if envelope.corr is None:
+            await self._reject_malformed("result missing corr")
+            return
+        try:
+            result_msg = ResultMsg.from_wire(envelope.payload)
+        except ValueError as exc:
+            await self._reject_malformed(f"malformed result: {exc}")
+            return
+        resolved = self._invocations.resolve(envelope.corr, result_msg.to_wire())
+        if not resolved:
+            # HDP-0.md §7: dropped silently on the model-facing side, logged here.
+            logger.info("late_result invocation_id=%s device_id=%s", envelope.corr, self.device_id)
+
+    async def _handle_progress(self, envelope: Envelope) -> None:
+        pass  # declared per HDP-0.md §2; no M1 consumer
+
+    async def _handle_heartbeat(self, envelope: Envelope) -> None:
+        reply = Envelope.new("heartbeat", {})
+        await self._ws.send_str(json.dumps(reply.to_wire()))
+
+    async def _handle_error(self, envelope: Envelope) -> None:
+        logger.info("node reported error device_id=%s payload=%s", self.device_id, envelope.payload)
+
+    # -- malformed-frame bookkeeping ------------------------------------------------------------
+
+    def _remember_id(self, envelope_id: str) -> None:
+        self._seen_ids[envelope_id] = None
+        if len(self._seen_ids) > _SEEN_IDS_CAP:
+            self._seen_ids.popitem(last=False)
+
+    def _record_malformed(self) -> bool:
+        """Append now, drop anything outside the 60s window, and report whether the connection
+        has now exceeded 10 malformed frames within that window (HDP-0.md §5)."""
+        now = time.monotonic()
+        self._malformed_times.append(now)
+        cutoff = now - _MALFORMED_WINDOW_S
+        self._malformed_times = [t for t in self._malformed_times if t >= cutoff]
+        return len(self._malformed_times) > _MALFORMED_LIMIT
+
+    async def _reject_malformed(self, message: str) -> None:
+        error_msg = ErrorMsg(
+            code="malformed_frame", message=message, hint="Send a well-formed HDP/0 frame."
+        )
+        envelope = Envelope.new("error", error_msg.to_wire())
+        try:
+            await self._ws.send_str(json.dumps(envelope.to_wire()))
+        except ConnectionResetError:
+            pass
+        if self._record_malformed():
+            await self._ws.close(
+                code=WSCloseCode.PROTOCOL_ERROR, message=b"too many malformed frames"
+            )
+
+    # -- disconnect -----------------------------------------------------------------------------
+
+    async def _on_disconnect(self) -> None:
+        if self.device_id is None:
+            return
+        self._registry.mark_offline(self.device_id)
+        failed = self._invocations.fail_all_for_device(self.device_id)
+        if failed:
+            logger.info(
+                "device_offline mid-call device_id=%s invocation_ids=%s", self.device_id, failed
+            )
+        self._connections.pop(self.device_id, None)

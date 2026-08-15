@@ -44,26 +44,28 @@ class InprocTransport:
         self._started = False
 
     async def invoke(self, req: InvokeRequest) -> InvokeResult:
-        # Bridge-side mint: at M0 this stub *is* the bridge (FR-28, transport/base.py's
+        # Bridge-side mint: at M0/M1 this stub *is* the bridge (FR-28, transport/base.py's
         # InvokeRequest docstring). The pending-table discipline is exercised even though
         # nothing here can actually time out or be cancelled yet.
-        invocation_id = self._invocations.mint()
+        invocation_id, _entry = self._invocations.mint_for(
+            req.device_id or "loopback", capability=req.capability
+        )
 
-        # Round-trip through the real codec so M0 exercises hdp_proto end to end, even though
-        # the "wire" is a function call. A canned success is the honest answer here: there is no
-        # node, so nothing produced this data except the stub itself (docs/m0-plan.md §M0-5).
+        # Round-trip through the real codec so this stub exercises hdp_proto end to end, even
+        # though the "wire" is a function call. A canned success is the honest answer here: there
+        # is no node, so nothing produced this data except the stub itself (docs/m0-plan.md §M0-5).
         envelope = Envelope.new("invoke", {"capability": req.capability, "args": req.args})
         Envelope.from_wire(envelope.to_wire())  # exercise the round trip; discard the copy
 
-        self._invocations.drop(invocation_id)  # drop before returning — FR-30's ordering rule
+        self._invocations.expire(invocation_id)  # remove before returning — FR-30's ordering rule
         return InvokeResult(invocation_id=invocation_id, ok=True, data={})
 
     async def cancel(self, invocation_id: str, reason: str) -> None:
-        # Nothing at M0 calls this (ASK is unreachable, nothing times out against a synchronous
-        # stub). docs/m0-plan.md §6.4 says this "returns not_implemented" — but `_handler` maps
-        # a raised NotImplementedError to BRIDGE_UNAVAILABLE, not ErrorCode.NOT_IMPLEMENTED. M1,
-        # when it wires real cancellation, should return the ErrorCode.NOT_IMPLEMENTED result
-        # shape rather than raise, so the code the model sees matches the taxonomy.
+        # Nothing calls this on the stub (nothing times out against a synchronous function call);
+        # real cancellation lives in `embedded.py` from M1. Raising satisfies docs/m0-plan.md
+        # §6.4's "returns not_implemented": `tools._handler` catches NotImplementedError
+        # specifically and returns the ErrorCode.NOT_IMPLEMENTED shape, so the code the model sees
+        # matches the taxonomy even though this signature can't return a result of its own.
         raise NotImplementedError("cancel is not implemented until M1")
 
     async def list_devices(self) -> list[DeviceInfo]:
@@ -76,8 +78,6 @@ class InprocTransport:
         return []
 
     async def resolve_approval(self, invocation_id: str, decision: str, scope: str) -> None:
-        # Same discrepancy as `cancel` above: docs/m0-plan.md §6.4 says "returns
-        # not_implemented", but raising here surfaces as BRIDGE_UNAVAILABLE through `_handler`,
-        # not ErrorCode.NOT_IMPLEMENTED. Unreachable until M3's approval flow exists; M3 should
-        # return the NOT_IMPLEMENTED result shape rather than raise.
+        # Unreachable until M3's approval flow exists. Same mechanism as `cancel` above:
+        # `tools._handler` turns this raise into the ErrorCode.NOT_IMPLEMENTED result shape.
         raise NotImplementedError("resolve_approval is not implemented until M3")

@@ -1,6 +1,6 @@
 import pytest
 from hdp_proto import ids
-from hdp_proto.envelope import Envelope, EnvelopeError
+from hdp_proto.envelope import Envelope, EnvelopeError, UnknownTypeError, UnsupportedVersionError
 from hdp_proto.version import HDP_VERSION
 
 
@@ -67,3 +67,24 @@ def test_from_wire_rejects_malformed_input(overrides):
 def test_from_wire_rejects_non_dict():
     with pytest.raises(EnvelopeError):
         Envelope.from_wire("not a dict")  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize("overrides", [{"hdp": "1"}, {"hdp": None}, {"hdp": "99"}])
+def test_version_mismatch_raises_the_specific_subclass(overrides):
+    """HDP-0.md §3: a version mismatch must be distinguishable from an unknown type, because the
+    connection layer reacts differently (close vs. reply-and-stay-open)."""
+    with pytest.raises(UnsupportedVersionError):
+        Envelope.from_wire(_valid_wire(**overrides))
+
+
+@pytest.mark.parametrize("overrides", [{"type": "not_a_real_type"}, {"type": None}])
+def test_unknown_type_raises_the_specific_subclass(overrides):
+    with pytest.raises(UnknownTypeError):
+        Envelope.from_wire(_valid_wire(**overrides))
+
+
+def test_both_subclasses_are_still_catchable_as_envelope_error():
+    with pytest.raises(EnvelopeError):
+        Envelope.from_wire(_valid_wire(hdp="1"))
+    with pytest.raises(EnvelopeError):
+        Envelope.from_wire(_valid_wire(type="bogus"))

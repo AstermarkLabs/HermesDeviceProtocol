@@ -1,28 +1,30 @@
-"""The M1 embedded aiohttp server — the counterpart of the eventual `hdp_bridge/server.py`
-(ADR-0004, design §3). Lives inside the Hermes plugin process at M1; extraction to a standalone
-`hdp-bridge` daemon is M2 (m1-plan.md §1's explicit non-goal: "process separation").
+"""The standalone `hdp-bridge` daemon's aiohttp app (ADR-0004, design §3) — the M2 extraction of
+the M1 embedded server. `hdp_bridge/daemon.py` (Task 5) constructs `HdpServer`, resolving
+`host`/`port`/`allow_remote`/`bridge_addr_path` from `hdp_bridge`'s own config module and passing
+them in explicitly; this module has no filesystem-path or environment opinion of its own (same
+discipline the original `_server.py` already had, ADR-0006) and, per the Global Constraints, must
+never import from `hermes_device_plugin`.
 
 Routes per hdp-spec/HDP-0.md §8: `GET /hdp/v0/health` (live), `GET /hdp/v0/socket` (WebSocket
-upgrade, delegates the connection lifecycle to `_connection.NodeConnection`), `POST /hdp/v0/pair`
+upgrade, delegates the connection lifecycle to `connection.NodeConnection`), `POST /hdp/v0/pair`
 (absent — no route registered, a 404), `/hdp/v0/blobs` (any method — reserved, `501`).
 
-Bind lifecycle is owned by whoever constructs `EmbeddedServer` (`embedded.py`, itself started by
-`HDPRuntime` on its owned loop — never by module import, per M1-1's risk mitigation in
-m1-plan.md §9). `web.run_app` is never used here: it owns and creates its own event loop, which
-is incompatible with running on `HDPRuntime`'s already-owned loop — `AppRunner`/`TCPSite` are the
-lower-level pair that let a caller control the loop and the start/stop lifecycle explicitly.
+Bind lifecycle is owned by whoever constructs `HdpServer`. `web.run_app` is never used here: it
+owns and creates its own event loop, which is incompatible with running on a caller-owned loop —
+`AppRunner`/`TCPSite` are the lower-level pair that let a caller control the loop and the
+start/stop lifecycle explicitly.
 """
 
 from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable, Coroutine
+from pathlib import Path
 from typing import Any
 
 from aiohttp import web
 
-from .. import config
-from ._connection import NodeConnection
+from .connection import NodeConnection
 
 ConnectionFactory = Callable[[web.WebSocketResponse], NodeConnection]
 
@@ -30,8 +32,8 @@ ConnectionFactory = Callable[[web.WebSocketResponse], NodeConnection]
 def build_app(connection_factory: ConnectionFactory) -> web.Application:
     """`connection_factory` builds one `NodeConnection` per accepted WebSocket, already wired to
     the shared `RegistryMem`/`InvocationsMem`/connections/descriptors state — kept as a factory
-    (rather than this module owning that state) so `EmbeddedServer` and `EmbeddedTransport` don't
-    have to agree on a wider shared-state object than "how do I make one of these"."""
+    (rather than this module owning that state) so `HdpServer` and its caller don't have to agree
+    on a wider shared-state object than "how do I make one of these"."""
     app = web.Application()
     app.router.add_get("/hdp/v0/health", _health)
     app.router.add_get("/hdp/v0/socket", _make_socket_handler(connection_factory))
@@ -64,21 +66,32 @@ def _make_socket_handler(
     return handler
 
 
-class EmbeddedServer:
+class HdpServer:
     """Owns the `AppRunner`/`TCPSite` pair and the `bridge.addr` discovery file."""
 
-    def __init__(self, connection_factory: ConnectionFactory) -> None:
+    def __init__(
+        self,
+        connection_factory: ConnectionFactory,
+        *,
+        host: str,
+        port: int,
+        allow_remote: bool,
+        bridge_addr_path: Path,
+    ) -> None:
         self._connection_factory = connection_factory
+        self._host = host
+        self._port = port
+        self._allow_remote = allow_remote
+        self._bridge_addr_path = bridge_addr_path
         self._runner: web.AppRunner | None = None
 
     async def start(self) -> int:
         """Bind and start serving. Returns the actually-bound port. Refuses to bind a
-        non-loopback host without `HDP_ALLOW_REMOTE=1` (NFR-4) — the guard ships at M1, the
+        non-loopback host without `allow_remote` (NFR-4) — the guard ships at M1, the
         remote-bind capability itself does not."""
-        host = config.hdp_bind_host()
-        if host not in ("127.0.0.1", "::1", "localhost") and not config.hdp_allow_remote():
+        if self._host not in ("127.0.0.1", "::1", "localhost") and not self._allow_remote:
             raise NotImplementedError(
-                f"binding to non-loopback host {host!r} requires HDP_ALLOW_REMOTE=1"
+                f"binding to non-loopback host {self._host!r} requires HDP_ALLOW_REMOTE=1"
             )
 
         app = build_app(self._connection_factory)
@@ -86,14 +99,14 @@ class EmbeddedServer:
         await runner.setup()
         # Assigned as soon as `setup()` succeeds, not after `site.start()` too: `close()` only
         # cleans up via `self._runner`, so if this coroutine is aborted between here and the
-        # `return` below (e.g. `HDPRuntime.close()` racing a not-yet-finished `start()`), the
+        # `return` below (e.g. a caller's `close()` racing a not-yet-finished `start()`), the
         # already-created runner must still be reachable for cleanup rather than orphaned.
         self._runner = runner
-        site = web.TCPSite(runner, host, config.hdp_bind_port())
+        site = web.TCPSite(runner, self._host, self._port)
         await site.start()
 
         bound_port = _bound_port(site)
-        await _write_bridge_addr(host, bound_port)
+        await _write_bridge_addr(self._bridge_addr_path, self._host, bound_port)
         return bound_port
 
     async def close(self) -> None:
@@ -101,13 +114,10 @@ class EmbeddedServer:
             await self._runner.cleanup()
             self._runner = None
         try:
-            config.bridge_addr_path().unlink(missing_ok=True)
-        except (KeyError, OSError):
-            # Best-effort only. In production nothing ever calls `HDPRuntime.close()` (D5) — this
-            # runs on the daemon "hdp-runtime" thread during the interpreter's own uncoordinated
-            # shutdown at process exit, where `os.environ` (KeyError, via `config.hermes_home()`)
-            # or the filesystem (OSError) may already be in a torn-down state. A stale
-            # `bridge.addr` left behind is harmless: the next process's `start()` overwrites it.
+            self._bridge_addr_path.unlink(missing_ok=True)
+        except OSError:
+            # Best-effort only — a stale `bridge.addr` left behind is harmless: the next
+            # process's `start()` overwrites it.
             pass
 
 
@@ -122,22 +132,17 @@ def _bound_port(site: web.TCPSite) -> int:
 
 
 async def _write_bridge_addr(
-    host: str, port: int, *, attempts: int = 3, delay_s: float = 0.1
+    bridge_addr_path: Path, host: str, port: int, *, attempts: int = 3, delay_s: float = 0.1
 ) -> None:
-    """Write `$HERMES_HOME/hdp/bridge.addr`, retrying briefly on `KeyError` (empirically: the
-    real Hermes host process's own tool machinery has been observed to mutate `os.environ` from
-    another thread around unrelated tool calls, occasionally landing exactly on the instant this
-    reads `HERMES_HOME` — see the M1 status section of README.md). By this point the socket is
-    already bound and `self._runner` already set (`EmbeddedServer.start()`'s ordering), so a
-    transient failure here is worth retrying rather than tearing down an otherwise-working
-    server."""
     for attempt in range(attempts):
         try:
-            addr_path = config.bridge_addr_path()
-            addr_path.parent.mkdir(parents=True, exist_ok=True)
-            addr_path.write_text(f"{host}:{port}\n")
+            # noqa: ASYNC240 — this project has no trio/anyio dependency; a few bytes to a local
+            # file is the same acceptable blocking write the M1 version of this function always
+            # did (only now typed explicitly as `Path`, which is what makes ruff able to see it).
+            bridge_addr_path.parent.mkdir(parents=True, exist_ok=True)  # noqa: ASYNC240
+            bridge_addr_path.write_text(f"{host}:{port}\n")  # noqa: ASYNC240
             return
-        except KeyError:
+        except OSError:
             if attempt == attempts - 1:
                 raise
             await asyncio.sleep(delay_s)

@@ -39,3 +39,13 @@ async def test_invoke_round_trips_through_the_real_codec_and_succeeds():
     assert result.ok is True
     assert result.invocation_id  # a real ULID was minted
     await transport.close()
+
+
+def test_device_info_carries_fr13_fields_with_safe_defaults():
+    from hermes_device_plugin.transport.base import DeviceInfo
+
+    device = DeviceInfo(device_id="dev_x", friendly_name="x", platform="unknown", online=True)
+    assert device.state == "active"
+    assert device.client_version == ""
+    assert device.first_paired_at == 0
+    assert device.last_seen_at == 0

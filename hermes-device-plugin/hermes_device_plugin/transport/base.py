@@ -60,6 +60,12 @@ class DeviceInfo:
     platform: str
     online: bool
     capabilities: list[CapabilityInfo] = field(default_factory=list)
+    state: str = "active"
+    """`active` or `revoked` (FR-13, M2). Always `active` before M2 pairing exists."""
+    client_version: str = ""
+    first_paired_at: int = 0
+    """Unix ms. `0` means "never persisted" — true for every M0/M1 in-memory-only device."""
+    last_seen_at: int = 0
 
 
 @dataclass(frozen=True)

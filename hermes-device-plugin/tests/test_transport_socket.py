@@ -6,15 +6,13 @@ plugin-side half of Task 6's TDD cycle; the server-side handlers (`ctl_invoke`, 
 node connection to exercise the ack/deadline race itself. These tests only need zero connected
 devices to exercise `SocketTransport`'s own framing, error mapping, and reconnect behavior.
 
-NOTE (pre-Task-7 collection blocker, documented in Task 3/4/5's reports): importing
-`hermes_device_plugin` currently pulls in `hermes_device_plugin/runtime.py` ->
-`transport/embedded.py`, which still imports the now-relocated `transport/_connection.py` et al.
-(git-mv'd into `hdp_bridge` by Task 3). That chain is fixed by Task 7 flipping the default
-transport and deleting `embedded.py` — explicitly out of scope for this task. This file is
-correct and will collect/pass automatically once Task 7 lands; until then `uv run pytest` on it
-fails at collection with `ModuleNotFoundError: ...transport._connection`, not because of anything
-in `socket.py`. See `.superpowers/sdd/2026-08-15-m2-registry-pairing-extraction/task-6-report.md`
-for the manual smoke-test evidence gathered in place of a real pytest run.
+(Was collection-blocked pre-Task-7: importing `hermes_device_plugin` pulled in
+`hermes_device_plugin/runtime.py` -> `transport/embedded.py`, which imported the now-relocated
+`transport/_connection.py` et al. Task 7 flipped `runtime.py`'s default transport to
+`SocketTransport` and deleted `embedded.py`, which fixed that chain — this file collects and
+passes normally now. See
+`.superpowers/sdd/2026-08-15-m2-registry-pairing-extraction/task-6-report.md` for the manual
+smoke-test evidence gathered before Task 7 landed.)
 """
 
 from __future__ import annotations

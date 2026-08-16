@@ -30,7 +30,7 @@ except ImportError:  # pragma: no cover — bare `pytest` runs with no Hermes on
     from ._singleton import lazy_singleton
 
 from .transport.base import BridgeTransport
-from .transport.embedded import EmbeddedTransport
+from .transport.socket import SocketTransport
 
 T = TypeVar("T")
 
@@ -45,7 +45,7 @@ class HDPRuntime:
         self._ready = threading.Event()
         self._close_requested = threading.Event()
         self._loop: asyncio.AbstractEventLoop | None = None
-        self.transport: BridgeTransport = EmbeddedTransport()
+        self.transport: BridgeTransport = SocketTransport()
         self._thread = threading.Thread(target=self._run_loop, name=_HDP_THREAD_NAME, daemon=True)
         self._thread.start()
         self._ready.wait()

@@ -101,7 +101,7 @@ class ControlServer:
     async def start(self) -> None:
         self._socket_path.parent.mkdir(parents=True, exist_ok=True)
         self._socket_path.unlink(missing_ok=True)
-        self._server = await asyncio.start_unix_server(self._handle, path=str(self._socket_path))
+        self._server = await asyncio.start_unix_server(self._accepted, path=str(self._socket_path))
         self._socket_path.chmod(0o600)
 
     async def close(self) -> None:
@@ -109,17 +109,52 @@ class ControlServer:
             self._server.close()
             await self._server.wait_closed()
             self._server = None
-        # `Server.close()` only stops accepting new connections — it leaves every already-open
-        # control-socket connection running, which would otherwise leak the plugin's connection
-        # forever (its `SocketTransport` would never observe the daemon going away). Force-close
-        # every live connection so a stopped daemon is actually stopped, not merely deaf.
+        # `Server.close()`/`wait_closed()` only guarantees no *new* connection gets accepted from
+        # here on — it says nothing about a connection whose OS-level `accept()` already happened
+        # (pulling it off the kernel backlog) moments earlier, whose asyncio-level wiring
+        # (`_accept_connection2`'s transport/protocol setup, which is what eventually calls our
+        # `_accepted` callback) is a separately-scheduled `Task` that simply hasn't had its turn
+        # to run yet. A connection opened in the very same event-loop tick as this `close()` call
+        # (e.g. `SocketTransport.start()` connecting immediately before shutdown, with no
+        # intervening `await` in between — a real ordering the M2 conformance/unit tests
+        # exercise) can otherwise slip through: `_active_writers` doesn't have it yet when the
+        # loop below runs, so it never gets force-closed, and it goes on serving requests after
+        # the daemon believes it has fully stopped. Give any such in-flight acceptance a bounded
+        # number of event-loop ticks to finish registering itself before treating the set of
+        # connections to force-close as final — each `asyncio.sleep(0)` is one ready-queue drain,
+        # and the wiring chain is a handful of `Task` hops deep, so this settles almost
+        # immediately whether or not anything is actually pending.
+        previous_count = -1
+        for _ in range(20):
+            if len(self._active_writers) == previous_count:
+                break
+            previous_count = len(self._active_writers)
+            await asyncio.sleep(0)
+        # Force-close every live connection so a stopped daemon is actually stopped, not merely
+        # deaf — `Server.close()` alone leaves already-open control-socket connections running,
+        # which would otherwise leak the plugin's connection forever (its `SocketTransport` would
+        # never observe the daemon going away).
         for writer in list(self._active_writers):
             writer.close()
         self._active_writers.clear()
         self._socket_path.unlink(missing_ok=True)
 
-    async def _handle(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+    def _accepted(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+        """`asyncio.start_unix_server`'s `client_connected_cb`. Deliberately a plain (non-async)
+        callback rather than a coroutine function: asyncio calls plain callbacks synchronously at
+        accept time, whereas a coroutine function would be wrapped in a `Task` whose body doesn't
+        run until a later event-loop tick. Registering `writer` here — not as `_handle`'s first
+        line — closes a real race: with a coroutine-function callback, a connection accepted
+        immediately before `close()` runs (e.g. `SocketTransport.start()` connecting, followed
+        synchronously by a caller tearing the daemon down with no intervening `await`) could get
+        accepted by the OS/event loop but not yet have added itself to `_active_writers` by the
+        time `close()` enumerates that set — leaving an orphaned, still-fully-functional
+        connection that `close()` never touches and that goes on serving requests after the
+        daemon believes it has shut down."""
         self._active_writers.add(writer)
+        asyncio.ensure_future(self._handle(reader, writer))
+
+    async def _handle(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
         try:
             while True:
                 try:

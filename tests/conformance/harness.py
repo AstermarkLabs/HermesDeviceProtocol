@@ -10,10 +10,45 @@ suite. A uniquely-named module sidesteps it entirely.
 from __future__ import annotations
 
 import asyncio
+import os
 import sys
+from pathlib import Path
 
 from hermes_device_plugin.transport.base import DeviceInfo
-from hermes_device_plugin.transport.embedded import EmbeddedTransport
+from hermes_device_plugin.transport.socket import SocketTransport
+
+
+async def start_bridge(hermes_home: Path) -> asyncio.subprocess.Process:
+    """Launch the real `hdp-bridge serve` daemon as a subprocess, pointed at `hermes_home`. The
+    caller is responsible for calling `stop_bridge` on the result."""
+    env = {**os.environ, "HERMES_HOME": str(hermes_home), "HDP_BIND_PORT": "0"}
+    proc = await asyncio.create_subprocess_exec(
+        "uv",
+        "run",
+        "hdp-bridge",
+        "serve",
+        env=env,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.STDOUT,
+    )
+    # Poll for bridge.addr to appear (same discovery file hdp-node already reads) before
+    # returning, bounded — same shape as wait_for_device's polling loop below.
+    addr_path = hermes_home / "hdp" / "bridge.addr"
+    for _ in range(100):
+        if addr_path.exists():
+            return proc
+        await asyncio.sleep(0.05)
+    raise TimeoutError("hdp-bridge serve did not bind within 5s")
+
+
+async def stop_bridge(proc: asyncio.subprocess.Process) -> None:
+    if proc.returncode is None:
+        proc.terminate()
+        try:
+            await asyncio.wait_for(proc.wait(), timeout=5.0)
+        except TimeoutError:
+            proc.kill()
+            await proc.wait()
 
 
 async def start_node(
@@ -48,7 +83,7 @@ async def stop_node(proc: asyncio.subprocess.Process) -> None:
             await proc.wait()
 
 
-async def wait_for_device(bridge: EmbeddedTransport, *, timeout_s: float = 10.0) -> DeviceInfo:
+async def wait_for_device(bridge: SocketTransport, *, timeout_s: float = 10.0) -> DeviceInfo:
     """Poll `bridge.list_devices()` until at least one device is online, or raise on timeout."""
     loop = asyncio.get_running_loop()
     deadline = loop.time() + timeout_s

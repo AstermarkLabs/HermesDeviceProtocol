@@ -8,14 +8,22 @@ produce a real one. `docs/m0-plan.md` §6.4 and §M0-5 name this precisely: a re
 
 Retained after M1 as a fast, dependency-free test transport (design §2's module docstring) —
 this class does not go away when `socket.py` ships.
+
+M2's Task 3 `git mv`'d the shared `transport/_invocations.py` and `transport/_registry_mem.py`
+into `hdp_bridge` (they grew real ack/deadline/cancel semantics there — ack-timeout distinct from
+execution-deadline, `fail_all_for_device`, etc. — none of which this stub needs or may depend on:
+`hermes_device_plugin` must never import `hdp_bridge`, per this plan's Global Constraints). This
+stub only ever needed "mint an id" and "list zero devices," so those two tiny pieces are kept
+local here instead of reintroducing a shared module this class has no business depending on.
 """
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
+
+from hdp_proto import ids
 from hdp_proto.envelope import Envelope
 
-from ._invocations import InvocationsMem
-from ._registry_mem import RegistryMem
 from .base import (
     BridgeStatus,
     DeviceInfo,
@@ -25,13 +33,39 @@ from .base import (
 )
 
 
+@dataclass
+class _LoopbackInvocations:
+    """Minimal id-minting stand-in for the real bridge-side pending-invocation table
+    (`hdp_bridge.invocations.InvocationsMem`) — this stub has no node, so nothing ever actually
+    waits on an invocation; it only needs a fresh id per call."""
+
+    _pending: set[str] = field(default_factory=set)
+
+    def mint_for(self, device_id: str, *, capability: str = "") -> tuple[str, None]:
+        invocation_id = ids.new()
+        self._pending.add(invocation_id)
+        return invocation_id, None
+
+    def expire(self, invocation_id: str) -> None:
+        self._pending.discard(invocation_id)
+
+
+@dataclass
+class _LoopbackRegistry:
+    """Minimal stand-in for the real bridge-side device registry (`hdp_bridge.registry.RegistryMem`)
+    — this stub has no node, so there is never a device to list."""
+
+    def list_devices(self) -> list[DeviceInfo]:
+        return []
+
+
 class InprocTransport:
     """Implements `BridgeTransport` (verified structurally by the tests, not by explicit
     subclassing — `Protocol` is structural on purpose, see transport/base.py)."""
 
     def __init__(self) -> None:
-        self._registry = RegistryMem()
-        self._invocations = InvocationsMem()
+        self._registry = _LoopbackRegistry()
+        self._invocations = _LoopbackInvocations()
         self._started = False
 
     async def start(self) -> None:
@@ -62,10 +96,11 @@ class InprocTransport:
 
     async def cancel(self, invocation_id: str, reason: str) -> None:
         # Nothing calls this on the stub (nothing times out against a synchronous function call);
-        # real cancellation lives in `embedded.py` from M1. Raising satisfies docs/m0-plan.md
-        # §6.4's "returns not_implemented": `tools._handler` catches NotImplementedError
-        # specifically and returns the ErrorCode.NOT_IMPLEMENTED shape, so the code the model sees
-        # matches the taxonomy even though this signature can't return a result of its own.
+        # real cancellation lives in `socket.py`/`hdp_bridge` from M2 onward. Raising satisfies
+        # docs/m0-plan.md §6.4's "returns not_implemented": `tools._handler` catches
+        # NotImplementedError specifically and returns the ErrorCode.NOT_IMPLEMENTED shape, so the
+        # code the model sees matches the taxonomy even though this signature can't return a
+        # result of its own.
         raise NotImplementedError("cancel is not implemented until M1")
 
     async def list_devices(self) -> list[DeviceInfo]:

@@ -13,6 +13,7 @@ one `EmbeddedTransport` (embedded.py constructs them once and passes the same ob
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import sqlite3
@@ -56,6 +57,7 @@ direction."""
 _MALFORMED_WINDOW_S = 60.0
 _MALFORMED_LIMIT = 10
 _SEEN_IDS_CAP = 256
+_DEAD_PEER_TIMEOUT_S = 45.0
 
 
 class _InvokeRequestLike(Protocol):
@@ -77,6 +79,7 @@ class NodeConnection:
         invocations: InvocationsMem,
         connections: dict[str, NodeConnection],
         descriptors: dict[str, dict[str, CapabilityDescriptor]],
+        dead_peer_timeout_s: float = _DEAD_PEER_TIMEOUT_S,
     ) -> None:
         self._ws = ws
         self._conn = conn
@@ -87,6 +90,8 @@ class NodeConnection:
         self.device_id: str | None = None
         self._seen_ids: OrderedDict[str, None] = OrderedDict()
         self._malformed_times: list[float] = []
+        self._dead_peer_timeout_s = dead_peer_timeout_s
+        self._last_heartbeat = time.monotonic()
         self._disconnect_reason: str = "device_offline"
         """The reason `_on_disconnect` passes to `fail_all_for_device`. Ordinary socket drops
         never touch this (stays the default). `revocation.revoke_device` sets it to `"revoked"`
@@ -97,6 +102,7 @@ class NodeConnection:
         before the close happens, not after."""
 
     async def run(self) -> None:
+        monitor_task = asyncio.create_task(self._dead_peer_monitor())
         try:
             async for msg in self._ws:
                 if msg.type == WSMsgType.TEXT:
@@ -104,7 +110,56 @@ class NodeConnection:
                 elif msg.type == WSMsgType.ERROR:
                     break
         finally:
+            # `_on_disconnect()` runs first and un-shielded by any extra `await` ahead of it —
+            # HDP-0.md §7's "mid-call disconnect fails in-flight invocations immediately" rule
+            # means this cannot wait on anything else first. (An earlier draft cancelled+awaited
+            # `monitor_task` *before* this call; that extra `await` gave aiohttp's own handler-
+            # task teardown a window to deliver a `CancelledError` to `run()` itself right there,
+            # which skipped `_on_disconnect()` entirely and let the mid-call ack-timeout fire
+            # instead — reproduced against a real `aiohttp` `TestServer` in
+            # `test_control.py::test_ctl_invoke_disconnect_mid_call_is_immediate`.)
             await self._on_disconnect()
+            monitor_task.cancel()
+            # Reap it so it can't outlive this `run()` call (a monitor task still `.cancel()`-
+            # requested but never awaited can surface as "Task was destroyed but it is pending!"
+            # once the event loop closes) — safe to do only now, after the invariant above holds.
+            await asyncio.gather(monitor_task, return_exceptions=True)
+
+    async def _dead_peer_monitor(self) -> None:
+        """Started alongside `run()`'s own read loop and reaped in that same `finally`, on every
+        exit path, so it can never outlive its `NodeConnection`. Polls for `_dead_peer_timeout_s`
+        of silence since the last `heartbeat` frame; production's default 45s timeout is checked
+        roughly once a second (`min(1.0, ...)` below clamps to 1.0 for any timeout >= 4s), while a
+        test-only short override (see `test_presence.py`) gets a proportionally shorter poll
+        interval so the check actually lands inside the test's wait window — a fixed 1s poll
+        can't observe a 0.2s timeout within a 0.4s test budget.
+
+        Calls `self._on_disconnect()` directly — *before* closing the socket, not after, so
+        nothing (including this task's own subsequent `close()` await) can delay it — rather than
+        relying solely on `run()`'s `async for` loop noticing the close and hitting its own
+        `finally`. This module's docstring is explicit that the bridge "must never wait for a
+        deadline to notice the socket is gone," and a real `aiohttp` `close()` performs a close
+        handshake that can delay that loop's exit on an already-half-dead socket. `_on_disconnect`
+        is idempotent
+        (`mark_offline` re-write, `fail_all_for_device` on an already-empty pending set returns
+        `[]`, `connections.pop(..., None)` is a no-op second time), so `run()`'s `finally` calling
+        it again after this does no harm. Deliberately does NOT touch `_disconnect_reason` — a
+        dead-peer timeout is an ordinary disconnect, not a revocation, so it stays at its
+        `"device_offline"` default (see that attribute's docstring)."""
+        poll_interval_s = max(0.01, min(1.0, self._dead_peer_timeout_s / 4))
+        while True:
+            await asyncio.sleep(poll_interval_s)
+            if time.monotonic() - self._last_heartbeat > self._dead_peer_timeout_s:
+                # Fail in-flight first, close second — same ordering argument as `run()`'s
+                # `finally` (see its comment): `close()` yields control (a real `aiohttp` close
+                # performs a handshake), which is exactly the kind of await that could let this
+                # task's own cancellation land before `_on_disconnect()` runs, if something ever
+                # raced to cancel this task at that exact point. Doing the fail-in-flight call
+                # first makes the §7 immediacy guarantee unconditional rather than relying on
+                # `run()`'s own `finally` as a fallback.
+                await self._on_disconnect()
+                await self._ws.close(code=WSCloseCode.GOING_AWAY, message=b"dead peer")
+                return
 
     # -- outbound -----------------------------------------------------------------------------
 
@@ -322,8 +377,14 @@ class NodeConnection:
         pass  # declared per HDP-0.md §2; no M1 consumer
 
     async def _handle_heartbeat(self, envelope: Envelope) -> None:
-        reply = Envelope.new("heartbeat", {})
-        await self._ws.send_str(json.dumps(reply.to_wire()))
+        self._last_heartbeat = time.monotonic()
+        if self.device_id is not None:
+            with self._conn:
+                self._conn.execute(
+                    "UPDATE devices SET last_seen_at = ? WHERE device_id = ?",
+                    (int(time.time() * 1000), self.device_id),
+                )
+        await self._send(Envelope.new("heartbeat", {}))
 
     async def _handle_error(self, envelope: Envelope) -> None:
         logger.info("node reported error device_id=%s payload=%s", self.device_id, envelope.payload)

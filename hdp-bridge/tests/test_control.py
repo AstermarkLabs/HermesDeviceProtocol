@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import socket
 
 import pytest
 from aiohttp.test_utils import TestClient, TestServer
@@ -404,3 +405,43 @@ async def test_close_force_closes_live_connections(tmp_path):
     with pytest.raises((asyncio.IncompleteReadError, ConnectionResetError)):
         await asyncio.wait_for(read_frame(reader), timeout=2.0)
     writer.close()
+
+
+async def test_close_drains_a_connection_still_in_the_kernel_accept_backlog(tmp_path):
+    """Isolates the exact race `ControlServer.close()`'s backlog-drain step exists for: a client
+    whose `connect()` already completed at the OS level (queued in the listening socket's kernel
+    accept backlog) but which asyncio has not yet called `accept()` on — because nothing has ever
+    given the event loop a chance to run its accept callback for this connection — must not
+    survive `close()` un-force-closed. `test_close_force_closes_live_connections` above only
+    covers a connection that's already fully wired up (round-tripped a request even) well before
+    `close()` runs; it can't exercise this narrower, tighter window at all.
+
+    Connecting with a raw, plain `socket.socket(...).connect(...)` — never `await`ing anything, so
+    the event loop gets zero opportunity to run between the connect and `close()` — is what makes
+    this deterministic instead of a probabilistic race depending on how many event-loop ticks
+    asyncio's own accept pipeline happens to take: the connection is *guaranteed* to still be
+    sitting un-accepted in the kernel backlog when `close()` runs, every single time this test
+    runs, on any platform, under any scheduler load. `raw.connect()` itself is a plain local-socket
+    syscall for `AF_UNIX` (no network handshake), so it returns immediately regardless."""
+    registry = RegistryMem()
+    invocations = InvocationsMem()
+    socket_path = tmp_path / "bridge.sock"
+    server = ControlServer(socket_path, registry=registry, invocations=invocations, connections={})
+    await server.start()
+
+    raw = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    raw.connect(str(socket_path))
+    try:
+        # No `await` between the connect above and `close()` below: the event loop has not run a
+        # single iteration since the OS accepted this connection into the backlog, so asyncio's
+        # own accept callback for the listening socket has had no opportunity to fire.
+        await server.close()
+
+        # If this connection had slipped through un-force-closed (the bug the backlog drain
+        # fixes), the peer socket would still look "connected" from the OS's point of view and
+        # this read would hang until the 2s timeout instead of observing a clean, immediate EOF.
+        raw.settimeout(2.0)
+        data = raw.recv(4096)
+        assert data == b""
+    finally:
+        raw.close()

@@ -16,8 +16,10 @@ unrecognized-but-known-wire-type verb (including those two, until M3) falls thro
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import logging
+import socket
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -95,64 +97,102 @@ class ControlServer:
         self._descriptors: dict[str, dict[str, CapabilityDescriptor]] = (
             descriptors if descriptors is not None else {}
         )
-        self._server: asyncio.Server | None = None
+        self._raw_sock: socket.socket | None = None
+        self._accept_task: asyncio.Task[None] | None = None
         self._active_writers: set[asyncio.StreamWriter] = set()
 
     async def start(self) -> None:
+        # A hand-rolled accept loop over a raw socket, rather than `asyncio.start_unix_server`,
+        # is deliberate: see `close()`'s docstring for the race this sidesteps. `listen()`'s
+        # backlog of 100 matches `asyncio.start_unix_server`'s own default.
         self._socket_path.parent.mkdir(parents=True, exist_ok=True)
         self._socket_path.unlink(missing_ok=True)
-        self._server = await asyncio.start_unix_server(self._accepted, path=str(self._socket_path))
+        self._raw_sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        self._raw_sock.setblocking(False)
+        self._raw_sock.bind(str(self._socket_path))
+        self._raw_sock.listen(100)
         self._socket_path.chmod(0o600)
+        self._accept_task = asyncio.ensure_future(self._accept_loop())
+
+    async def _accept_loop(self) -> None:
+        if self._raw_sock is None:
+            raise RuntimeError("_accept_loop started before start() bound a listening socket")
+        raw_sock = self._raw_sock
+        loop = asyncio.get_running_loop()
+        while True:
+            conn, _addr = await loop.sock_accept(raw_sock)
+            try:
+                conn.setblocking(False)
+                reader = asyncio.StreamReader(loop=loop)
+                protocol = asyncio.StreamReaderProtocol(reader, loop=loop)
+                transport, _ = await loop.connect_accepted_socket(lambda p=protocol: p, conn)
+            except asyncio.CancelledError:
+                # `close()` cancelled us while we were still wiring this connection up (we'd
+                # already popped it off the kernel backlog via `sock_accept()`, so nobody else
+                # will ever close it) — close the raw socket ourselves so it isn't leaked, then
+                # let the cancellation propagate as usual.
+                conn.close()
+                raise
+            writer = asyncio.StreamWriter(transport, protocol, reader, loop)
+            # Registering here, and *only* here — synchronous with respect to `_accept_loop`'s own
+            # control flow, with no `await` between it and the `ensure_future` below — is what
+            # makes `close()`'s accounting complete: by the time `close()` cancels this task and
+            # awaits that cancellation, this connection is either (a) fully registered in
+            # `_active_writers` already (this line already ran), or (b) still in-flight inside the
+            # `try` block above, in which case the `except CancelledError` branch just above
+            # closes it directly. There is no third state.
+            self._active_writers.add(writer)
+            asyncio.ensure_future(self._handle(reader, writer))
 
     async def close(self) -> None:
-        if self._server is not None:
-            self._server.close()
-            await self._server.wait_closed()
-            self._server = None
-        # `Server.close()`/`wait_closed()` only guarantees no *new* connection gets accepted from
-        # here on — it says nothing about a connection whose OS-level `accept()` already happened
-        # (pulling it off the kernel backlog) moments earlier, whose asyncio-level wiring
-        # (`_accept_connection2`'s transport/protocol setup, which is what eventually calls our
-        # `_accepted` callback) is a separately-scheduled `Task` that simply hasn't had its turn
-        # to run yet. A connection opened in the very same event-loop tick as this `close()` call
-        # (e.g. `SocketTransport.start()` connecting immediately before shutdown, with no
-        # intervening `await` in between — a real ordering the M2 conformance/unit tests
-        # exercise) can otherwise slip through: `_active_writers` doesn't have it yet when the
-        # loop below runs, so it never gets force-closed, and it goes on serving requests after
-        # the daemon believes it has fully stopped. Give any such in-flight acceptance a bounded
-        # number of event-loop ticks to finish registering itself before treating the set of
-        # connections to force-close as final — each `asyncio.sleep(0)` is one ready-queue drain,
-        # and the wiring chain is a handful of `Task` hops deep, so this settles almost
-        # immediately whether or not anything is actually pending.
-        previous_count = -1
-        for _ in range(20):
-            if len(self._active_writers) == previous_count:
-                break
-            previous_count = len(self._active_writers)
-            await asyncio.sleep(0)
+        """Two independent mechanisms — not a poll loop guessing how many event-loop ticks
+        asyncio's own (opaque, undocumented-timing) accept pipeline needs — jointly account for
+        every connection that can possibly exist at the moment `close()` is called, including one
+        whose `connect()` completed at the OS level in the very same event-loop tick as this call
+        (e.g. `SocketTransport.start()` connecting immediately before a caller tears the daemon
+        down, with no intervening `await`):
+
+        1. Cancelling `_accept_task` and awaiting it settles `_accept_loop` into exactly one of
+           three states for whatever connection it was last handling: not yet popped off the
+           kernel backlog at all (untouched by the cancellation — see the drain below), popped and
+           mid-wiring (`_accept_loop`'s own `except CancelledError` branch closes the raw socket
+           before re-raising), or already fully registered into `_active_writers` (handled by the
+           force-close loop below, same as any other live connection).
+        2. `sock_accept()`/`connect_accepted_socket()` only ever process one connection at a time,
+           serially — a connection that arrived while `_accept_task` was busy wiring up an earlier
+           one is still sitting, untouched, in the kernel's own accept backlog, invisible to
+           anything in this process. Draining it directly off the raw listening socket here —
+           `accept()` on a non-blocking socket returns immediately, either a queued connection or
+           `BlockingIOError`, so this never waits for a connection that isn't already there — is
+           the only way to account for it; nothing above ever gets a chance to.
+
+        Together these leave no window: every connection that exists at the moment `close()` runs
+        is either mid-flight inside `_accept_task` (mechanism 1), sitting in the kernel backlog
+        (mechanism 2), or already in `_active_writers` (the force-close loop below) — not a fourth,
+        unaccounted-for state.
+        """
+        if self._accept_task is not None:
+            self._accept_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await self._accept_task
+            self._accept_task = None
+        if self._raw_sock is not None:
+            while True:
+                try:
+                    conn, _addr = self._raw_sock.accept()
+                except (BlockingIOError, OSError):
+                    break
+                conn.close()
+            self._raw_sock.close()
+            self._raw_sock = None
         # Force-close every live connection so a stopped daemon is actually stopped, not merely
-        # deaf — `Server.close()` alone leaves already-open control-socket connections running,
-        # which would otherwise leak the plugin's connection forever (its `SocketTransport` would
-        # never observe the daemon going away).
+        # deaf — nothing above touches a connection that already finished wiring up before
+        # `close()` was ever called; that would otherwise leak the plugin's connection forever
+        # (its `SocketTransport` would never observe the daemon going away).
         for writer in list(self._active_writers):
             writer.close()
         self._active_writers.clear()
         self._socket_path.unlink(missing_ok=True)
-
-    def _accepted(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
-        """`asyncio.start_unix_server`'s `client_connected_cb`. Deliberately a plain (non-async)
-        callback rather than a coroutine function: asyncio calls plain callbacks synchronously at
-        accept time, whereas a coroutine function would be wrapped in a `Task` whose body doesn't
-        run until a later event-loop tick. Registering `writer` here — not as `_handle`'s first
-        line — closes a real race: with a coroutine-function callback, a connection accepted
-        immediately before `close()` runs (e.g. `SocketTransport.start()` connecting, followed
-        synchronously by a caller tearing the daemon down with no intervening `await`) could get
-        accepted by the OS/event loop but not yet have added itself to `_active_writers` by the
-        time `close()` enumerates that set — leaving an orphaned, still-fully-functional
-        connection that `close()` never touches and that goes on serving requests after the
-        daemon believes it has shut down."""
-        self._active_writers.add(writer)
-        asyncio.ensure_future(self._handle(reader, writer))
 
     async def _handle(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
         try:

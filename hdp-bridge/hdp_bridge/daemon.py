@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+from pathlib import Path
 
 from . import config
 from .connection import NodeConnection
@@ -16,7 +17,43 @@ from .server import HdpServer
 from .store import db as store_db
 
 
+class AlreadyRunningError(RuntimeError):
+    """Another live hdp-bridge process already holds this profile's PID file."""
+
+
+def _pid_is_live(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True  # exists, owned by someone else — treat as live, fail closed
+    return True
+
+
+def _check_and_claim_pid(pid_path: Path) -> None:
+    """Treat `pid_path` as a *claim* to verify, not a fact to trust. If it names a live
+    process, refuse to start. If it names a dead process (an unclean prior exit left it
+    behind), the claim is stale — clear it and claim the file for this process instead.
+    Must run before either socket binds, so a refusal never leaves a partially-started
+    daemon behind."""
+    if pid_path.exists():
+        try:
+            existing_pid = int(pid_path.read_text().strip())
+        except ValueError:
+            existing_pid = None
+        if existing_pid is not None and _pid_is_live(existing_pid):
+            raise AlreadyRunningError(
+                f"hdp-bridge is already running (pid {existing_pid}, {pid_path})"
+            )
+    pid_path.parent.mkdir(parents=True, exist_ok=True)
+    pid_path.write_text(str(os.getpid()))
+
+
 async def serve(*, stop_event: asyncio.Event | None = None) -> None:
+    pid_path = config.pid_path()
+    _check_and_claim_pid(pid_path)
+
     registry = Registry(config.registry_db_path())
     # NOTE — deliberate deviation from the plan's stated design: m2-plan.md describes one
     # `sqlite3.Connection` shared by `Registry`/pairing/credentials. `Registry.__init__` (Task 10,
@@ -75,14 +112,11 @@ async def serve(*, stop_event: asyncio.Event | None = None) -> None:
         await control.start()
     except BaseException:
         # If control.start() fails (unwritable socket path, permission error, ...), the
-        # already-bound node-facing TCP socket and the `bridge.addr` file it wrote must not
-        # leak — tear down what already succeeded before propagating.
+        # already-bound node-facing TCP socket, the `bridge.addr` file it wrote, and the PID
+        # claim taken above must not leak — tear down what already succeeded before propagating.
         await hdp_server.close()
+        pid_path.unlink(missing_ok=True)
         raise
-
-    pid_path = config.pid_path()
-    pid_path.parent.mkdir(parents=True, exist_ok=True)
-    pid_path.write_text(str(os.getpid()))
 
     stop_event = stop_event or asyncio.Event()
     try:

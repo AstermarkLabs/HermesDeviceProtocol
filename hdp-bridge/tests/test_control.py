@@ -20,6 +20,7 @@ import json
 import socket
 
 import pytest
+from aiohttp import WSMsgType
 from aiohttp.test_utils import TestClient, TestServer
 from hdp_bridge import config as bridge_config
 from hdp_bridge import pairing
@@ -106,6 +107,7 @@ class _Harness:
             invocations=self.invocations,
             connections=self.connections,
             descriptors=self.descriptors,
+            conn=self.conn,
         )
 
     def make_connection(self, ws: object) -> NodeConnection:
@@ -413,6 +415,50 @@ async def test_close_force_closes_live_connections(tmp_path):
     with pytest.raises((asyncio.IncompleteReadError, ConnectionResetError)):
         await asyncio.wait_for(read_frame(reader), timeout=2.0)
     writer.close()
+
+
+async def test_ctl_devices_revoke_disconnects_live_node_and_fails_in_flight_invoke(
+    node_client, ctl_conn, harness
+):
+    """End-to-end (Task 13, FR-15): a live node connection receives a `revoke` frame and its
+    socket is closed, and any invocation still awaited via a second control connection comes back
+    `revoked`, not `device_offline`."""
+    ws, device_id = await _connect_and_hello(node_client, harness)
+    reader, writer = ctl_conn
+
+    invoke_reply_task = asyncio.create_task(
+        _ctl_invoke(reader, writer, device_id=device_id, deadline_ms=30_000)
+    )
+    await ws.receive(timeout=5)  # the invoke frame — deliberately never acked
+
+    revoke_reader, revoke_writer = await asyncio.open_unix_connection(str(harness.socket_path))
+    await write_frame(
+        revoke_writer, Envelope.new("ctl_devices_revoke", {"device_id": device_id}).to_wire()
+    )
+    revoke_reply = Envelope.from_wire(await read_frame(revoke_reader))
+    revoke_writer.close()
+    assert revoke_reply.type == "ctl_devices_revoke_reply"
+    assert revoke_reply.payload["ok"] is True
+
+    reply = await invoke_reply_task
+    assert reply.payload["ok"] is False
+    assert reply.payload["error"]["code"] == "revoked"
+
+    # The node received the `revoke` frame (step 2), then its socket was actually closed
+    # server-side (step 3 of the four-step order).
+    revoke_frame_msg = await ws.receive(timeout=5)
+    assert revoke_frame_msg.type == WSMsgType.TEXT
+    assert json.loads(revoke_frame_msg.data)["type"] == "revoke"
+    close_msg = await ws.receive(timeout=5)
+    assert close_msg.type == WSMsgType.CLOSE
+
+
+async def test_ctl_devices_revoke_without_device_id_is_no_matching_device(ctl_conn):
+    reader, writer = ctl_conn
+    await write_frame(writer, Envelope.new("ctl_devices_revoke", {}).to_wire())
+    reply = Envelope.from_wire(await read_frame(reader))
+    assert reply.type == "error"
+    assert reply.payload["code"] == "no_matching_device"
 
 
 async def test_close_drains_a_connection_still_in_the_kernel_accept_backlog(tmp_path):

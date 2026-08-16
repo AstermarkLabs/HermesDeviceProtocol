@@ -87,6 +87,14 @@ class NodeConnection:
         self.device_id: str | None = None
         self._seen_ids: OrderedDict[str, None] = OrderedDict()
         self._malformed_times: list[float] = []
+        self._disconnect_reason: str = "device_offline"
+        """The reason `_on_disconnect` passes to `fail_all_for_device`. Ordinary socket drops
+        never touch this (stays the default). `revocation.revoke_device` sets it to `"revoked"`
+        *before* closing the socket — closing a real `aiohttp` WebSocket concurrently wakes this
+        connection's own `run()` loop and races it against `revoke_device`'s own explicit
+        fail-all-in-flight step; whichever of the two actually pops the pending entries must use
+        `"revoked"`, not fall back to the ordinary-disconnect default, so this flag has to be set
+        before the close happens, not after."""
 
     async def run(self) -> None:
         try:
@@ -356,7 +364,9 @@ class NodeConnection:
         if self.device_id is None:
             return
         self._registry.mark_offline(self.device_id)
-        failed = self._invocations.fail_all_for_device(self.device_id)
+        failed = self._invocations.fail_all_for_device(
+            self.device_id, reason=self._disconnect_reason
+        )
         if failed:
             logger.info(
                 "device_offline mid-call device_id=%s invocation_ids=%s", self.device_id, failed

@@ -25,7 +25,16 @@ class DeviceDisconnected(Exception):
     """Set as the exception on whichever future (ack or result) is still pending when a device's
     connection drops mid-invocation — this is what makes `fail_all_for_device` interrupt an
     in-progress `asyncio.wait_for` immediately rather than waiting out its timeout (HDP-0.md §7's
-    "mid-call disconnect fails in-flight invocations immediately" rule)."""
+    "mid-call disconnect fails in-flight invocations immediately" rule).
+
+    Carries an optional `reason`, defaulting to `"device_offline"` (the ordinary mid-call-
+    disconnect path, unchanged). Operator revocation (Task 13, FR-15) passes `"revoked"` instead,
+    so callers that inspect `.reason` (`control.py`'s `ctl_invoke` handler) can surface the
+    distinct `ErrorCode.REVOKED` to the model rather than the generic `device_offline`."""
+
+    def __init__(self, reason: str = "device_offline") -> None:
+        super().__init__(reason)
+        self.reason = reason
 
 
 @dataclass
@@ -94,26 +103,29 @@ class InvocationsMem:
         disconnect path is `fail_all_for_device`, not this."""
         return self._fail(device_id=None)
 
-    def fail_all_for_device(self, device_id: str) -> list[str]:
-        """A device's connection dropped: fail every invocation still pending for it, immediately,
-        by raising `DeviceDisconnected` on whichever future (ack or result) is still outstanding.
-        Returns the list of invocation ids that were failed, for logging."""
-        return self._fail(device_id=device_id)
+    def fail_all_for_device(self, device_id: str, *, reason: str = "device_offline") -> list[str]:
+        """A device's connection dropped (or was revoked): fail every invocation still pending for
+        it, immediately, by raising `DeviceDisconnected(reason)` on both the ack and result
+        futures that are still outstanding. Returns the list of invocation ids that were failed,
+        for logging."""
+        return self._fail(device_id=device_id, reason=reason)
 
-    def _fail(self, *, device_id: str | None) -> list[str]:
-        """Remove and fail every pending entry (all of them when `device_id` is `None`). The
-        exception goes on exactly one future — `elif`, not a second `if`: setting it on both would
-        leave the ack future's exception unretrieved once the awaiter has already bailed out on
-        the first one, which surfaces as asyncio's "exception was never retrieved" noise."""
+    def _fail(self, *, device_id: str | None, reason: str = "device_offline") -> list[str]:
+        """Remove and fail every pending entry (all of them when `device_id` is `None`). Sets the
+        exception on *both* futures that are not yet done — not just whichever one is currently
+        being awaited — so a caller inspecting either future after the fact (e.g. revocation's own
+        immediate-failure guarantee) observes the failure regardless of which future it happens to
+        look at, not only the one a normal ack->result sequential awaiter would have reached
+        first."""
         failed: list[str] = []
         for invocation_id, entry in list(self._pending.items()):
             if device_id is not None and entry.device_id != device_id:
                 continue
             del self._pending[invocation_id]
             if not entry.ack_future.done():
-                entry.ack_future.set_exception(DeviceDisconnected())
-            elif not entry.result_future.done():
-                entry.result_future.set_exception(DeviceDisconnected())
+                entry.ack_future.set_exception(DeviceDisconnected(reason))
+            if not entry.result_future.done():
+                entry.result_future.set_exception(DeviceDisconnected(reason))
             failed.append(invocation_id)
         return failed
 

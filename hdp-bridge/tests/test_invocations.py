@@ -89,6 +89,32 @@ async def test_fail_all_for_device_fails_result_future_when_already_acked():
         await entry.result_future
 
 
+async def test_fail_all_for_device_with_reason_revoked_sets_it_on_the_exception():
+    invocations = InvocationsMem()
+    invocation_id, entry = invocations.mint_for("dev_a")
+
+    failed = invocations.fail_all_for_device("dev_a", reason="revoked")
+
+    assert failed == [invocation_id]
+    with pytest.raises(DeviceDisconnected) as exc_info:
+        await entry.ack_future
+    assert exc_info.value.reason == "revoked"
+    with pytest.raises(DeviceDisconnected) as exc_info:
+        await entry.result_future
+    assert exc_info.value.reason == "revoked"
+
+
+async def test_fail_all_for_device_default_reason_is_device_offline():
+    invocations = InvocationsMem()
+    invocation_id, entry = invocations.mint_for("dev_a")
+
+    invocations.fail_all_for_device("dev_a")
+
+    with pytest.raises(DeviceDisconnected) as exc_info:
+        await entry.ack_future
+    assert exc_info.value.reason == "device_offline"
+
+
 async def test_fail_all_fails_every_pending_invocation_regardless_of_device():
     invocations = InvocationsMem()
     id_a, entry_a = invocations.mint_for("dev_a")

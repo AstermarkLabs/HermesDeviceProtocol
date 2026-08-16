@@ -20,6 +20,7 @@ import contextlib
 import json
 import logging
 import socket
+import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -29,6 +30,7 @@ from hdp_proto.envelope import Envelope, EnvelopeError
 from hdp_proto.errors import ErrorCode, err
 
 from . import config
+from . import revocation as _revocation
 from .invocations import DeviceDisconnected
 
 if TYPE_CHECKING:
@@ -89,6 +91,7 @@ class ControlServer:
         invocations: InvocationsMem,
         connections: dict[str, NodeConnection],
         descriptors: dict[str, dict[str, CapabilityDescriptor]] | None = None,
+        conn: sqlite3.Connection | None = None,
     ) -> None:
         self._socket_path = socket_path
         self._registry = registry
@@ -97,6 +100,11 @@ class ControlServer:
         self._descriptors: dict[str, dict[str, CapabilityDescriptor]] = (
             descriptors if descriptors is not None else {}
         )
+        # A raw `sqlite3.Connection`, distinct from `registry`'s own internal one (see
+        # `daemon.py`'s NOTE on the two-connections deviation) — needed only by
+        # `ctl_devices_revoke`, which operates below `Registry`'s device-record API via
+        # `credentials.py`. `None` in tests that never exercise that verb.
+        self._conn = conn
         self._raw_sock: socket.socket | None = None
         self._accept_task: asyncio.Task[None] | None = None
         self._active_writers: set[asyncio.StreamWriter] = set()
@@ -224,6 +232,7 @@ class ControlServer:
             "ctl_invoke": self._ctl_invoke,
             "ctl_cancel": self._ctl_cancel,
             "ctl_status": self._ctl_status,
+            "ctl_devices_revoke": self._ctl_devices_revoke,
         }.get(envelope.type)
         if handler is None:
             detail = f"unknown control verb {envelope.type!r}"
@@ -297,11 +306,12 @@ class ControlServer:
             return _invoke_failure(
                 invocation_id, ErrorCode.DEVICE_OFFLINE, "device did not ack within the timeout"
             )
-        except DeviceDisconnected:
-            # `connection.py`'s disconnect handler already removed the pending entry.
-            return _invoke_failure(
-                invocation_id, ErrorCode.DEVICE_OFFLINE, "device disconnected before acking"
-            )
+        except DeviceDisconnected as exc:
+            # `connection.py`'s disconnect handler (or `revocation.revoke_device`) already
+            # removed the pending entry. `exc.reason` distinguishes an operator revocation
+            # (`"revoked"`, FR-15) from an ordinary mid-call disconnect (`"device_offline"`).
+            code = ErrorCode.REVOKED if exc.reason == "revoked" else ErrorCode.DEVICE_OFFLINE
+            return _invoke_failure(invocation_id, code, "device disconnected before acking")
 
         deadline_s = deadline_ms / 1000
         try:
@@ -314,10 +324,9 @@ class ControlServer:
                 ErrorCode.INVOCATION_TIMEOUT,
                 "device did not return a result within its deadline",
             )
-        except DeviceDisconnected:
-            return _invoke_failure(
-                invocation_id, ErrorCode.DEVICE_OFFLINE, "device disconnected mid-call"
-            )
+        except DeviceDisconnected as exc:
+            code = ErrorCode.REVOKED if exc.reason == "revoked" else ErrorCode.DEVICE_OFFLINE
+            return _invoke_failure(invocation_id, code, "device disconnected mid-call")
 
         return self._to_invoke_reply(invocation_id, device_id, capability, result_payload)
 
@@ -379,3 +388,21 @@ class ControlServer:
             "ctl_status_reply",
             {"healthy": True, "detail": f"{len(self._connections)} device(s) connected"},
         )
+
+    async def _ctl_devices_revoke(self, envelope: Envelope) -> Envelope:
+        """Operator-only verb (FR-15, §4.4) — the CLI's `hdp-bridge devices revoke` reaches this
+        when a daemon is running, so the revoke frame and socket close happen against a live
+        connection rather than the CLI's DB-only fallback (`cli.py`'s `_run_devices_revoke`)."""
+        device_id = envelope.payload.get("device_id")
+        if not device_id:
+            error_payload = err(
+                ErrorCode.NO_MATCHING_DEVICE, "revoke requires a device_id"
+            )["error"]
+            return Envelope.new("error", error_payload)
+        if self._conn is None:  # pragma: no cover — always set in daemon.py's real wiring
+            error_payload = err(
+                ErrorCode.BRIDGE_UNAVAILABLE, "control server has no database connection"
+            )["error"]
+            return Envelope.new("error", error_payload)
+        await _revocation.revoke_device(self._conn, device_id, connections=self._connections)
+        return Envelope.new("ctl_devices_revoke_reply", {"ok": True, "device_id": device_id})

@@ -103,20 +103,36 @@ class InvocationsMem:
         disconnect path is `fail_all_for_device`, not this."""
         return self._fail(device_id=None)
 
-    def fail_all_for_device(self, device_id: str, *, reason: str = "device_offline") -> list[str]:
+    def fail_all_for_device(
+        self, device_id: str, *, reason: str = "device_offline", fail_both: bool = False
+    ) -> list[str]:
         """A device's connection dropped (or was revoked): fail every invocation still pending for
-        it, immediately, by raising `DeviceDisconnected(reason)` on both the ack and result
-        futures that are still outstanding. Returns the list of invocation ids that were failed,
-        for logging."""
-        return self._fail(device_id=device_id, reason=reason)
+        it, immediately, by raising `DeviceDisconnected(reason)` on whichever future (ack or
+        result) is still outstanding. Returns the list of invocation ids that were failed, for
+        logging.
 
-    def _fail(self, *, device_id: str | None, reason: str = "device_offline") -> list[str]:
-        """Remove and fail every pending entry (all of them when `device_id` is `None`). Sets the
-        exception on *both* futures that are not yet done — not just whichever one is currently
-        being awaited — so a caller inspecting either future after the fact (e.g. revocation's own
-        immediate-failure guarantee) observes the failure regardless of which future it happens to
-        look at, not only the one a normal ack->result sequential awaiter would have reached
-        first."""
+        `fail_both` defaults to `False` — the ordinary disconnect path (`connection.py`'s
+        `_on_disconnect`) and `fail_all()`'s transport-shutdown backstop both rely on that default
+        to avoid asyncio's "exception was never retrieved" GC noise (see `_fail`'s docstring).
+        `revocation.revoke_device`'s own explicit fail-all step is the one caller that opts into
+        `fail_both=True`: it's not necessarily racing a sequential ack->result awaiter the way the
+        ordinary disconnect path is, and needs both futures observably failed regardless of which
+        one a caller happens to inspect afterward (FR-15's "fail every in-flight invocation
+        immediately" guarantee, verified directly against the futures in `test_revocation.py`,
+        not just through `ctl_invoke`'s sequential await)."""
+        return self._fail(device_id=device_id, reason=reason, fail_both=fail_both)
+
+    def _fail(
+        self, *, device_id: str | None, reason: str = "device_offline", fail_both: bool = False
+    ) -> list[str]:
+        """Remove and fail every pending entry (all of them when `device_id` is `None`). By
+        default the exception goes on exactly one future — `elif`, not a second `if`: setting it
+        on both would leave the ack future's exception unretrieved once the awaiter has already
+        bailed out on the first one, which surfaces as asyncio's "exception was never retrieved"
+        noise. `fail_both=True` (only `revoke_device`'s explicit step 4 opts in — see
+        `fail_all_for_device`'s docstring) sets it on both not-yet-done futures instead, for
+        callers that need every future observably failed rather than just whichever one an
+        ack->result sequential awaiter would reach first."""
         failed: list[str] = []
         for invocation_id, entry in list(self._pending.items()):
             if device_id is not None and entry.device_id != device_id:
@@ -124,7 +140,9 @@ class InvocationsMem:
             del self._pending[invocation_id]
             if not entry.ack_future.done():
                 entry.ack_future.set_exception(DeviceDisconnected(reason))
-            if not entry.result_future.done():
+                if fail_both and not entry.result_future.done():
+                    entry.result_future.set_exception(DeviceDisconnected(reason))
+            elif not entry.result_future.done():
                 entry.result_future.set_exception(DeviceDisconnected(reason))
             failed.append(invocation_id)
         return failed

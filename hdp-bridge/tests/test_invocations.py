@@ -90,10 +90,28 @@ async def test_fail_all_for_device_fails_result_future_when_already_acked():
 
 
 async def test_fail_all_for_device_with_reason_revoked_sets_it_on_the_exception():
+    """Default `fail_both=False` behavior — only the not-yet-done ack future gets the exception
+    (the pre-existing anti-noise `elif`), just with a `"revoked"` reason instead of the default."""
     invocations = InvocationsMem()
     invocation_id, entry = invocations.mint_for("dev_a")
 
     failed = invocations.fail_all_for_device("dev_a", reason="revoked")
+
+    assert failed == [invocation_id]
+    with pytest.raises(DeviceDisconnected) as exc_info:
+        await entry.ack_future
+    assert exc_info.value.reason == "revoked"
+    assert not entry.result_future.done()
+
+
+async def test_fail_all_for_device_fail_both_sets_the_exception_on_both_futures():
+    """`fail_both=True` — the opt-in `revoke_device`'s explicit step 4 uses, so a caller
+    inspecting either future directly (not just through a sequential ack->result awaiter) observes
+    the failure regardless of which one it looks at."""
+    invocations = InvocationsMem()
+    invocation_id, entry = invocations.mint_for("dev_a")
+
+    failed = invocations.fail_all_for_device("dev_a", reason="revoked", fail_both=True)
 
     assert failed == [invocation_id]
     with pytest.raises(DeviceDisconnected) as exc_info:

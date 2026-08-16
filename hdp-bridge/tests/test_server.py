@@ -22,7 +22,7 @@ from aiohttp.test_utils import TestClient, TestServer
 from hdp_bridge import server as _server
 from hdp_bridge.connection import NodeConnection
 from hdp_bridge.invocations import InvocationsMem
-from hdp_bridge.registry import RegistryMem
+from hdp_bridge.registry import Registry
 from hdp_proto.capabilities import CapabilityDescriptor
 from hdp_proto.envelope import Envelope
 from hdp_proto.messages import Hello
@@ -44,12 +44,12 @@ ECHO_DESCRIPTOR = CapabilityDescriptor(
 
 
 class _Harness:
-    """The same shared-state wiring `EmbeddedTransport` used to own at M1: one `RegistryMem`,
+    """The same shared-state wiring `EmbeddedTransport` used to own at M1: one `Registry`,
     one `InvocationsMem`, and the `connections`/`descriptors` dicts every `NodeConnection` on this
     app shares."""
 
-    def __init__(self) -> None:
-        self.registry = RegistryMem()
+    def __init__(self, tmp_path) -> None:
+        self.registry = Registry(tmp_path / "registry.db")
         self.invocations = InvocationsMem()
         self.connections: dict[str, NodeConnection] = {}
         self.descriptors: dict = {}
@@ -65,8 +65,8 @@ class _Harness:
 
 
 @pytest.fixture
-def harness():
-    return _Harness()
+def harness(tmp_path):
+    return _Harness(tmp_path)
 
 
 @pytest.fixture
@@ -114,7 +114,12 @@ async def test_hello_welcome_handshake_registers_the_device(client, harness):
     devices = harness.registry.list_devices()
     assert len(devices) == 1
     assert devices[0].device_id == device_id
-    assert devices[0].online is True
+    # `Registry` (SQLite-backed as of M2 Task 10) never persists `online` — it is process-lifetime
+    # information overlaid by the caller. Overlaying the live `_connections` state onto this read
+    # is Task 12's job (credential verification in the handshake); until then a device fetched
+    # straight from the registry always reads back offline, even while its `NodeConnection` is
+    # live. See `hdp_bridge/registry.py`'s `Registry._to_record` docstring comment.
+    assert devices[0].online is False
     assert devices[0].capabilities[0].name == "diagnostics.echo"
     await ws.close()
 

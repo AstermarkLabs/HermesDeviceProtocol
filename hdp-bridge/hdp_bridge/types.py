@@ -13,6 +13,8 @@ from typing import Any
 class CapabilityRecord:
     name: str
     version: int
+    input_schema: dict[str, Any] = field(default_factory=dict)
+    output_schema: dict[str, Any] = field(default_factory=dict)
 
     def to_wire(self) -> dict[str, Any]:
         return {"name": self.name, "version": self.version}

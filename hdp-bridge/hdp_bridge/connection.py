@@ -38,7 +38,7 @@ from .types import CapabilityRecord, DeviceRecord
 
 if TYPE_CHECKING:
     from .invocations import InvocationsMem
-    from .registry import RegistryMem
+    from .registry import Registry
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +70,7 @@ class NodeConnection:
         self,
         ws: web.WebSocketResponse,
         *,
-        registry: RegistryMem,
+        registry: Registry,
         invocations: InvocationsMem,
         connections: dict[str, NodeConnection],
         descriptors: dict[str, dict[str, CapabilityDescriptor]],
@@ -181,7 +181,13 @@ class NodeConnection:
 
         device_id = ids.new()
         capability_infos = [
-            CapabilityRecord(name=c.name, version=c.version) for c in hello.capabilities
+            CapabilityRecord(
+                name=c.name,
+                version=c.version,
+                input_schema=c.input_schema,
+                output_schema=c.output_schema,
+            )
+            for c in hello.capabilities
         ]
         self._registry.register(
             DeviceRecord(
@@ -213,7 +219,13 @@ class NodeConnection:
         friendly_name = existing.friendly_name if existing else device_id
         platform = existing.platform if existing else "unknown"
         capability_infos = [
-            CapabilityRecord(name=c.name, version=c.version) for c in msg.capabilities
+            CapabilityRecord(
+                name=c.name,
+                version=c.version,
+                input_schema=c.input_schema,
+                output_schema=c.output_schema,
+            )
+            for c in msg.capabilities
         ]
         # Full-set replacement (FR-8), not a merge — matches `hello`'s initial registration.
         self._registry.register(

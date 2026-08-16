@@ -6,7 +6,7 @@ below `ECHO_DESCRIPTOR` is Task 6: `ctl_invoke`'s ack-timeout/execution-deadline
 
 `ctl_invoke` needs a real node on the other end of a real `NodeConnection` to exercise the ack/
 result frames the race waits on — a fake "node" is a raw aiohttp WebSocket test client speaking
-HDP/0 by hand, wired to the *same* `RegistryMem`/`InvocationsMem`/`connections`/`descriptors`
+HDP/0 by hand, wired to the *same* `Registry`/`InvocationsMem`/`connections`/`descriptors`
 state as the `ControlServer` under test (mirrors `test_server.py`'s `_Harness`, and is a direct
 port of the wire-level tests `hermes_device_plugin/tests/test_transport_embedded.py` used to carry
 before that module's shared state moved into `hdp_bridge` — see that deleted file's git history
@@ -26,7 +26,7 @@ from hdp_bridge import server as _server
 from hdp_bridge.connection import NodeConnection
 from hdp_bridge.control import ControlServer, read_frame, write_frame
 from hdp_bridge.invocations import InvocationsMem
-from hdp_bridge.registry import RegistryMem
+from hdp_bridge.registry import Registry
 from hdp_bridge.types import DeviceRecord
 from hdp_proto.capabilities import CapabilityDescriptor
 from hdp_proto.envelope import Envelope
@@ -35,7 +35,7 @@ from hdp_proto.messages import Hello, ResultMsg
 
 @pytest.fixture
 async def control_server(tmp_path):
-    registry = RegistryMem()
+    registry = Registry(tmp_path / "registry.db")
     registry.register(DeviceRecord(device_id="dev_1", friendly_name="n", platform="p", online=True))
     invocations = InvocationsMem()
     socket_path = tmp_path / "bridge.sock"
@@ -86,12 +86,12 @@ ECHO_DESCRIPTOR = CapabilityDescriptor(
 
 
 class _Harness:
-    """One `RegistryMem`/`InvocationsMem`/`connections`/`descriptors` set, shared between the
+    """One `Registry`/`InvocationsMem`/`connections`/`descriptors` set, shared between the
     node-facing aiohttp app and the `ControlServer` under test — exactly the wiring
     `hdp_bridge.daemon.serve()` sets up in production, minus the real TCP bind."""
 
     def __init__(self, tmp_path) -> None:
-        self.registry = RegistryMem()
+        self.registry = Registry(tmp_path / "registry.db")
         self.invocations = InvocationsMem()
         self.connections: dict[str, NodeConnection] = {}
         self.descriptors: dict = {}
@@ -389,7 +389,7 @@ async def test_ctl_list_approvals_verb_is_not_implemented_yet(ctl_conn):
 async def test_close_force_closes_live_connections(tmp_path):
     """`Server.close()` alone leaves already-accepted connections open — without this, a stopped
     daemon would leak every open plugin connection instead of actually disconnecting it."""
-    registry = RegistryMem()
+    registry = Registry(tmp_path / "registry.db")
     invocations = InvocationsMem()
     socket_path = tmp_path / "bridge.sock"
     server = ControlServer(socket_path, registry=registry, invocations=invocations, connections={})
@@ -423,7 +423,7 @@ async def test_close_drains_a_connection_still_in_the_kernel_accept_backlog(tmp_
     sitting un-accepted in the kernel backlog when `close()` runs, every single time this test
     runs, on any platform, under any scheduler load. `raw.connect()` itself is a plain local-socket
     syscall for `AF_UNIX` (no network handshake), so it returns immediately regardless."""
-    registry = RegistryMem()
+    registry = Registry(tmp_path / "registry.db")
     invocations = InvocationsMem()
     socket_path = tmp_path / "bridge.sock"
     server = ControlServer(socket_path, registry=registry, invocations=invocations, connections={})

@@ -11,12 +11,12 @@ from . import config
 from .connection import NodeConnection
 from .control import ControlServer
 from .invocations import InvocationsMem
-from .registry import RegistryMem
+from .registry import Registry
 from .server import HdpServer
 
 
 async def serve(*, stop_event: asyncio.Event | None = None) -> None:
-    registry = RegistryMem()
+    registry = Registry(config.registry_db_path())
     invocations = InvocationsMem()
     connections: dict[str, NodeConnection] = {}
     descriptors: dict = {}

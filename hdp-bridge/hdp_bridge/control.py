@@ -36,7 +36,7 @@ if TYPE_CHECKING:
 
     from .connection import NodeConnection
     from .invocations import InvocationsMem
-    from .registry import RegistryMem
+    from .registry import Registry
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +85,7 @@ class ControlServer:
         self,
         socket_path: Path,
         *,
-        registry: RegistryMem,
+        registry: Registry,
         invocations: InvocationsMem,
         connections: dict[str, NodeConnection],
         descriptors: dict[str, dict[str, CapabilityDescriptor]] | None = None,
@@ -232,7 +232,18 @@ class ControlServer:
         return await handler(envelope)
 
     async def _ctl_list_devices(self, envelope: Envelope) -> Envelope:
-        devices = [d.to_wire() for d in self._registry.list_devices()]
+        # `Registry.list_devices()` (M2 Task 10) never reports `online` — as of this task,
+        # `online` is process-lifetime information the durable store deliberately doesn't
+        # persist (see `hdp_bridge/registry.py`'s `Registry._to_record`). `self._connections`
+        # (populated by `NodeConnection._handle_hello`/`_on_disconnect`) is the live source of
+        # truth for which devices are actually connected right now, so overlay it here rather
+        # than let every registered-but-disconnected device read back as permanently offline —
+        # a full rework of this overlay (moving it onto `NodeConnection` itself) is Task 12's.
+        devices = []
+        for record in self._registry.list_devices():
+            wire = record.to_wire()
+            wire["online"] = record.device_id in self._connections
+            devices.append(wire)
         return Envelope.new("ctl_list_devices_reply", {"devices": devices})
 
     async def _ctl_invoke(self, envelope: Envelope) -> Envelope:

@@ -122,10 +122,11 @@ async def test_hello_welcome_handshake_registers_the_device(client, harness):
     assert len(devices) == 1
     assert devices[0].device_id == device_id
     # `Registry` (SQLite-backed as of M2 Task 10) never persists `online` — it is process-lifetime
-    # information overlaid by the caller. Overlaying the live `_connections` state onto this read
-    # is Task 12's job (credential verification in the handshake); until then a device fetched
-    # straight from the registry always reads back offline, even while its `NodeConnection` is
-    # live. See `hdp_bridge/registry.py`'s `Registry._to_record` docstring comment.
+    # information overlaid by the caller. `Registry.list_devices()`/`.get()` reads always come
+    # back `online=False`; the overlay of live `_connections` state happens in `control.py`'s
+    # `_ctl_list_devices` (Task 6), not here — this test reads straight through `Registry`, so it
+    # always sees offline even while the `NodeConnection` above is live. See
+    # `hdp_bridge/registry.py`'s `Registry._to_record` comment.
     assert devices[0].online is False
     assert devices[0].capabilities[0].name == "diagnostics.echo"
     await ws.close()

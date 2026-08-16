@@ -50,7 +50,8 @@ class Registry:
             first_paired_at=row[4],
             last_seen_at=row[5],
             state=row[6],
-            online=False,  # caller (connection.py) overlays live online state; see Task 12
+            online=False,  # caller overlays live online state — done in control.py's
+            # `_ctl_list_devices` (Task 6), via `record.device_id in self._connections`.
             capabilities=[
                 CapabilityRecord(
                     name=c[0],

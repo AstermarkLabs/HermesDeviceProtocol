@@ -184,7 +184,7 @@ teardown:
 |---|---|
 | `GET /hdp/v0/health` | Live. Returns `200 {"status": "ok"}`. |
 | `GET /hdp/v0/socket` | WebSocket upgrade; see §3. |
-| `POST /hdp/v0/pair` | **Absent at M1** — no route registered (404). Added at M2. |
+| `POST /hdp/v0/pair` | **Absent.** No route registered (404) at M1 or M2 — see Amendments (v0.2): pairing happens entirely through the WebSocket handshake's `pair:`-prefixed credential, not a separate HTTP route. |
 | `/hdp/v0/blobs` (any method) | **Reserved.** Returns `501`. |
 
 **Binary payload rule, normative from day one:** metadata travels in the JSON envelope; binary

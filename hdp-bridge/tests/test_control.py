@@ -22,11 +22,13 @@ import socket
 import pytest
 from aiohttp.test_utils import TestClient, TestServer
 from hdp_bridge import config as bridge_config
+from hdp_bridge import pairing
 from hdp_bridge import server as _server
 from hdp_bridge.connection import NodeConnection
 from hdp_bridge.control import ControlServer, read_frame, write_frame
 from hdp_bridge.invocations import InvocationsMem
 from hdp_bridge.registry import Registry
+from hdp_bridge.store import db
 from hdp_bridge.types import DeviceRecord
 from hdp_proto.capabilities import CapabilityDescriptor
 from hdp_proto.envelope import Envelope
@@ -91,7 +93,9 @@ class _Harness:
     `hdp_bridge.daemon.serve()` sets up in production, minus the real TCP bind."""
 
     def __init__(self, tmp_path) -> None:
-        self.registry = Registry(tmp_path / "registry.db")
+        db_path = tmp_path / "registry.db"
+        self.conn = db.connect(db_path)
+        self.registry = Registry(db_path)
         self.invocations = InvocationsMem()
         self.connections: dict[str, NodeConnection] = {}
         self.descriptors: dict = {}
@@ -107,6 +111,7 @@ class _Harness:
     def make_connection(self, ws: object) -> NodeConnection:
         return NodeConnection(
             ws,  # type: ignore[arg-type]
+            conn=self.conn,
             registry=self.registry,
             invocations=self.invocations,
             connections=self.connections,
@@ -136,13 +141,16 @@ async def ctl_conn(harness):
     writer.close()
 
 
-async def _connect_and_hello(client, *, device_name="test-node", capabilities=(ECHO_DESCRIPTOR,)):
+async def _connect_and_hello(
+    client, harness, *, device_name="test-node", capabilities=(ECHO_DESCRIPTOR,)
+):
     ws = await client.ws_connect("/hdp/v0/socket")
+    code = pairing.mint_pairing_code(harness.conn)
     hello = Hello(
         hdp_versions=(0,),
         device_name=device_name,
         capabilities=tuple(capabilities),
-        credential=None,
+        credential=f"pair:{code}",
     )
     envelope = Envelope.new("hello", hello.to_wire())
     await ws.send_str(json.dumps(envelope.to_wire()))
@@ -177,8 +185,8 @@ async def test_ctl_invoke_against_unknown_device_is_device_offline(ctl_conn):
     assert reply.payload["error"]["code"] == "device_offline"
 
 
-async def test_ctl_invoke_round_trips_and_validates_output(node_client, ctl_conn):
-    ws, device_id = await _connect_and_hello(node_client)
+async def test_ctl_invoke_round_trips_and_validates_output(node_client, ctl_conn, harness):
+    ws, device_id = await _connect_and_hello(node_client, harness)
     reader, writer = ctl_conn
 
     async def _serve_one():
@@ -201,9 +209,9 @@ async def test_ctl_invoke_round_trips_and_validates_output(node_client, ctl_conn
     await ws.close()
 
 
-async def test_ctl_invoke_never_ack_yields_device_offline(node_client, ctl_conn, monkeypatch):
+async def test_ctl_invoke_never_ack_yields_device_offline(node_client, ctl_conn, monkeypatch, harness):
     monkeypatch.setattr(bridge_config, "ACK_TIMEOUT_S", 0.2)
-    ws, device_id = await _connect_and_hello(node_client)
+    ws, device_id = await _connect_and_hello(node_client, harness)
     reader, writer = ctl_conn
 
     reply = await _ctl_invoke(reader, writer, device_id=device_id)
@@ -212,8 +220,8 @@ async def test_ctl_invoke_never_ack_yields_device_offline(node_client, ctl_conn,
     await ws.close()
 
 
-async def test_ctl_invoke_slow_result_yields_invocation_timeout(node_client, ctl_conn):
-    ws, device_id = await _connect_and_hello(node_client)
+async def test_ctl_invoke_slow_result_yields_invocation_timeout(node_client, ctl_conn, harness):
+    ws, device_id = await _connect_and_hello(node_client, harness)
     reader, writer = ctl_conn
 
     async def _ack_and_never_answer():
@@ -230,8 +238,8 @@ async def test_ctl_invoke_slow_result_yields_invocation_timeout(node_client, ctl
     await ws.close()
 
 
-async def test_ctl_invoke_disconnect_mid_call_is_immediate(node_client, ctl_conn):
-    ws, device_id = await _connect_and_hello(node_client)
+async def test_ctl_invoke_disconnect_mid_call_is_immediate(node_client, ctl_conn, harness):
+    ws, device_id = await _connect_and_hello(node_client, harness)
     reader, writer = ctl_conn
 
     async def _drop_connection():
@@ -250,8 +258,8 @@ async def test_ctl_invoke_disconnect_mid_call_is_immediate(node_client, ctl_conn
     assert elapsed < 5.0  # nowhere near the 30s deadline
 
 
-async def test_ctl_invoke_malformed_result_is_rejected(node_client, ctl_conn):
-    ws, device_id = await _connect_and_hello(node_client)
+async def test_ctl_invoke_malformed_result_is_rejected(node_client, ctl_conn, harness):
+    ws, device_id = await _connect_and_hello(node_client, harness)
     reader, writer = ctl_conn
 
     async def _reply_with_wrong_shape():
@@ -273,8 +281,8 @@ async def test_ctl_invoke_malformed_result_is_rejected(node_client, ctl_conn):
     await ws.close()
 
 
-async def test_ctl_invoke_node_reported_failure_passes_through(node_client, ctl_conn):
-    ws, device_id = await _connect_and_hello(node_client)
+async def test_ctl_invoke_node_reported_failure_passes_through(node_client, ctl_conn, harness):
+    ws, device_id = await _connect_and_hello(node_client, harness)
     reader, writer = ctl_conn
 
     async def _reply_with_failure():
@@ -306,7 +314,7 @@ async def test_ctl_invoke_expired_invocation_leaves_nothing_pending(
     ack timeout — the invocation_id is absent from the pending table (FR-30's ordering rule:
     `expire()` runs before the best-effort `cancel` is sent)."""
     monkeypatch.setattr(bridge_config, "ACK_TIMEOUT_S", 0.2)
-    ws, device_id = await _connect_and_hello(node_client)
+    ws, device_id = await _connect_and_hello(node_client, harness)
     reader, writer = ctl_conn
 
     async def _never_ack():
@@ -324,7 +332,7 @@ async def test_ctl_invoke_expired_invocation_leaves_nothing_pending(
 async def test_ctl_cancel_on_pending_invocation_resolves_it_negatively(
     node_client, ctl_conn, harness
 ):
-    ws, device_id = await _connect_and_hello(node_client)
+    ws, device_id = await _connect_and_hello(node_client, harness)
     reader, writer = ctl_conn
 
     invoke_reply_task = asyncio.create_task(
@@ -367,8 +375,8 @@ async def test_ctl_cancel_on_unknown_invocation_is_a_silent_no_op(ctl_conn):
     assert reply.payload["ok"] is True
 
 
-async def test_ctl_status_reports_connected_device_count(node_client, ctl_conn):
-    _ws, _device_id = await _connect_and_hello(node_client)
+async def test_ctl_status_reports_connected_device_count(node_client, ctl_conn, harness):
+    _ws, _device_id = await _connect_and_hello(node_client, harness)
     reader, writer = ctl_conn
     await write_frame(writer, Envelope.new("ctl_status", {}).to_wire())
     reply = Envelope.from_wire(await read_frame(reader))

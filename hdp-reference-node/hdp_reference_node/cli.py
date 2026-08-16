@@ -49,6 +49,26 @@ def build_parser() -> argparse.ArgumentParser:
         help="Bridge WebSocket URL. Defaults to discovering $HERMES_HOME/hdp/bridge.addr.",
     )
     connect.add_argument(
+        "--pair-code",
+        default=None,
+        dest="pair_code",
+        help=(
+            "First-time pairing code (M2, m2-plan.md §4). Required on a node's very first "
+            "connection unless --credential-file already holds a stored credential from a "
+            "previous pairing."
+        ),
+    )
+    connect.add_argument(
+        "--credential-file",
+        default="./.hdp-node-credential",
+        dest="credential_file",
+        help=(
+            "Path this reference node reads its stored device credential from, and writes the "
+            "bridge-issued credential to on a successful first-time pairing (M2). Defaults to "
+            "./.hdp-node-credential for the reference implementation's convenience."
+        ),
+    )
+    connect.add_argument(
         "--fault",
         action="append",
         default=[],
@@ -69,4 +89,12 @@ def main(argv: list[str] | None = None) -> None:
     if args.command == "connect":
         url = args.url or _default_bridge_url()
         faults = FaultConfig.parse(args.faults)
-        asyncio.run(node.run(url, args.name, faults))
+        asyncio.run(
+            node.run(
+                url,
+                args.name,
+                faults,
+                pair_code=args.pair_code,
+                credential_file=Path(args.credential_file),
+            )
+        )

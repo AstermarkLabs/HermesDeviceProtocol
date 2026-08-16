@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from pathlib import Path
 from typing import Any
 
 import aiohttp
@@ -38,6 +39,8 @@ async def run(
     name: str,
     faults: FaultConfig,
     *,
+    pair_code: str | None = None,
+    credential_file: Path = Path("./.hdp-node-credential"),
     max_reconnect_attempts: int | None = None,
 ) -> None:
     """Connect, advertise, dispatch forever, reconnecting with exponential backoff on an
@@ -45,11 +48,20 @@ async def run(
     network error) ends `run` rather than triggering a reconnect — the caller decides whether to
     call `run` again. `max_reconnect_attempts` is `None` for the real CLI (retry forever); tests
     pass a small number so a deliberately uncooperative bridge cannot hang a test suite.
+
+    M2 auth (hdp-spec/HDP-0.md's Amendments (v0.2)): `credential_file` is checked first on every
+    connect attempt, including reconnects — if it already holds a stored credential (from a
+    previous pairing, on this run or an earlier one), that credential is sent as-is and
+    `pair_code` is ignored. Only when no stored credential exists is `pair_code` used, prefixed
+    `pair:`, to complete a first-time pairing; the credential the bridge issues in response is
+    written to `credential_file` immediately so every subsequent reconnect in this `run()` call
+    (and every future invocation of this CLI against the same `--credential-file`) uses it
+    instead of the one-time pairing code, which the bridge has already consumed.
     """
     attempt = 0
     while max_reconnect_attempts is None or attempt < max_reconnect_attempts:
         try:
-            await _connect_and_serve(url, name, faults)
+            await _connect_and_serve(url, name, faults, pair_code, credential_file)
             return
         except (aiohttp.ClientError, OSError) as exc:
             attempt += 1
@@ -60,10 +72,26 @@ async def run(
             await asyncio.sleep(backoff)
 
 
-async def _connect_and_serve(url: str, name: str, faults: FaultConfig) -> None:
+def _resolve_credential(pair_code: str | None, credential_file: Path) -> str:
+    if credential_file.exists():
+        stored = credential_file.read_text().strip()
+        if stored:
+            return stored
+    if pair_code:
+        return f"pair:{pair_code}"
+    raise SystemExit(
+        f"no stored credential at {credential_file} and no --pair-code given; "
+        "a node's first connection requires one or the other"
+    )
+
+
+async def _connect_and_serve(
+    url: str, name: str, faults: FaultConfig, pair_code: str | None, credential_file: Path
+) -> None:
+    credential = _resolve_credential(pair_code, credential_file)
     async with aiohttp.ClientSession() as session, session.ws_connect(url, heartbeat=15.0) as ws:
         hello = Hello(
-            hdp_versions=(0,), device_name=name, capabilities=_DESCRIPTORS, credential=None
+            hdp_versions=(0,), device_name=name, capabilities=_DESCRIPTORS, credential=credential
         )
         await ws.send_str(json.dumps(Envelope.new("hello", hello.to_wire()).to_wire()))
 
@@ -75,6 +103,11 @@ async def _connect_and_serve(url: str, name: str, faults: FaultConfig) -> None:
             raise ConnectionError(f"expected welcome, got {welcome_envelope.type!r}")
         welcome = Welcome.from_wire(welcome_envelope.payload)
         logger.info("connected as device_id=%s", welcome.device_id)
+        if welcome.credential is not None:
+            # First-time pairing just completed — persist the newly-issued credential so every
+            # future connect (this run's own reconnects, and any later invocation of this CLI
+            # against the same --credential-file) authenticates as a returning device instead.
+            credential_file.write_text(welcome.credential)
 
         node_session = _NodeSession(ws, faults)
         async for msg in ws:

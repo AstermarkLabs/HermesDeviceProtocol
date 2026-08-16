@@ -29,6 +29,12 @@ _CASES = [
     ),
     (Hello(hdp_versions=(0,), device_name="n", capabilities=(), credential="secret"), "extra"),
     (Welcome(hdp_version=0, device_id="01JB0000000000000000000000"), "extra"),
+    (
+        Welcome(
+            hdp_version=0, device_id="01JB0000000000000000000000", credential="new-credential"
+        ),
+        "extra",
+    ),
     (CapabilitiesMsg(capabilities=(_DESCRIPTOR,)), "extra"),
     (
         InvokeMsg(
@@ -67,6 +73,15 @@ def test_from_wire_tolerates_unknown_fields(instance, extra_key):
     wire[extra_key] = "ignored"
     restored = cls.from_wire(wire)
     assert restored == instance
+
+
+def test_welcome_credential_defaults_to_none_and_round_trips_present_as_null():
+    welcome = Welcome(hdp_version=0, device_id="01JB0000000000000000000000")
+    assert welcome.credential is None
+    wire = welcome.to_wire()
+    assert "credential" in wire
+    assert wire["credential"] is None
+    assert Welcome.from_wire(wire).credential is None
 
 
 def test_hello_rejects_malformed_hdp_versions():

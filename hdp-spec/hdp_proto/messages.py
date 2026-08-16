@@ -86,19 +86,29 @@ class Hello:
 
 @dataclass(frozen=True)
 class Welcome:
-    """Bridge → Node, reply to a successful `hello`."""
+    """Bridge → Node, reply to a successful `hello`. `credential` (M2, §4.3) is present only on
+    a first-time pairing handshake, carrying the newly-issued device credential in plaintext
+    exactly once; absent (null) on every other `welcome`. Defaulted so this is not a wire break
+    for an M1 receiver."""
 
     hdp_version: int
     device_id: str
+    credential: str | None = None
 
     @classmethod
     def from_wire(cls, d: dict[str, Any]) -> Welcome:
         return cls(
-            hdp_version=_require_int(d, "hdp_version"), device_id=_require_str(d, "device_id")
+            hdp_version=_require_int(d, "hdp_version"),
+            device_id=_require_str(d, "device_id"),
+            credential=_require_str_or_none(d, "credential"),
         )
 
     def to_wire(self) -> dict[str, Any]:
-        return {"hdp_version": self.hdp_version, "device_id": self.device_id}
+        return {
+            "hdp_version": self.hdp_version,
+            "device_id": self.device_id,
+            "credential": self.credential,
+        }
 
 
 @dataclass(frozen=True)

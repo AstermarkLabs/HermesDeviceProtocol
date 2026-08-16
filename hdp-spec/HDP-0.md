@@ -198,3 +198,24 @@ See `hdp-spec/errors.md` for the closed error-code taxonomy. Error frames on the
 `type: "error"` with `payload` shaped `{"code", "message", "hint"}` — the same shape
 `hdp_proto.errors.err()` produces for the model-facing result envelope, so a bridge translating a
 wire-level `error` frame into a tool result does not need to reshape it.
+
+## Amendments (v0.2)
+
+Landed at M2, without a wire break (§3's "unknown fields tolerated" rule is what makes this
+possible — see docs/m2-plan.md §4.3). The `hdp` envelope field's value is unchanged (`"0"`); this
+is a document revision, not a new protocol version.
+
+- **`hello.credential` is now verified.** M1 accepted any value, including absent. M2 requires a
+  credential: either an existing device's stored credential (a returning connection), or a
+  first-time pairing code prefixed `pair:` (a new pairing). Absent or invalid → `auth_failed`,
+  connection closed. There is no more anonymous/unpaired connection path.
+- **`welcome.credential`** (new, optional field): present only on a first-time pairing
+  handshake, carrying the newly-issued device credential in plaintext exactly once (FR-12).
+  Absent on every other `welcome`.
+- **`revoke` is now sent** by the bridge on operator-initiated revocation (§4.4).
+- **`POST /hdp/v0/pair` remains absent on the HTTP surface** — M2 implements pairing entirely
+  through the WebSocket handshake's `pair:`-prefixed credential, not a separate REST endpoint.
+  (Deliberate deviation from m2-plan.md's mention of a `POST /hdp/v0/pair` route: a second HTTP
+  round trip before the WebSocket upgrade would need its own auth story for no benefit, since the
+  pairing code itself is already the one-time secret. Recorded here as the resolution of that
+  ambiguity, not a silent drop.)

@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import os
 import sys
+import uuid
 from pathlib import Path
 
 from hermes_device_plugin.transport.base import DeviceInfo
@@ -51,11 +52,50 @@ async def stop_bridge(proc: asyncio.subprocess.Process) -> None:
             await proc.wait()
 
 
+async def mint_pairing_code() -> str:
+    """Run `hdp-bridge pair new` as a subprocess against the already-running bridge daemon
+    (`$HERMES_HOME` is already set for this test by the `_hermes_home` fixture, and both this
+    subprocess and the daemon's own connection see the same SQLite file — WAL mode makes that
+    safe) and return the minted pairing code. M2: every node connection now needs one of these
+    before it can complete a `hello` handshake — see `start_node`'s docstring."""
+    proc = await asyncio.create_subprocess_exec(
+        "uv",
+        "run",
+        "hdp-bridge",
+        "pair",
+        "new",
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    stdout, stderr = await proc.communicate()
+    if proc.returncode != 0:
+        raise RuntimeError(f"hdp-bridge pair new failed: {stderr.decode(errors='replace')}")
+    return stdout.decode().strip()
+
+
 async def start_node(
-    bridge_url: str, *, name: str = "conformance-node", faults: tuple[str, ...] = ()
+    bridge_url: str,
+    *,
+    name: str = "conformance-node",
+    faults: tuple[str, ...] = (),
+    credential_file: Path | None = None,
 ) -> asyncio.subprocess.Process:
     """Launch the real `hdp-node` CLI as a subprocess with the given `--fault` flags, pointed at
-    `bridge_url`. The caller is responsible for calling `stop_node` on the result."""
+    `bridge_url`. The caller is responsible for calling `stop_node` on the result.
+
+    M2: the bridge no longer accepts an unpaired `hello` (hdp-spec/HDP-0.md's Amendments (v0.2)),
+    so this mints a fresh one-time pairing code for every call via `mint_pairing_code()` and
+    passes it as `--pair-code`. `credential_file` defaults to a name unique to this call
+    (`os.getpid()`-scoped) rather than the CLI's own `./.hdp-node-credential` default, so
+    concurrent/sequential `start_node` calls in the same test working directory never share (or
+    collide over) a stored credential."""
+    if credential_file is None:
+        # `$HERMES_HOME` is this test's own tmp_path (the `_hermes_home` fixture) — parking the
+        # credential file there, not the repo's cwd, keeps the working tree clean and gives each
+        # test's node processes an isolated location regardless of run order.
+        hermes_home = Path(os.environ["HERMES_HOME"])
+        credential_file = hermes_home / f".hdp-node-credential.{uuid.uuid4().hex}"
+    pair_code = await mint_pairing_code()
     cmd = [
         sys.executable,
         "-m",
@@ -65,6 +105,10 @@ async def start_node(
         name,
         "--url",
         bridge_url,
+        "--pair-code",
+        pair_code,
+        "--credential-file",
+        str(credential_file),
     ]
     for flag in faults:
         cmd += ["--fault", flag]

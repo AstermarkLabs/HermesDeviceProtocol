@@ -13,10 +13,16 @@ from .control import ControlServer
 from .invocations import InvocationsMem
 from .registry import Registry
 from .server import HdpServer
+from .store import db as store_db
 
 
 async def serve(*, stop_event: asyncio.Event | None = None) -> None:
     registry = Registry(config.registry_db_path())
+    # A second `sqlite3.Connection` onto the same database file as `registry`'s own — WAL mode
+    # (store/db.py's `_apply_pragmas`) makes this safe. `NodeConnection` needs a raw connection
+    # for `credentials.py`/`pairing.py`, which operate below `Registry`'s device-record API; one
+    # shared connection here (not a pool) is correct per §3.2's single-writer-thread daemon.
+    conn = store_db.connect(config.registry_db_path())
     invocations = InvocationsMem()
     connections: dict[str, NodeConnection] = {}
     descriptors: dict = {}
@@ -24,6 +30,7 @@ async def serve(*, stop_event: asyncio.Event | None = None) -> None:
     def make_connection(ws: object) -> NodeConnection:
         return NodeConnection(
             ws,  # type: ignore[arg-type]
+            conn=conn,
             registry=registry,
             invocations=invocations,
             connections=connections,

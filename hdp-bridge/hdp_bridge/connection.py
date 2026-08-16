@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import logging
+import sqlite3
 import time
 from collections import OrderedDict
 from typing import TYPE_CHECKING, Any, Protocol
@@ -34,6 +35,7 @@ from hdp_proto.messages import (
 )
 from hdp_proto.version import HDP_VERSION
 
+from . import credentials, pairing
 from .types import CapabilityRecord, DeviceRecord
 
 if TYPE_CHECKING:
@@ -70,12 +72,14 @@ class NodeConnection:
         self,
         ws: web.WebSocketResponse,
         *,
+        conn: sqlite3.Connection,
         registry: Registry,
         invocations: InvocationsMem,
         connections: dict[str, NodeConnection],
         descriptors: dict[str, dict[str, CapabilityDescriptor]],
     ) -> None:
         self._ws = ws
+        self._conn = conn
         self._registry = registry
         self._invocations = invocations
         self._connections = connections
@@ -173,13 +177,61 @@ class NodeConnection:
         await handler(envelope)
 
     async def _handle_hello(self, envelope: Envelope) -> None:
+        """M2 auth (§3, §4.3): a `hello` must carry a credential — either an existing device's
+        stored credential (a returning connection, resolved by hash — `hello` carries no
+        device_id, only the credential, per `credentials.verify_credential_and_resolve_device`'s
+        docstring) or a first-time pairing code, carried in the same `credential` field prefixed
+        `pair:` (no wire-shape change — see hdp-spec/HDP-0.md's Amendments (v0.2)). There is no
+        more anonymous/unpaired path: absent or invalid, in either form, closes the connection
+        with `auth_failed`, full stop — this was only ever M1 scaffolding behavior."""
         try:
             hello = Hello.from_wire(envelope.payload)
         except ValueError as exc:
             await self._reject_malformed(f"malformed hello: {exc}")
             return
 
+        if hello.credential and hello.credential.startswith("pair:"):
+            await self._handle_pairing_hello(hello)
+            return
+
+        if not hello.credential:
+            await self._ws.close(code=WSCloseCode.POLICY_VIOLATION, message=b"auth_failed")
+            logger.warning("auth_failed device_name=%s reason=no_credential", hello.device_name)
+            return
+
+        device_id = credentials.verify_credential_and_resolve_device(
+            self._conn, hello.credential
+        )
+        if device_id is None:
+            await self._ws.close(code=WSCloseCode.POLICY_VIOLATION, message=b"auth_failed")
+            logger.warning(
+                "auth_failed device_name=%s reason=unknown_credential", hello.device_name
+            )
+            return
+
+        self._register_device(device_id, hello)
+        welcome = Welcome(hdp_version=int(HDP_VERSION), device_id=device_id)
+        await self._send(Envelope.new("welcome", welcome.to_wire()))
+
+    async def _handle_pairing_hello(self, hello: Hello) -> None:
+        pair_code = hello.credential.removeprefix("pair:")  # type: ignore[union-attr]
         device_id = ids.new()
+        if not pairing.consume_pairing_code(self._conn, pair_code, device_id):
+            await self._ws.close(code=WSCloseCode.POLICY_VIOLATION, message=b"auth_failed")
+            logger.warning("auth_failed reason=invalid_or_expired_pairing_code")
+            return
+
+        # `devices` must exist before `credentials` (FK constraint) — `_register_device` writes
+        # the devices row (via `Registry`'s own connection to the same file; WAL mode makes the
+        # commit visible to `self._conn` immediately) before `issue_credential` inserts against it.
+        self._register_device(device_id, hello)
+        new_credential = credentials.issue_credential(self._conn, device_id)
+        welcome = Welcome(
+            hdp_version=int(HDP_VERSION), device_id=device_id, credential=new_credential
+        )
+        await self._send(Envelope.new("welcome", welcome.to_wire()))
+
+    def _register_device(self, device_id: str, hello: Hello) -> None:
         capability_infos = [
             CapabilityRecord(
                 name=c.name,
@@ -202,9 +254,8 @@ class NodeConnection:
         self._connections[device_id] = self
         self.device_id = device_id
 
-        welcome = Welcome(hdp_version=int(HDP_VERSION), device_id=device_id)
-        reply = Envelope.new("welcome", welcome.to_wire())
-        await self._ws.send_str(json.dumps(reply.to_wire()))
+    async def _send(self, envelope: Envelope) -> None:
+        await self._ws.send_str(json.dumps(envelope.to_wire()))
 
     async def _handle_capabilities(self, envelope: Envelope) -> None:
         try:

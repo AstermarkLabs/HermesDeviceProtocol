@@ -11,9 +11,12 @@ _FORBIDDEN_COLUMN_SUBSTRINGS = ("message", "conversation", "content", "transcrip
 def test_no_table_has_a_conversation_or_message_column(tmp_path):
     """NFR-6: registry.db is not a second Hermes session database."""
     conn = db.connect(tmp_path / "registry.db")
-    tables = [r[0] for r in conn.execute(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name != 'schema_version'"
-    )]
+    tables = [
+        r[0]
+        for r in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name != 'schema_version'"
+        )
+    ]
     assert tables, "expected at least the seven state tables to exist"
     for table in tables:
         columns = {r[1].lower() for r in conn.execute(f"PRAGMA table_info({table})")}

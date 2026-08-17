@@ -14,8 +14,14 @@ def test_connect_creates_schema_and_sets_pragmas(tmp_path):
     assert row[0] == 1
     tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     assert {
-        "devices", "credentials", "pairing_codes", "capabilities",
-        "policy_grants", "approvals", "invocations", "schema_version",
+        "devices",
+        "credentials",
+        "pairing_codes",
+        "capabilities",
+        "policy_grants",
+        "approvals",
+        "invocations",
+        "schema_version",
     } <= tables
     version_row = conn.execute("SELECT version FROM schema_version").fetchone()
     assert version_row[0] == db.CURRENT_SCHEMA_VERSION

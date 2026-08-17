@@ -19,7 +19,8 @@ import json
 
 import pytest
 from aiohttp.test_utils import TestClient, TestServer
-from hdp_bridge import pairing, server as _server
+from hdp_bridge import pairing
+from hdp_bridge import server as _server
 from hdp_bridge.connection import NodeConnection
 from hdp_bridge.invocations import InvocationsMem
 from hdp_bridge.registry import Registry

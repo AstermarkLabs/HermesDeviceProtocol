@@ -140,7 +140,12 @@ async def wait_for_device(bridge: SocketTransport, *, timeout_s: float = 10.0) -
     raise TimeoutError("no node connected within the timeout")
 
 
-async def wait_for_log(lines: list[str], substring: str, *, timeout: float = 2.0) -> None:
+async def wait_for_log(
+    lines: list[str],
+    substring: str,
+    *,
+    timeout: float = 2.0,  # noqa: ASYNC109 — a polling deadline, not a cancellation scope
+) -> None:
     """Poll the `bridge_log` list (conftest.py's live-updated capture of the `hdp-bridge serve`
     subprocess's stdout) until `substring` appears, or raise on timeout.
 
@@ -149,6 +154,12 @@ async def wait_for_log(lines: list[str], substring: str, *, timeout: float = 2.0
     OS pipe -> conftest's `_drain()` task -> `lines`. Nothing synchronizes the two, so asserting
     on `lines` immediately after `await bridge.invoke(...)` returns is a race the test loses
     whenever the drain task hasn't been scheduled yet. Polling closes it.
+
+    ASYNC109 wants `asyncio.timeout` instead of a `timeout` parameter. That rule is aimed at
+    functions that pass a timeout down to a single awaited operation; this one has no such
+    operation to wrap — it is a poll loop over a plain list, and the parameter names how long to
+    keep polling. `asyncio.timeout` here would only replace a specific failure message ("X never
+    appeared in the bridge log") with a bare `TimeoutError`.
 
     Lives in `harness.py` rather than `conftest.py` (which is where the review filed it) for the
     reason this module's own docstring gives: `from conftest import ...` is not safe in this

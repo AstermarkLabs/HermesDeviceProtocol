@@ -526,9 +526,9 @@ class ControlServer:
         connection rather than the CLI's DB-only fallback (`cli.py`'s `_run_devices_revoke`)."""
         device_id = envelope.payload.get("device_id")
         if not device_id:
-            error_payload = err(
-                ErrorCode.NO_MATCHING_DEVICE, "revoke requires a device_id"
-            )["error"]
+            error_payload = err(ErrorCode.NO_MATCHING_DEVICE, "revoke requires a device_id")[
+                "error"
+            ]
             return Envelope.new("error", error_payload)
         if self._conn is None:  # pragma: no cover — always set in daemon.py's real wiring
             error_payload = err(

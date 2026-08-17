@@ -30,9 +30,7 @@ _CASES = [
     (Hello(hdp_versions=(0,), device_name="n", capabilities=(), credential="secret"), "extra"),
     (Welcome(hdp_version=0, device_id="01JB0000000000000000000000"), "extra"),
     (
-        Welcome(
-            hdp_version=0, device_id="01JB0000000000000000000000", credential="new-credential"
-        ),
+        Welcome(hdp_version=0, device_id="01JB0000000000000000000000", credential="new-credential"),
         "extra",
     ),
     (CapabilitiesMsg(capabilities=(_DESCRIPTOR,)), "extra"),

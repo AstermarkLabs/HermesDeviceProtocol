@@ -8,10 +8,17 @@ import os
 import time
 from pathlib import Path
 
-_FSYNC_EVENTS = frozenset({
-    "paired", "pairing_code_minted", "revoked", "auth_failed",
-    "daemon_start", "daemon_stop", "rejected_control_verb",
-})
+_FSYNC_EVENTS = frozenset(
+    {
+        "paired",
+        "pairing_code_minted",
+        "revoked",
+        "auth_failed",
+        "daemon_start",
+        "daemon_stop",
+        "rejected_control_verb",
+    }
+)
 
 
 class AuditWriter:

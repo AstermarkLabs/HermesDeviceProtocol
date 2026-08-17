@@ -267,9 +267,7 @@ class NodeConnection:
                 self._audit.record("auth_failed", reason="no_credential")
             return
 
-        device_id = credentials.verify_credential_and_resolve_device(
-            self._conn, hello.credential
-        )
+        device_id = credentials.verify_credential_and_resolve_device(self._conn, hello.credential)
         if device_id is None:
             await self._ws.close(code=WSCloseCode.POLICY_VIOLATION, message=b"auth_failed")
             logger.warning(

@@ -43,8 +43,12 @@ async def test_revoke_invalidates_credential_sends_revoke_frame_and_fails_in_fli
     invocation_id, entry = invocations.mint_for("dev_1", capability="diagnostics.echo")
     ws = _FakeWS()
     connection = NodeConnection(
-        ws, conn=conn, registry=registry, invocations=invocations,
-        connections={"dev_1": None}, descriptors={},
+        ws,
+        conn=conn,
+        registry=registry,
+        invocations=invocations,
+        connections={"dev_1": None},
+        descriptors={},
     )
     connection.device_id = "dev_1"
     connections = {"dev_1": connection}
@@ -99,8 +103,12 @@ async def test_revoke_fails_in_flight_invocation_with_revoked_not_device_offline
     invocation_id, entry = invocations.mint_for("dev_3", capability="diagnostics.echo")
     ws = _FakeWS()
     connection = NodeConnection(
-        ws, conn=conn, registry=registry, invocations=invocations,
-        connections={"dev_3": None}, descriptors={},
+        ws,
+        conn=conn,
+        registry=registry,
+        invocations=invocations,
+        connections={"dev_3": None},
+        descriptors={},
     )
     connection.device_id = "dev_3"
     connections = {"dev_3": connection}

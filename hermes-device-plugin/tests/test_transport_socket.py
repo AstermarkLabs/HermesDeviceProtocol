@@ -188,7 +188,9 @@ class _FakeControlServer:
                 self._tasks.add(task)
                 task.add_done_callback(self._tasks.discard)
                 continue
-            self._write(writer, Envelope.new("ctl_status_reply", {"healthy": True}, corr=envelope.id))
+            self._write(
+                writer, Envelope.new("ctl_status_reply", {"healthy": True}, corr=envelope.id)
+            )
 
     async def _reply_slowly(self, envelope, writer) -> None:
         self.concurrent_invokes += 1

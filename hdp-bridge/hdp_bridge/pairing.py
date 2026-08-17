@@ -21,7 +21,7 @@ def _random_code() -> str:
         chars.append(_CROCKFORD[value & 0x1F])
         value >>= 5
     chars.reverse()
-    grouped = "-".join("".join(chars[i:i + 4]) for i in range(0, len(chars), 4))
+    grouped = "-".join("".join(chars[i : i + 4]) for i in range(0, len(chars), 4))
     return grouped
 
 

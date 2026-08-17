@@ -37,8 +37,12 @@ async def test_heartbeat_updates_last_seen_at(tmp_path):
     )
     registry = Registry(db_path)
     connection = NodeConnection(
-        _FakeWS(), conn=conn, registry=registry, invocations=InvocationsMem(),
-        connections={}, descriptors={},
+        _FakeWS(),
+        conn=conn,
+        registry=registry,
+        invocations=InvocationsMem(),
+        connections={},
+        descriptors={},
     )
     connection.device_id = "dev_1"
     import json
@@ -57,7 +61,12 @@ async def test_dead_peer_after_45s_of_silence_closes_and_fails_in_flight(tmp_pat
     invocations = InvocationsMem()
     ws = _FakeWS()
     connection = NodeConnection(
-        ws, conn=conn, registry=registry, invocations=invocations, connections={}, descriptors={},
+        ws,
+        conn=conn,
+        registry=registry,
+        invocations=invocations,
+        connections={},
+        descriptors={},
         dead_peer_timeout_s=0.2,  # test-only override, see Step 2
     )
     connection.device_id = "dev_1"
@@ -95,7 +104,12 @@ async def test_dead_peer_timeout_leaves_disconnect_reason_at_default(tmp_path):
     invocations = InvocationsMem()
     ws = _FakeWS()
     connection = NodeConnection(
-        ws, conn=conn, registry=registry, invocations=invocations, connections={}, descriptors={},
+        ws,
+        conn=conn,
+        registry=registry,
+        invocations=invocations,
+        connections={},
+        descriptors={},
         dead_peer_timeout_s=0.2,
     )
     connection.device_id = "dev_1"

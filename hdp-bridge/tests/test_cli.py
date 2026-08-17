@@ -110,9 +110,7 @@ def test_devices_revoke_of_an_unknown_device_reports_no_such_device_and_audits_n
     assert not list((tmp_path / "hdp" / "audit").glob("audit-*.jsonl"))
 
 
-def test_devices_revoke_twice_reports_no_such_device_the_second_time(
-    tmp_path, monkeypatch, capsys
-):
+def test_devices_revoke_twice_reports_no_such_device_the_second_time(tmp_path, monkeypatch, capsys):
     """Already-revoked is the same zero-rows case as never-existed — both are "nothing happened"
     and neither earns a second audit record."""
     monkeypatch.setenv("HERMES_HOME", str(tmp_path))

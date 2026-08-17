@@ -52,8 +52,13 @@ async def test_hello_with_no_credential_is_auth_failed(tmp_path):
     ws = _FakeWS()
     audit = AuditWriter(tmp_path / "audit")
     connection = NodeConnection(
-        ws, conn=conn, registry=registry, invocations=InvocationsMem(), connections={},
-        descriptors={}, audit=audit,
+        ws,
+        conn=conn,
+        registry=registry,
+        invocations=InvocationsMem(),
+        connections={},
+        descriptors={},
+        audit=audit,
     )
 
     hello = Hello(hdp_versions=(0,), device_name="n", capabilities=(), credential=None)
@@ -63,7 +68,9 @@ async def test_hello_with_no_credential_is_auth_failed(tmp_path):
 
     records = _read_audit_records(tmp_path / "audit")
     assert records[-1] == {
-        "event": "auth_failed", "ts": records[-1]["ts"], "reason": "no_credential",
+        "event": "auth_failed",
+        "ts": records[-1]["ts"],
+        "reason": "no_credential",
     }
 
 
@@ -73,8 +80,13 @@ async def test_hello_with_an_unknown_credential_is_auth_failed(tmp_path):
     ws = _FakeWS()
     audit = AuditWriter(tmp_path / "audit")
     connection = NodeConnection(
-        ws, conn=conn, registry=registry, invocations=InvocationsMem(), connections={},
-        descriptors={}, audit=audit,
+        ws,
+        conn=conn,
+        registry=registry,
+        invocations=InvocationsMem(),
+        connections={},
+        descriptors={},
+        audit=audit,
     )
 
     hello = Hello(hdp_versions=(0,), device_name="n", capabilities=(), credential="bogus")
@@ -93,8 +105,13 @@ async def test_hello_with_an_invalid_pairing_code_is_auth_failed(tmp_path):
     ws = _FakeWS()
     audit = AuditWriter(tmp_path / "audit")
     connection = NodeConnection(
-        ws, conn=conn, registry=registry, invocations=InvocationsMem(), connections={},
-        descriptors={}, audit=audit,
+        ws,
+        conn=conn,
+        registry=registry,
+        invocations=InvocationsMem(),
+        connections={},
+        descriptors={},
+        audit=audit,
     )
 
     hello = Hello(
@@ -117,8 +134,13 @@ async def test_hello_with_a_valid_pairing_code_pairs_and_returns_a_credential(tm
     ws = _FakeWS()
     audit = AuditWriter(tmp_path / "audit")
     connection = NodeConnection(
-        ws, conn=conn, registry=registry, invocations=InvocationsMem(), connections={},
-        descriptors={}, audit=audit,
+        ws,
+        conn=conn,
+        registry=registry,
+        invocations=InvocationsMem(),
+        connections={},
+        descriptors={},
+        audit=audit,
     )
 
     hello = Hello(hdp_versions=(0,), device_name="n", capabilities=(), credential=f"pair:{code}")
@@ -145,7 +167,12 @@ async def test_hello_with_a_previously_consumed_pairing_code_is_auth_failed(tmp_
     registry = Registry(db_path)
     ws = _FakeWS()
     connection = NodeConnection(
-        ws, conn=conn, registry=registry, invocations=InvocationsMem(), connections={}, descriptors={}
+        ws,
+        conn=conn,
+        registry=registry,
+        invocations=InvocationsMem(),
+        connections={},
+        descriptors={},
     )
 
     hello = Hello(hdp_versions=(0,), device_name="n", capabilities=(), credential=f"pair:{code}")
@@ -165,7 +192,12 @@ async def test_hello_with_a_returning_credential_resolves_the_same_device_id(tmp
     registry = Registry(db_path)
     ws = _FakeWS()
     connection = NodeConnection(
-        ws, conn=conn, registry=registry, invocations=InvocationsMem(), connections={}, descriptors={}
+        ws,
+        conn=conn,
+        registry=registry,
+        invocations=InvocationsMem(),
+        connections={},
+        descriptors={},
     )
 
     hello = Hello(hdp_versions=(0,), device_name="n", capabilities=(), credential=credential)
@@ -189,7 +221,12 @@ async def test_hello_with_a_revoked_credential_is_auth_failed(tmp_path):
     registry = Registry(db_path)
     ws = _FakeWS()
     connection = NodeConnection(
-        ws, conn=conn, registry=registry, invocations=InvocationsMem(), connections={}, descriptors={}
+        ws,
+        conn=conn,
+        registry=registry,
+        invocations=InvocationsMem(),
+        connections={},
+        descriptors={},
     )
 
     hello = Hello(hdp_versions=(0,), device_name="n", capabilities=(), credential=credential)

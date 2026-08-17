@@ -67,7 +67,10 @@ async def test_auth_failed_is_terminal_and_never_retried(bridge_stub, tmp_path, 
     start = loop.time()
     with pytest.raises(node.AuthFailed):
         await node.run(
-            bridge_stub, "test-node", FaultConfig(), credential_file=credential_file,
+            bridge_stub,
+            "test-node",
+            FaultConfig(),
+            credential_file=credential_file,
             max_reconnect_attempts=5,
         )
     elapsed = loop.time() - start
@@ -95,7 +98,10 @@ async def test_a_non_auth_close_is_still_retried(bridge_stub, tmp_path):
 
     with pytest.raises(ConnectionError):
         await node.run(
-            bridge_stub, "test-node", FaultConfig(), credential_file=credential_file,
+            bridge_stub,
+            "test-node",
+            FaultConfig(),
+            credential_file=credential_file,
             max_reconnect_attempts=2,
         )
 
@@ -117,7 +123,9 @@ async def test_the_issued_credential_is_written_0600(bridge_stub, tmp_path):
     i.e. a long-lived device secret readable by every user on the machine."""
     credential_file = tmp_path / "cred"
 
-    await node.run(bridge_stub, "test-node", FaultConfig(), pair_code="CODE", credential_file=credential_file)
+    await node.run(
+        bridge_stub, "test-node", FaultConfig(), pair_code="CODE", credential_file=credential_file
+    )
 
     assert credential_file.read_text() == "s3cret"
     assert stat.S_IMODE(credential_file.stat().st_mode) == 0o600
@@ -131,7 +139,9 @@ async def test_re_pairing_over_a_world_readable_file_still_ends_at_0600(bridge_s
     credential_file.write_text("an-old-credential")
     credential_file.chmod(0o644)
 
-    await node.run(bridge_stub, "test-node", FaultConfig(), pair_code="CODE", credential_file=credential_file)
+    await node.run(
+        bridge_stub, "test-node", FaultConfig(), pair_code="CODE", credential_file=credential_file
+    )
 
     assert stat.S_IMODE(credential_file.stat().st_mode) == 0o600
 
@@ -165,7 +175,10 @@ async def test_a_revoke_frame_ends_the_session_without_reconnecting(bridge_stub,
     with caplog.at_level("ERROR"):
         await asyncio.wait_for(
             node.run(
-                bridge_stub, "test-node", FaultConfig(), credential_file=credential_file,
+                bridge_stub,
+                "test-node",
+                FaultConfig(),
+                credential_file=credential_file,
                 max_reconnect_attempts=3,
             ),
             timeout=10,

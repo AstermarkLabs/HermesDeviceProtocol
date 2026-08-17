@@ -141,7 +141,12 @@ async def _serve_claimed(pid_path: Path, stop_event: asyncio.Event | None) -> No
         audit.record("daemon_stop")
         await control.close()
         await hdp_server.close()
-        pid_path.unlink(missing_ok=True)
+        # ASYNC240 flags blocking pathlib calls in async code. This one is a single unlink in a
+        # teardown `finally`, releasing this process's PID claim as the daemon exits — there is
+        # no throughput to protect at this point, and no correctness benefit to deferring it to a
+        # thread. Unclaiming synchronously is in fact what we want: it must have happened before
+        # `serve()` returns, or a fast restart could see a claim its owner has already abandoned.
+        pid_path.unlink(missing_ok=True)  # noqa: ASYNC240
 
 
 def main() -> None:

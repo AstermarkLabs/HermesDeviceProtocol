@@ -89,12 +89,20 @@ def main(argv: list[str] | None = None) -> None:
     if args.command == "connect":
         url = args.url or _default_bridge_url()
         faults = FaultConfig.parse(args.faults)
-        asyncio.run(
-            node.run(
-                url,
-                args.name,
-                faults,
-                pair_code=args.pair_code,
-                credential_file=Path(args.credential_file),
+        try:
+            asyncio.run(
+                node.run(
+                    url,
+                    args.name,
+                    faults,
+                    pair_code=args.pair_code,
+                    credential_file=Path(args.credential_file),
+                )
             )
-        )
+        except node.AuthFailed as exc:
+            # A terminal, operator-actionable condition (revoked or unknown credential, expired
+            # pairing code) — a one-line diagnosis and a nonzero exit, not a traceback.
+            raise SystemExit(
+                f"{exc}. Re-pair with `hdp-bridge pair new` and `--pair-code`, "
+                f"after removing {args.credential_file}."
+            ) from exc

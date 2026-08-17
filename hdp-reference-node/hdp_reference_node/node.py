@@ -11,6 +11,8 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
+import random
 from pathlib import Path
 from typing import Any
 
@@ -31,7 +33,43 @@ _HANDLERS = {
     device_status.DESCRIPTOR.name: device_status.handle,
 }
 
+_INITIAL_BACKOFF_S = 1.0
 _MAX_BACKOFF_S = 30.0
+_BACKOFF_JITTER_FRACTION = 0.25
+"""FR-14's reconnect schedule, exactly: exponential from 1s to a 30s ceiling, jittered.
+
+The previous shape (`min(30.0, 0.5 * (2 ** (attempt - 1)))`) started at 0.5s and had no jitter at
+all, so a bridge restart with N nodes attached produced N reconnect attempts in lockstep, forever
+— a self-inflicted thundering herd, and the reason FR-14 says "jittered" rather than merely
+"backed off". `hermes_device_plugin/transport/socket.py` already implements this same shape for
+the plugin side, describing itself as reusing the node-side one; this is now that shape.
+"""
+
+
+class AuthFailed(Exception):
+    """The bridge rejected this node's credential.
+
+    Deliberately **not** an `OSError` subclass. The previous code raised `ConnectionError` here,
+    which *is* one — so `run()`'s `except (aiohttp.ClientError, OSError)` reconnect handler caught
+    it and retried forever, presenting the same rejected credential every time. A rejected
+    credential is not a transient network condition and no amount of retrying will change it, so
+    this must be a type that reconnect handling cannot accidentally swallow.
+    """
+
+
+def _write_credential(credential_file: Path, credential: str) -> None:
+    """Write the bridge-issued credential 0600, with no world-readable window at any point.
+
+    `Path.write_text` creates at the process umask (typically 0644): a long-lived device secret
+    readable by every user on the machine. `os.open` with the mode argument closes that, but only
+    for a file that does not already exist — `O_CREAT`'s mode is ignored outright when it does —
+    so `fchmod` on the returned descriptor covers the re-pairing case too. Both act on the fd, so
+    there is no window and no path-based race.
+    """
+    fd = os.open(credential_file, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as handle:
+        os.fchmod(fd, 0o600)
+        handle.write(credential)
 
 
 async def run(
@@ -57,19 +95,41 @@ async def run(
     written to `credential_file` immediately so every subsequent reconnect in this `run()` call
     (and every future invocation of this CLI against the same `--credential-file`) uses it
     instead of the one-time pairing code, which the bridge has already consumed.
+
+    Two M2 conditions end `run` for good rather than reconnecting, because reconnecting could
+    only present a credential the bridge has already refused: an `auth_failed` close during the
+    handshake (raised as `AuthFailed`, which is *not* an `OSError` and so is not caught by the
+    reconnect handler below), and a `revoke` frame on an established session (which returns
+    cleanly out of `_connect_and_serve`).
     """
     attempt = 0
     while max_reconnect_attempts is None or attempt < max_reconnect_attempts:
         try:
             await _connect_and_serve(url, name, faults, pair_code, credential_file)
             return
+        except AuthFailed as exc:
+            # Terminal, never retried: the credential this node holds is not one the bridge will
+            # accept (revoked, unknown, or an expired/consumed pairing code). Reconnecting can
+            # only present the same rejected credential again (FR-15's revocation is meant to be
+            # immediate and total, so a node that retried through it would be defeating it).
+            logger.error("authentication rejected by the bridge (%s); not reconnecting", exc)
+            raise
         except (aiohttp.ClientError, OSError) as exc:
             attempt += 1
             if max_reconnect_attempts is not None and attempt >= max_reconnect_attempts:
                 raise
-            backoff = min(_MAX_BACKOFF_S, 0.5 * (2 ** (attempt - 1)))
+            backoff = _backoff_delay(attempt)
             logger.warning("connection lost (%s), reconnecting in %.1fs", exc, backoff)
             await asyncio.sleep(backoff)
+
+
+def _backoff_delay(attempt: int) -> float:
+    """FR-14: exponential 1s -> 30s, jittered. `attempt` is 1-based."""
+    base = min(_MAX_BACKOFF_S, _INITIAL_BACKOFF_S * (2 ** (attempt - 1)))
+    jitter = random.uniform(0, base * _BACKOFF_JITTER_FRACTION)  # noqa: S311
+    # Not a security context — retry-storm jitter for a reconnect loop, not a cryptographic
+    # value. Same call, same reasoning, as `transport/socket.py`'s plugin-side backoff.
+    return min(_MAX_BACKOFF_S, base + jitter)
 
 
 def _resolve_credential(pair_code: str | None, credential_file: Path) -> str:
@@ -97,6 +157,13 @@ async def _connect_and_serve(
 
         welcome_msg = await ws.receive()
         if welcome_msg.type != aiohttp.WSMsgType.TEXT:
+            # The bridge closes with `POLICY_VIOLATION` (1008) and no reply frame on every
+            # `auth_failed` path — no credential, unknown credential, invalid/expired pairing
+            # code (see `hdp_bridge/connection.py`'s `_handle_hello`). That is categorically
+            # different from a dropped socket and must not be retried. Note 4001 is *revocation*
+            # of an already-established session, handled on the frame path below, not here.
+            if ws.close_code == aiohttp.WSCloseCode.POLICY_VIOLATION:
+                raise AuthFailed("the bridge rejected this node's credential")
             raise ConnectionError(f"expected a welcome frame, got {welcome_msg.type!r}")
         welcome_envelope = Envelope.from_wire(json.loads(welcome_msg.data))
         if welcome_envelope.type != "welcome":
@@ -107,12 +174,18 @@ async def _connect_and_serve(
             # First-time pairing just completed — persist the newly-issued credential so every
             # future connect (this run's own reconnects, and any later invocation of this CLI
             # against the same --credential-file) authenticates as a returning device instead.
-            credential_file.write_text(welcome.credential)
+            _write_credential(credential_file, welcome.credential)
 
         node_session = _NodeSession(ws, faults)
         async for msg in ws:
             if msg.type == aiohttp.WSMsgType.TEXT:
                 await node_session.handle_frame(msg.data)
+                if node_session.revoked:
+                    # Returning normally (rather than raising) is what stops `run()` from
+                    # reconnecting — the credential we hold is now dead, so a reconnect would
+                    # only earn an `auth_failed` close. FR-15's revocation is immediate and
+                    # total; the node's job is to stay gone.
+                    return
             elif msg.type == aiohttp.WSMsgType.ERROR:
                 break
 
@@ -126,6 +199,9 @@ class _NodeSession:
         self._ws = ws
         self._faults = faults
         self._cancelled: set[str] = set()
+        self.revoked = False
+        """Set once a `revoke` frame arrives — `_connect_and_serve` reads it to end the session
+        for good rather than reconnecting."""
 
     async def handle_frame(self, raw: str) -> None:
         try:
@@ -140,7 +216,23 @@ class _NodeSession:
             self._handle_cancel(envelope)
         elif envelope.type == "heartbeat":
             await self._send(Envelope.new("heartbeat", {}))
-        # welcome/ack/revoke/error: no action needed from this reference implementation at M1.
+        elif envelope.type == "revoke":
+            await self._handle_revoke(envelope)
+        # welcome/ack/error: nothing for this reference implementation to do.
+
+    async def _handle_revoke(self, envelope: Envelope) -> None:
+        """M2 (HDP-0.md Amendments (v0.2)): `revoke` is sent for real now — at M1 it was a wire
+        type nothing ever emitted, which is why this used to be a no-op.
+
+        An operator has invalidated this device's credential. Log it loudly (this is the one
+        message that explains to whoever is reading the node's output why it just stopped), close
+        the connection, and let `_connect_and_serve` return so `run()` does not reconnect with a
+        credential the bridge will now reject.
+        """
+        reason = envelope.payload.get("reason", "")
+        logger.error("revoked by the bridge (%s); disconnecting and not reconnecting", reason)
+        self.revoked = True
+        await self._ws.close()
 
     def _handle_cancel(self, envelope: Envelope) -> None:
         if envelope.corr:

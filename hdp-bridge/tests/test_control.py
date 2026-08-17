@@ -25,6 +25,7 @@ from aiohttp.test_utils import TestClient, TestServer
 from hdp_bridge import config as bridge_config
 from hdp_bridge import pairing
 from hdp_bridge import server as _server
+from hdp_bridge.audit import AuditWriter
 from hdp_bridge.connection import NodeConnection
 from hdp_bridge.control import ControlServer, read_frame, write_frame
 from hdp_bridge.invocations import InvocationsMem
@@ -42,7 +43,10 @@ async def control_server(tmp_path):
     registry.register(DeviceRecord(device_id="dev_1", friendly_name="n", platform="p", online=True))
     invocations = InvocationsMem()
     socket_path = tmp_path / "bridge.sock"
-    server = ControlServer(socket_path, registry=registry, invocations=invocations, connections={})
+    audit = AuditWriter(tmp_path / "audit")
+    server = ControlServer(
+        socket_path, registry=registry, invocations=invocations, connections={}, audit=audit
+    )
     await server.start()
     yield server, socket_path
     await server.close()
@@ -59,7 +63,7 @@ async def test_ctl_list_devices_returns_registered_devices(control_server):
     assert reply.payload["devices"][0]["device_id"] == "dev_1"
 
 
-async def test_rejected_verb_gets_auth_failed(control_server):
+async def test_rejected_verb_gets_auth_failed(control_server, tmp_path):
     _server, socket_path = control_server
     reader, writer = await asyncio.open_unix_connection(str(socket_path))
     request = Envelope.new("ctl_policy_set", {})
@@ -68,6 +72,12 @@ async def test_rejected_verb_gets_auth_failed(control_server):
     writer.close()
     assert reply.type == "error"
     assert reply.payload["code"] == "auth_failed"
+
+    audit_files = list((tmp_path / "audit").glob("audit-*.jsonl"))
+    assert len(audit_files) == 1
+    record = json.loads(audit_files[0].read_text().strip())
+    assert record["event"] == "rejected_control_verb"
+    assert record["verb"] == "ctl_policy_set"
 
 
 # -- ctl_invoke / ctl_cancel / ctl_status ------------------------------------------------------

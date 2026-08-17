@@ -5,6 +5,9 @@ with a `revoked` error code (not `device_offline`)."""
 
 from __future__ import annotations
 
+import json
+
+from hdp_bridge.audit import AuditWriter
 from hdp_bridge.connection import NodeConnection
 from hdp_bridge.invocations import InvocationsMem
 from hdp_bridge.registry import Registry
@@ -45,14 +48,21 @@ async def test_revoke_invalidates_credential_sends_revoke_frame_and_fails_in_fli
     )
     connection.device_id = "dev_1"
     connections = {"dev_1": connection}
+    audit = AuditWriter(tmp_path / "audit")
 
-    await revoke_device(conn, "dev_1", connections=connections)
+    await revoke_device(conn, "dev_1", connections=connections, audit=audit)
 
     assert credentials.verify_credential(conn, "dev_1", credential) is False
     assert ws.closed_with is not None
     assert any('"revoke"' in frame for frame in ws.sent)
     assert entry.result_future.done()
     assert not invocations.is_pending(invocation_id)
+
+    audit_files = list((tmp_path / "audit").glob("audit-*.jsonl"))
+    assert len(audit_files) == 1
+    record = json.loads(audit_files[0].read_text().strip())
+    assert record["event"] == "revoked"
+    assert record["device_id"] == "dev_1"
 
 
 async def test_revoke_of_unconnected_device_still_invalidates_credential(tmp_path):

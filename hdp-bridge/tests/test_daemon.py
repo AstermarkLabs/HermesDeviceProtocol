@@ -1,12 +1,19 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 
 import pytest
 from hdp_bridge import daemon
 from hdp_bridge.control import ControlServer
 from hdp_bridge.server import HdpServer
+
+
+def _read_audit_records(hdp_home):
+    files = list((hdp_home / "audit").glob("audit-*.jsonl"))
+    assert len(files) == 1
+    return [json.loads(line) for line in files[0].read_text().splitlines()]
 
 
 async def test_serve_binds_control_socket_and_writes_pid(tmp_path, monkeypatch):
@@ -18,10 +25,17 @@ async def test_serve_binds_control_socket_and_writes_pid(tmp_path, monkeypatch):
     assert (tmp_path / "hdp" / "bridge.sock").exists()
     assert (tmp_path / "hdp" / "bridge.pid").exists()
     assert (tmp_path / "hdp" / "bridge.addr").exists()
+
+    records = _read_audit_records(tmp_path / "hdp")
+    assert records[0]["event"] == "daemon_start"
+
     stop_event.set()
     await asyncio.wait_for(serve_task, timeout=5)
     assert not (tmp_path / "hdp" / "bridge.sock").exists()
     assert not (tmp_path / "hdp" / "bridge.pid").exists()
+
+    records = _read_audit_records(tmp_path / "hdp")
+    assert [r["event"] for r in records] == ["daemon_start", "daemon_stop"]
 
 
 async def test_serve_tears_down_node_socket_if_control_bind_fails(tmp_path, monkeypatch):

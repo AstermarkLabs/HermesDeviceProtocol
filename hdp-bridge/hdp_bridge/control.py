@@ -36,6 +36,7 @@ from .invocations import DeviceDisconnected
 if TYPE_CHECKING:
     from hdp_proto.capabilities import CapabilityDescriptor
 
+    from .audit import AuditWriter
     from .connection import NodeConnection
     from .invocations import InvocationsMem
     from .registry import Registry
@@ -92,6 +93,7 @@ class ControlServer:
         connections: dict[str, NodeConnection],
         descriptors: dict[str, dict[str, CapabilityDescriptor]] | None = None,
         conn: sqlite3.Connection | None = None,
+        audit: AuditWriter | None = None,
     ) -> None:
         self._socket_path = socket_path
         self._registry = registry
@@ -100,6 +102,7 @@ class ControlServer:
         self._descriptors: dict[str, dict[str, CapabilityDescriptor]] = (
             descriptors if descriptors is not None else {}
         )
+        self._audit = audit
         # A raw `sqlite3.Connection`, distinct from `registry`'s own internal one (see
         # `daemon.py`'s NOTE on the two-connections deviation) — needed only by
         # `ctl_devices_revoke`, which operates below `Registry`'s device-record API via
@@ -224,6 +227,8 @@ class ControlServer:
     async def _dispatch(self, envelope: Envelope) -> Envelope:
         if envelope.type in _REJECTED_VERBS:
             logger.warning("rejected control verb=%s (audited)", envelope.type)
+            if self._audit is not None:
+                self._audit.record("rejected_control_verb", verb=envelope.type)
             detail = f"{envelope.type} is not accepted on this connection"
             error_payload = err(ErrorCode.AUTH_FAILED, detail)["error"]
             return Envelope.new("error", error_payload)
@@ -404,5 +409,7 @@ class ControlServer:
                 ErrorCode.BRIDGE_UNAVAILABLE, "control server has no database connection"
             )["error"]
             return Envelope.new("error", error_payload)
-        await _revocation.revoke_device(self._conn, device_id, connections=self._connections)
+        await _revocation.revoke_device(
+            self._conn, device_id, connections=self._connections, audit=self._audit
+        )
         return Envelope.new("ctl_devices_revoke_reply", {"ok": True, "device_id": device_id})

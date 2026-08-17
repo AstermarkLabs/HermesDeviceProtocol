@@ -13,12 +13,19 @@ from __future__ import annotations
 import json
 
 from hdp_bridge import credentials, pairing
+from hdp_bridge.audit import AuditWriter
 from hdp_bridge.connection import NodeConnection
 from hdp_bridge.invocations import InvocationsMem
 from hdp_bridge.registry import Registry
 from hdp_bridge.store import db
 from hdp_proto.envelope import Envelope
 from hdp_proto.messages import Hello, Welcome
+
+
+def _read_audit_records(audit_dir):
+    files = list(audit_dir.glob("audit-*.jsonl"))
+    assert len(files) == 1
+    return [json.loads(line) for line in files[0].read_text().splitlines()]
 
 
 class _FakeWS:
@@ -43,8 +50,10 @@ async def test_hello_with_no_credential_is_auth_failed(tmp_path):
     conn = db.connect(tmp_path / "registry.db")
     registry = Registry(tmp_path / "registry.db")
     ws = _FakeWS()
+    audit = AuditWriter(tmp_path / "audit")
     connection = NodeConnection(
-        ws, conn=conn, registry=registry, invocations=InvocationsMem(), connections={}, descriptors={}
+        ws, conn=conn, registry=registry, invocations=InvocationsMem(), connections={},
+        descriptors={}, audit=audit,
     )
 
     hello = Hello(hdp_versions=(0,), device_name="n", capabilities=(), credential=None)
@@ -52,13 +61,20 @@ async def test_hello_with_no_credential_is_auth_failed(tmp_path):
     assert ws.closed_with is not None
     assert connection.device_id is None
 
+    records = _read_audit_records(tmp_path / "audit")
+    assert records[-1] == {
+        "event": "auth_failed", "ts": records[-1]["ts"], "reason": "no_credential",
+    }
+
 
 async def test_hello_with_an_unknown_credential_is_auth_failed(tmp_path):
     conn = db.connect(tmp_path / "registry.db")
     registry = Registry(tmp_path / "registry.db")
     ws = _FakeWS()
+    audit = AuditWriter(tmp_path / "audit")
     connection = NodeConnection(
-        ws, conn=conn, registry=registry, invocations=InvocationsMem(), connections={}, descriptors={}
+        ws, conn=conn, registry=registry, invocations=InvocationsMem(), connections={},
+        descriptors={}, audit=audit,
     )
 
     hello = Hello(hdp_versions=(0,), device_name="n", capabilities=(), credential="bogus")
@@ -66,13 +82,19 @@ async def test_hello_with_an_unknown_credential_is_auth_failed(tmp_path):
     assert ws.closed_with is not None
     assert connection.device_id is None
 
+    records = _read_audit_records(tmp_path / "audit")
+    assert records[-1]["event"] == "auth_failed"
+    assert records[-1]["reason"] == "unknown_credential"
+
 
 async def test_hello_with_an_invalid_pairing_code_is_auth_failed(tmp_path):
     conn = db.connect(tmp_path / "registry.db")
     registry = Registry(tmp_path / "registry.db")
     ws = _FakeWS()
+    audit = AuditWriter(tmp_path / "audit")
     connection = NodeConnection(
-        ws, conn=conn, registry=registry, invocations=InvocationsMem(), connections={}, descriptors={}
+        ws, conn=conn, registry=registry, invocations=InvocationsMem(), connections={},
+        descriptors={}, audit=audit,
     )
 
     hello = Hello(
@@ -82,6 +104,10 @@ async def test_hello_with_an_invalid_pairing_code_is_auth_failed(tmp_path):
     assert ws.closed_with is not None
     assert connection.device_id is None
 
+    records = _read_audit_records(tmp_path / "audit")
+    assert records[-1]["event"] == "auth_failed"
+    assert records[-1]["reason"] == "invalid_or_expired_pairing_code"
+
 
 async def test_hello_with_a_valid_pairing_code_pairs_and_returns_a_credential(tmp_path):
     db_path = tmp_path / "registry.db"
@@ -89,8 +115,10 @@ async def test_hello_with_a_valid_pairing_code_pairs_and_returns_a_credential(tm
     code = pairing.mint_pairing_code(conn)
     registry = Registry(db_path)
     ws = _FakeWS()
+    audit = AuditWriter(tmp_path / "audit")
     connection = NodeConnection(
-        ws, conn=conn, registry=registry, invocations=InvocationsMem(), connections={}, descriptors={}
+        ws, conn=conn, registry=registry, invocations=InvocationsMem(), connections={},
+        descriptors={}, audit=audit,
     )
 
     hello = Hello(hdp_versions=(0,), device_name="n", capabilities=(), credential=f"pair:{code}")
@@ -101,6 +129,12 @@ async def test_hello_with_a_valid_pairing_code_pairs_and_returns_a_credential(tm
 
     # The registered device is discoverable and online now.
     assert registry.get(connection.device_id) is not None
+
+    records = _read_audit_records(tmp_path / "audit")
+    assert records[-1]["event"] == "paired"
+    assert records[-1]["device_id"] == connection.device_id
+    # No credential, plaintext or otherwise, ever reaches the audit line.
+    assert "credential" not in json.dumps(records[-1]).lower()
 
 
 async def test_hello_with_a_previously_consumed_pairing_code_is_auth_failed(tmp_path):

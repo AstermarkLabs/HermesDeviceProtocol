@@ -15,11 +15,15 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from typing import TYPE_CHECKING
 
 from hdp_proto.envelope import Envelope
 
 from . import credentials
 from .connection import NodeConnection
+
+if TYPE_CHECKING:
+    from .audit import AuditWriter
 
 
 async def revoke_device(
@@ -27,8 +31,11 @@ async def revoke_device(
     device_id: str,
     *,
     connections: dict[str, NodeConnection],
+    audit: AuditWriter | None = None,
 ) -> None:
     credentials.revoke_credential(conn, device_id)  # step 1 — committed first, fails closed
+    if audit is not None:
+        audit.record("revoked", device_id=device_id)
 
     connection = connections.get(device_id)
     if connection is None:

@@ -40,6 +40,7 @@ from . import credentials, pairing
 from .types import CapabilityRecord, DeviceRecord
 
 if TYPE_CHECKING:
+    from .audit import AuditWriter
     from .invocations import InvocationsMem
     from .registry import Registry
 
@@ -80,6 +81,7 @@ class NodeConnection:
         connections: dict[str, NodeConnection],
         descriptors: dict[str, dict[str, CapabilityDescriptor]],
         dead_peer_timeout_s: float = _DEAD_PEER_TIMEOUT_S,
+        audit: AuditWriter | None = None,
     ) -> None:
         self._ws = ws
         self._conn = conn
@@ -87,6 +89,7 @@ class NodeConnection:
         self._invocations = invocations
         self._connections = connections
         self._descriptors = descriptors
+        self._audit = audit
         self.device_id: str | None = None
         self._seen_ids: OrderedDict[str, None] = OrderedDict()
         self._malformed_times: list[float] = []
@@ -260,6 +263,8 @@ class NodeConnection:
         if not hello.credential:
             await self._ws.close(code=WSCloseCode.POLICY_VIOLATION, message=b"auth_failed")
             logger.warning("auth_failed device_name=%s reason=no_credential", hello.device_name)
+            if self._audit is not None:
+                self._audit.record("auth_failed", reason="no_credential")
             return
 
         device_id = credentials.verify_credential_and_resolve_device(
@@ -270,6 +275,8 @@ class NodeConnection:
             logger.warning(
                 "auth_failed device_name=%s reason=unknown_credential", hello.device_name
             )
+            if self._audit is not None:
+                self._audit.record("auth_failed", reason="unknown_credential")
             return
 
         self._register_device(device_id, hello)
@@ -282,6 +289,8 @@ class NodeConnection:
         if not pairing.consume_pairing_code(self._conn, pair_code, device_id):
             await self._ws.close(code=WSCloseCode.POLICY_VIOLATION, message=b"auth_failed")
             logger.warning("auth_failed reason=invalid_or_expired_pairing_code")
+            if self._audit is not None:
+                self._audit.record("auth_failed", reason="invalid_or_expired_pairing_code")
             return
 
         # `devices` must exist before `credentials` (FK constraint) — `_register_device` writes
@@ -293,6 +302,8 @@ class NodeConnection:
             hdp_version=int(HDP_VERSION), device_id=device_id, credential=new_credential
         )
         await self._send(Envelope.new("welcome", welcome.to_wire()))
+        if self._audit is not None:
+            self._audit.record("paired", device_id=device_id)
 
     def _register_device(self, device_id: str, hello: Hello) -> None:
         capability_infos = [

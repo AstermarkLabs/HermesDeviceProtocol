@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 
 from . import config
+from .audit import AuditWriter
 from .connection import NodeConnection
 from .control import ControlServer
 from .invocations import InvocationsMem
@@ -91,6 +92,7 @@ async def _serve_claimed(pid_path: Path, stop_event: asyncio.Event | None) -> No
     invocations = InvocationsMem()
     connections: dict[str, NodeConnection] = {}
     descriptors: dict = {}
+    audit = AuditWriter(config.hdp_home() / "audit")
 
     def make_connection(ws: object) -> NodeConnection:
         return NodeConnection(
@@ -100,6 +102,7 @@ async def _serve_claimed(pid_path: Path, stop_event: asyncio.Event | None) -> No
             invocations=invocations,
             connections=connections,
             descriptors=descriptors,
+            audit=audit,
         )
 
     hdp_server = HdpServer(
@@ -116,6 +119,7 @@ async def _serve_claimed(pid_path: Path, stop_event: asyncio.Event | None) -> No
         connections=connections,
         descriptors=descriptors,
         conn=conn,
+        audit=audit,
     )
 
     await hdp_server.start()
@@ -129,10 +133,12 @@ async def _serve_claimed(pid_path: Path, stop_event: asyncio.Event | None) -> No
         await hdp_server.close()
         raise
 
+    audit.record("daemon_start")
     stop_event = stop_event or asyncio.Event()
     try:
         await stop_event.wait()
     finally:
+        audit.record("daemon_stop")
         await control.close()
         await hdp_server.close()
         pid_path.unlink(missing_ok=True)

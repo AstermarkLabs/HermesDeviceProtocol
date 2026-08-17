@@ -63,6 +63,68 @@ async def test_ctl_list_devices_returns_registered_devices(control_server):
     assert reply.payload["devices"][0]["device_id"] == "dev_1"
 
 
+async def test_ctl_devices_list_detailed_is_an_alias_of_ctl_list_devices(control_server):
+    """Task 17 Step 2: `DeviceRecord.to_wire()` (Task 2) already carries `state`/
+    `first_paired_at`/`last_seen_at`, so `ctl_devices_list_detailed` is a genuine alias — same
+    payload as `ctl_list_devices`, just its own pinned wire type (`ctl_devices_list_detailed_reply`,
+    `KNOWN_TYPES`) rather than a second code path."""
+    server, socket_path = control_server
+    server._registry.register(
+        DeviceRecord(
+            device_id="dev_2",
+            friendly_name="detailed",
+            platform="p",
+            online=False,
+            state="active",
+            first_paired_at=1000,
+            last_seen_at=2000,
+        )
+    )
+    reader, writer = await asyncio.open_unix_connection(str(socket_path))
+    request = Envelope.new("ctl_devices_list_detailed", {})
+    await write_frame(writer, request.to_wire())
+    reply = Envelope.from_wire(await read_frame(reader))
+    writer.close()
+
+    assert reply.type == "ctl_devices_list_detailed_reply"
+    by_id = {d["device_id"]: d for d in reply.payload["devices"]}
+    assert by_id["dev_2"]["state"] == "active"
+    assert by_id["dev_2"]["first_paired_at"] == 1000
+    assert by_id["dev_2"]["last_seen_at"] == 2000
+
+
+async def test_ctl_audit_tail_returns_todays_records(control_server, tmp_path):
+    server, socket_path = control_server
+    server._audit.record("daemon_start")
+    reader, writer = await asyncio.open_unix_connection(str(socket_path))
+    request = Envelope.new("ctl_audit_tail", {})
+    await write_frame(writer, request.to_wire())
+    reply = Envelope.from_wire(await read_frame(reader))
+    writer.close()
+
+    assert reply.type == "ctl_audit_tail_reply"
+    events = [line["event"] for line in reply.payload["lines"]]
+    assert events == ["daemon_start"]
+
+
+async def test_ctl_audit_tail_with_no_audit_writer_returns_empty(tmp_path):
+    registry = Registry(tmp_path / "registry.db")
+    invocations = InvocationsMem()
+    socket_path = tmp_path / "bridge_no_audit.sock"
+    server = ControlServer(socket_path, registry=registry, invocations=invocations, connections={})
+    await server.start()
+    try:
+        reader, writer = await asyncio.open_unix_connection(str(socket_path))
+        request = Envelope.new("ctl_audit_tail", {})
+        await write_frame(writer, request.to_wire())
+        reply = Envelope.from_wire(await read_frame(reader))
+        writer.close()
+        assert reply.type == "ctl_audit_tail_reply"
+        assert reply.payload["lines"] == []
+    finally:
+        await server.close()
+
+
 async def test_rejected_verb_gets_auth_failed(control_server, tmp_path):
     _server, socket_path = control_server
     reader, writer = await asyncio.open_unix_connection(str(socket_path))
@@ -221,7 +283,9 @@ async def test_ctl_invoke_round_trips_and_validates_output(node_client, ctl_conn
     await ws.close()
 
 
-async def test_ctl_invoke_never_ack_yields_device_offline(node_client, ctl_conn, monkeypatch, harness):
+async def test_ctl_invoke_never_ack_yields_device_offline(
+    node_client, ctl_conn, monkeypatch, harness
+):
     monkeypatch.setattr(bridge_config, "ACK_TIMEOUT_S", 0.2)
     ws, device_id = await _connect_and_hello(node_client, harness)
     reader, writer = ctl_conn

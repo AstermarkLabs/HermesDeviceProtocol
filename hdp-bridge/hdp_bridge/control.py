@@ -238,6 +238,8 @@ class ControlServer:
             "ctl_cancel": self._ctl_cancel,
             "ctl_status": self._ctl_status,
             "ctl_devices_revoke": self._ctl_devices_revoke,
+            "ctl_devices_list_detailed": self._ctl_devices_list_detailed,
+            "ctl_audit_tail": self._ctl_audit_tail,
         }.get(envelope.type)
         if handler is None:
             detail = f"unknown control verb {envelope.type!r}"
@@ -393,6 +395,24 @@ class ControlServer:
             "ctl_status_reply",
             {"healthy": True, "detail": f"{len(self._connections)} device(s) connected"},
         )
+
+    async def _ctl_devices_list_detailed(self, envelope: Envelope) -> Envelope:
+        """Operator-only verb (`hermes hdp devices` at Task 17 was ultimately built against the
+        plugin-reachable `ctl_list_devices` instead, since `DeviceRecord.to_wire()` already
+        carries `state`/`first_paired_at`/`last_seen_at` — see registry.py/types.py). This verb
+        is kept as a genuine alias rather than deleted: it is pinned in `KNOWN_TYPES` as a
+        distinct, operator-only wire type (§4.2's three-closed-sets argument), and a second body
+        here would just duplicate `_ctl_list_devices` line for line for no behavioural gain."""
+        reply = await self._ctl_list_devices(envelope)
+        return Envelope.new("ctl_devices_list_detailed_reply", reply.payload)
+
+    async def _ctl_audit_tail(self, envelope: Envelope) -> Envelope:
+        """Operator-only verb backing `hermes hdp audit` / `/hdp audit` — read-only, but still
+        goes through the control socket rather than a direct file read (brief Step 5) so it works
+        identically regardless of whether the calling process can see the daemon's filesystem
+        under a different profile's permissions."""
+        lines = self._audit.read_today() if self._audit is not None else []
+        return Envelope.new("ctl_audit_tail_reply", {"lines": lines})
 
     async def _ctl_devices_revoke(self, envelope: Envelope) -> Envelope:
         """Operator-only verb (FR-15, §4.4) — the CLI's `hdp-bridge devices revoke` reaches this

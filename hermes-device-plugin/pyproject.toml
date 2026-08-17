@@ -6,6 +6,7 @@ requires-python = ">=3.11,<3.13"
 dependencies = [
   "aiohttp",
   "hdp-proto",
+  "hdp-bridge",
 ]
 
 [build-system]
@@ -14,6 +15,13 @@ build-backend = "hatchling.build"
 
 [tool.uv.sources]
 hdp-proto = { workspace = true }
+# Task 17's one deliberate exception to "hdp_bridge must never import from hermes_device_plugin
+# / the reverse direction is off-limits" — this direction (plugin -> hdp_bridge) is fine, and is
+# exactly how `hdp-bridge`'s own CLI already works: `hermes hdp pair`/`devices revoke`/`audit`
+# reuse `hdp_bridge.pairing`/`credentials`/`audit`/`control` directly, as a second CLI-invoked
+# renderer of the same operator surface (FR-18), never from the always-running plugin
+# daemon-thread code path.
+hdp-bridge = { workspace = true }
 
 [tool.hatch.build.targets.wheel]
 packages = ["hermes_device_plugin"]

@@ -1,16 +1,17 @@
 """Hermes Device Plugin package.
 
-`register(ctx)` below is the **only** module in this package that imports a Hermes runtime API
-(design §2's confinement rule) — everything else (`engine.py`, `tools.py`, `schemas.py`,
-`runtime.py`, `config.py`, `transport/`) is ordinary, host-independent Python, importable and
-testable by a bare `pytest` run with no Hermes install present.
+`register(ctx)` below, plus `cli.py` and `commands.py` which it delegates two of its calls to,
+are the **only** modules in this package that import a Hermes runtime API (design §2's
+confinement rule) — everything else (`engine.py`, `tools.py`, `schemas.py`, `runtime.py`,
+`config.py`, `transport/`) is ordinary, host-independent Python, importable and testable by a bare
+`pytest` run with no Hermes install present.
 """
 
 from __future__ import annotations
 
 from typing import Any
 
-from . import schemas, tools
+from . import cli, commands, schemas, tools
 
 
 def register(ctx: Any) -> None:
@@ -49,3 +50,9 @@ def register(ctx: Any) -> None:
         is_async=True,
         description="Round-trip a JSON payload to a device and back.",
     )
+    # M2 Task 17: `hermes hdp {status,devices,pair,audit}` and `/hdp` — two more renderers of the
+    # exact same `hdp_bridge` operations the three tools above expose to the model (FR-18's
+    # surface-independence claim). Metadata-only registration, same as the tool calls above —
+    # neither of these builds an `HDPRuntime` or opens a socket as a side effect of `register()`.
+    cli.register_cli_command(ctx)
+    commands.register_command(ctx)

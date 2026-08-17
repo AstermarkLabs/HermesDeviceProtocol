@@ -33,3 +33,14 @@ class AuditWriter:
                 os.fsync(fd)
         finally:
             os.close(fd)
+
+    def read_today(self) -> list[dict]:
+        """Today's audit records, parsed. Backs `control.py`'s `ctl_audit_tail` verb — reads
+        through *this* writer's own `_audit_dir`, not a path re-derived from `config` at the call
+        site, so the control server always reports whatever directory it actually opened (matters
+        for tests that wire a `tmp_path`-scoped `AuditWriter` directly, and for profile
+        isolation in general)."""
+        path = self._current_path()
+        if not path.exists():
+            return []
+        return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]

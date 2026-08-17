@@ -51,3 +51,27 @@ def test_audit_tail_prints_nothing_when_no_audit_file_exists(tmp_path, monkeypat
     cli._run_audit_tail()
 
     assert capsys.readouterr().out == ""
+
+
+def test_devices_revoke_offline_fallback_records_a_revoked_audit_entry(
+    tmp_path, monkeypatch, capsys
+):
+    """Task 17's gap-fix for the review finding carried forward from Task 16: with no daemon
+    reachable, `_run_devices_revoke` used to invalidate the credential via
+    `credentials.revoke_credential` directly (bypassing `revocation.revoke_device`) and leave zero
+    audit trail. It must now record its own `revoked` event, distinguishable from the live-daemon
+    path by `via="offline_fallback"`."""
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    # No control socket bound at $HERMES_HOME/hdp/bridge.sock — `_via_control_socket` fails to
+    # connect and `_run_devices_revoke` falls through to the DB-only branch under test.
+    store_db.connect(tmp_path / "hdp" / "registry.db")
+
+    cli._run_devices_revoke("dev_1")
+
+    assert capsys.readouterr().out.strip() == "revoked dev_1"
+    audit_files = list((tmp_path / "hdp" / "audit").glob("audit-*.jsonl"))
+    assert len(audit_files) == 1
+    record = json.loads(audit_files[0].read_text().strip())
+    assert record["event"] == "revoked"
+    assert record["device_id"] == "dev_1"
+    assert record["via"] == "offline_fallback"

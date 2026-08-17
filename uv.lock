@@ -231,12 +231,14 @@ version = "0.0.0"
 source = { editable = "hermes-device-plugin" }
 dependencies = [
     { name = "aiohttp" },
+    { name = "hdp-bridge" },
     { name = "hdp-proto" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "aiohttp" },
+    { name = "hdp-bridge", editable = "hdp-bridge" },
     { name = "hdp-proto", editable = "hdp-spec" },
 ]
 

@@ -189,3 +189,13 @@ class SocketTransport:
 
     async def resolve_approval(self, invocation_id: str, decision: str, scope: str) -> None:
         raise NotImplementedError("resolve_approval is not implemented until M3")
+
+    async def ctl_audit_tail(self) -> list[dict]:
+        """Operator-only verb, deliberately **not** on `BridgeTransport` — never reachable by the
+        model (§4.2's three-closed-sets argument), only by `hermes hdp audit` / `/hdp audit`
+        (Task 17). Lives here, not duplicated in `cli.py`, so those callers reuse this
+        connection's framing/backoff/error-handling instead of re-opening a second raw socket."""
+        reply = await self._roundtrip(Envelope.new("ctl_audit_tail", {}))
+        if reply.type == "error":
+            return []
+        return reply.payload.get("lines", [])

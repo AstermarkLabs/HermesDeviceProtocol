@@ -89,8 +89,17 @@ def _run_devices_revoke(device_id: str) -> None:
     reached_daemon = asyncio.run(_via_control_socket())
     if not reached_daemon:
         from . import config, credentials
+        from .audit import AuditWriter
         from .store import db as store_db
 
         conn = store_db.connect(config.registry_db_path())
         credentials.revoke_credential(conn, device_id)
+        # Task 17 gap-fix: the control-socket path audits via `revocation.revoke_device`
+        # (control.py's `_ctl_devices_revoke`); this offline fallback bypassed that entirely and
+        # left zero audit trail. `via="offline_fallback"` distinguishes this record from an
+        # ordinary operator revoke against a live daemon — same event name, same shape
+        # (`device_id=...`), one extra field.
+        AuditWriter(config.hdp_home() / "audit").record(
+            "revoked", device_id=device_id, via="offline_fallback"
+        )
     print(f"revoked {device_id}")

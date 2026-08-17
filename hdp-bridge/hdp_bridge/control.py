@@ -21,7 +21,7 @@ import json
 import logging
 import socket
 import sqlite3
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -68,6 +68,33 @@ def _invoke_failure(invocation_id: str, code: ErrorCode, detail: str) -> Envelop
     )
 
 
+def _correlate(reply: Envelope, request: Envelope) -> Envelope:
+    """Stamp `reply.corr` with the request envelope's `id`.
+
+    Applied to *every* reply, not just `ctl_invoke_reply`, so the client's demultiplexer has one
+    rule instead of two (finding I3). Replies used to arrive uncorrelated and be matched purely
+    by arrival order, which is only sound while the server answers strictly in request order —
+    exactly the property `_handle` gives up in order to let invocations overlap.
+    """
+    return replace(reply, corr=request.id)
+
+
+def _log_task_exception(task: asyncio.Task) -> None:
+    """`add_done_callback` hook for every fire-and-forget task this module spawns.
+
+    Without it, an exception escaping such a task is stored on the task object and only ever
+    surfaces as asyncio's "Task exception was never retrieved" message at garbage-collection
+    time — arbitrarily later, with no context, and (because the daemon's stdout is what the
+    conformance suite reads as `bridge_log`) as noise in an unrelated test's captured log.
+    Retrieving it here turns a silent failure into a logged one (defense in depth, findings I3
+    and I6)."""
+    if task.cancelled():
+        return
+    exc = task.exception()
+    if exc is not None:
+        logger.error("control-plane task failed: %r", exc, exc_info=exc)
+
+
 async def read_frame(reader: asyncio.StreamReader) -> dict:
     header = await reader.readexactly(4)
     length = int.from_bytes(header, "big")
@@ -111,6 +138,10 @@ class ControlServer:
         self._raw_sock: socket.socket | None = None
         self._accept_task: asyncio.Task[None] | None = None
         self._active_writers: set[asyncio.StreamWriter] = set()
+        # Every in-flight `ctl_invoke`, which `_handle` runs off its read loop rather than
+        # inline (finding I3). Server-level rather than per-connection so `close()` can account
+        # for all of them; `_handle` also cancels its own connection's share on disconnect.
+        self._invoke_tasks: set[asyncio.Task[None]] = set()
 
     async def start(self) -> None:
         # A hand-rolled accept loop over a raw socket, rather than `asyncio.start_unix_server`,
@@ -124,6 +155,10 @@ class ControlServer:
         self._raw_sock.listen(100)
         self._socket_path.chmod(0o600)
         self._accept_task = asyncio.ensure_future(self._accept_loop())
+        # Defense in depth (finding I6): if anything ever does escape `_accept_loop`'s own
+        # handling below, it must be visible rather than silently killing the daemon's ability to
+        # accept control connections for the rest of the process lifetime.
+        self._accept_task.add_done_callback(_log_task_exception)
 
     async def _accept_loop(self) -> None:
         if self._raw_sock is None:
@@ -131,7 +166,20 @@ class ControlServer:
         raw_sock = self._raw_sock
         loop = asyncio.get_running_loop()
         while True:
-            conn, _addr = await loop.sock_accept(raw_sock)
+            try:
+                conn, _addr = await loop.sock_accept(raw_sock)
+            except asyncio.CancelledError:
+                raise
+            except OSError as exc:
+                # A transient accept failure — `EMFILE`/`ENFILE` (process or system fd table
+                # full) being the realistic one — used to propagate straight out of this loop,
+                # permanently deafening the daemon to new control connections with no visible
+                # error at all, since nothing ever retrieved this task's exception (finding I6).
+                # Back off briefly and keep serving: the condition that caused it is virtually
+                # always temporary, and the alternative is a daemon that is alive but unreachable.
+                logger.warning("control accept failed (%r); retrying", exc)
+                await asyncio.sleep(0.05)
+                continue
             try:
                 conn.setblocking(False)
                 reader = asyncio.StreamReader(loop=loop)
@@ -144,6 +192,13 @@ class ControlServer:
                 # let the cancellation propagate as usual.
                 conn.close()
                 raise
+            except OSError as exc:
+                # Same reasoning as the accept-side handler above, for the wiring-up half: this
+                # one connection is lost (and its raw socket closed here so it isn't leaked), but
+                # the loop survives to serve the next one.
+                logger.warning("control connection setup failed (%r); dropping it", exc)
+                conn.close()
+                continue
             writer = asyncio.StreamWriter(transport, protocol, reader, loop)
             # Registering here, and *only* here — synchronous with respect to `_accept_loop`'s own
             # control flow, with no `await` between it and the `ensure_future` below — is what
@@ -203,9 +258,32 @@ class ControlServer:
         for writer in list(self._active_writers):
             writer.close()
         self._active_writers.clear()
+        # In-flight `ctl_invoke` tasks now run off their connection's read loop (finding I3), so
+        # closing the writers above no longer accounts for them — a task parked in `wait_for` on
+        # an execution deadline would outlive this `close()` entirely. Cancel and settle them
+        # here, so a stopped daemon leaves no orphaned work behind.
+        invoke_tasks = list(self._invoke_tasks)
+        for task in invoke_tasks:
+            task.cancel()
+        if invoke_tasks:
+            await asyncio.gather(*invoke_tasks, return_exceptions=True)
+        self._invoke_tasks.clear()
         self._socket_path.unlink(missing_ok=True)
 
     async def _handle(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+        """Read loop for one control connection.
+
+        `ctl_invoke` is dispatched *off* this loop, as its own task, rather than awaited inline
+        (finding I3). Awaiting it here meant one in-flight device invocation blocked every other
+        verb on this connection for its entire deadline — a functional regression from M1, where
+        the bridge lived in-process and invocations genuinely overlapped. It also made
+        `ctl_cancel` undeliverable by construction: the only connection that could carry a cancel
+        was the one wedged inside the invoke being cancelled.
+
+        Every other verb stays inline. They are all short, non-blocking, and serialising them
+        preserves the obvious ordering guarantee for the operator verbs.
+        """
+        connection_tasks: set[asyncio.Task[None]] = set()
         try:
             while True:
                 try:
@@ -216,13 +294,41 @@ class ControlServer:
                     envelope = Envelope.from_wire(raw)
                 except EnvelopeError as exc:
                     error_payload = err(ErrorCode.NOT_IMPLEMENTED, str(exc))["error"]
+                    # No `corr`: there is no valid envelope here, so there is no id to echo. The
+                    # client logs and drops replies it can't correlate.
                     await write_frame(writer, Envelope.new("error", error_payload).to_wire())
                     continue
+                if envelope.type == "ctl_invoke":
+                    task = asyncio.ensure_future(self._invoke_and_reply(envelope, writer))
+                    connection_tasks.add(task)
+                    self._invoke_tasks.add(task)
+                    task.add_done_callback(connection_tasks.discard)
+                    task.add_done_callback(self._invoke_tasks.discard)
+                    task.add_done_callback(_log_task_exception)
+                    continue
                 reply = await self._dispatch(envelope)
-                await write_frame(writer, reply.to_wire())
+                await write_frame(writer, _correlate(reply, envelope).to_wire())
         finally:
+            # This connection is gone; nothing is left to deliver its invoke replies to.
+            for task in connection_tasks:
+                task.cancel()
             self._active_writers.discard(writer)
             writer.close()
+
+    async def _invoke_and_reply(self, envelope: Envelope, writer: asyncio.StreamWriter) -> None:
+        """Run one `ctl_invoke` to completion and write its reply.
+
+        Safe to run concurrently with other replies on the same `writer` because `write_frame`
+        emits the 4-byte length header and the body in a single `writer.write(...)` call — two
+        interleaved replies can never split each other's frames. Do not separate those writes.
+        """
+        reply = await self._ctl_invoke(envelope)
+        try:
+            await write_frame(writer, _correlate(reply, envelope).to_wire())
+        except (ConnectionResetError, BrokenPipeError, OSError):
+            # The caller disconnected while its invocation was in flight. Nothing to deliver to
+            # and nothing to escalate — the invocation's own bookkeeping is already settled.
+            logger.debug("dropped a ctl_invoke_reply for a closed control connection")
 
     async def _dispatch(self, envelope: Envelope) -> Envelope:
         if envelope.type in _REJECTED_VERBS:

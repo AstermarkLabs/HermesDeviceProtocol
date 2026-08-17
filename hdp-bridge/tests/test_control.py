@@ -237,7 +237,13 @@ async def _connect_and_hello(
 async def _ctl_invoke(
     reader, writer, *, device_id, deadline_ms=2000, capability="diagnostics.echo"
 ):
-    request = Envelope.new(
+    request = _ctl_invoke_envelope(device_id, deadline_ms=deadline_ms, capability=capability)
+    await write_frame(writer, request.to_wire())
+    return Envelope.from_wire(await read_frame(reader))
+
+
+def _ctl_invoke_envelope(device_id, *, deadline_ms=2000, capability="diagnostics.echo"):
+    return Envelope.new(
         "ctl_invoke",
         {
             "device_id": device_id,
@@ -247,8 +253,117 @@ async def _ctl_invoke(
             "deadline_ms": deadline_ms,
         },
     )
-    await write_frame(writer, request.to_wire())
-    return Envelope.from_wire(await read_frame(reader))
+
+
+async def test_two_invocations_to_different_devices_overlap_instead_of_serialising(
+    node_client, ctl_conn, harness
+):
+    """Finding I3, server half: `_handle` used to `await self._dispatch(...)` inline in its read
+    loop, so a second `ctl_invoke` frame was not even *read* off the socket until the first
+    invocation had finished — one slow device stalled every other device for its whole deadline.
+
+    Two devices each take ~1s to produce a result. Serialised, the pair takes ~2s; overlapped,
+    ~1s. The assertion is deliberately banded well below the serial figure rather than tightly
+    around the concurrent one, so it fails on the regression without flaking on a loaded machine.
+    """
+    ws_a, device_a = await _connect_and_hello(node_client, harness, device_name="node-a")
+    ws_b, device_b = await _connect_and_hello(node_client, harness, device_name="node-b")
+    reader, writer = ctl_conn
+
+    async def _serve_one_slowly(ws):
+        msg = await ws.receive(timeout=10)
+        envelope = Envelope.from_wire(json.loads(msg.data))
+        assert envelope.type == "invoke"
+        invocation_id = envelope.corr
+        await ws.send_str(json.dumps(Envelope.new("ack", {}, corr=invocation_id).to_wire()))
+        await asyncio.sleep(1.0)
+        result = ResultMsg(ok=True, data={"payload": {}}, error=None)
+        await ws.send_str(
+            json.dumps(Envelope.new("result", result.to_wire(), corr=invocation_id).to_wire())
+        )
+
+    servers = [
+        asyncio.create_task(_serve_one_slowly(ws_a)),
+        asyncio.create_task(_serve_one_slowly(ws_b)),
+    ]
+
+    request_a = _ctl_invoke_envelope(device_a, deadline_ms=10_000)
+    request_b = _ctl_invoke_envelope(device_b, deadline_ms=10_000)
+    loop = asyncio.get_running_loop()
+    start = loop.time()
+    # Both frames go out before either reply is read — the whole point. Correlate the replies by
+    # `corr` rather than by arrival order, which is exactly what the `corr` echo is now for.
+    await write_frame(writer, request_a.to_wire())
+    await write_frame(writer, request_b.to_wire())
+    replies = {}
+    for _ in range(2):
+        reply = Envelope.from_wire(await read_frame(reader))
+        replies[reply.corr] = reply
+    elapsed = loop.time() - start
+
+    await asyncio.gather(*servers)
+    assert set(replies) == {request_a.id, request_b.id}
+    assert all(r.payload["ok"] is True for r in replies.values())
+    assert elapsed < 1.6, f"invocations serialised ({elapsed:.2f}s for two ~1s calls)"
+    await ws_a.close()
+    await ws_b.close()
+
+
+async def test_a_second_verb_is_served_while_an_invoke_is_still_in_flight(
+    node_client, ctl_conn, harness
+):
+    """The corollary finding I3 names: the read loop must keep servicing other verbs — a future
+    `ctl_cancel` among them — while an invoke is outstanding on the same connection. Before the
+    fix this `ctl_status` could not be answered until the invoke's deadline had elapsed."""
+    ws, device_id = await _connect_and_hello(node_client, harness)
+    reader, writer = ctl_conn
+
+    async def _ack_then_stall():
+        msg = await ws.receive(timeout=10)
+        envelope = Envelope.from_wire(json.loads(msg.data))
+        await ws.send_str(json.dumps(Envelope.new("ack", {}, corr=envelope.corr).to_wire()))
+        await asyncio.sleep(1.0)
+        result = ResultMsg(ok=True, data={"payload": {}}, error=None)
+        await ws.send_str(
+            json.dumps(Envelope.new("result", result.to_wire(), corr=envelope.corr).to_wire())
+        )
+
+    server = asyncio.create_task(_ack_then_stall())
+    invoke_request = _ctl_invoke_envelope(device_id, deadline_ms=10_000)
+    await write_frame(writer, invoke_request.to_wire())
+
+    status_request = Envelope.new("ctl_status", {})
+    loop = asyncio.get_running_loop()
+    start = loop.time()
+    await write_frame(writer, status_request.to_wire())
+    status_reply = Envelope.from_wire(await read_frame(reader))
+    elapsed = loop.time() - start
+
+    assert status_reply.type == "ctl_status_reply"
+    assert status_reply.corr == status_request.id
+    assert elapsed < 0.5, f"ctl_status waited on the in-flight invoke ({elapsed:.2f}s)"
+
+    invoke_reply = Envelope.from_wire(await read_frame(reader))
+    assert invoke_reply.corr == invoke_request.id
+    assert invoke_reply.payload["ok"] is True
+    await asyncio.gather(server)
+    await ws.close()
+
+
+async def test_every_reply_echoes_the_request_envelope_id_as_corr(ctl_conn):
+    """The demultiplexing contract `SocketTransport._read_loop` depends on: one rule for every
+    reply, not a special case for `ctl_invoke_reply` (finding I3)."""
+    reader, writer = ctl_conn
+    for request in (
+        Envelope.new("ctl_status", {}),
+        Envelope.new("ctl_list_devices", {}),
+        Envelope.new("ctl_cancel", {"invocation_id": "nope", "reason": ""}),
+        Envelope.new("ctl_policy_set", {}),  # a rejection is still correlated
+        _ctl_invoke_envelope("dev_nonexistent"),
+    ):
+        await write_frame(writer, request.to_wire())
+        reply = Envelope.from_wire(await read_frame(reader))
+        assert reply.corr == request.id, f"{request.type} reply lost its correlation"
 
 
 async def test_ctl_invoke_against_unknown_device_is_device_offline(ctl_conn):

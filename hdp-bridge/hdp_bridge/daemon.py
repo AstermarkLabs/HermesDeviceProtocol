@@ -54,6 +54,17 @@ async def serve(*, stop_event: asyncio.Event | None = None) -> None:
     pid_path = config.pid_path()
     _check_and_claim_pid(pid_path)
 
+    try:
+        await _serve_claimed(pid_path, stop_event)
+    except BaseException:
+        # Anything from here through a successful `control.start()` — Registry/connection
+        # construction, HdpServer/ControlServer construction, either `.start()` call — must not
+        # leave the PID claim taken above on disk. Unclaim it before propagating.
+        pid_path.unlink(missing_ok=True)
+        raise
+
+
+async def _serve_claimed(pid_path: Path, stop_event: asyncio.Event | None) -> None:
     registry = Registry(config.registry_db_path())
     # NOTE — deliberate deviation from the plan's stated design: m2-plan.md describes one
     # `sqlite3.Connection` shared by `Registry`/pairing/credentials. `Registry.__init__` (Task 10,
@@ -112,10 +123,10 @@ async def serve(*, stop_event: asyncio.Event | None = None) -> None:
         await control.start()
     except BaseException:
         # If control.start() fails (unwritable socket path, permission error, ...), the
-        # already-bound node-facing TCP socket, the `bridge.addr` file it wrote, and the PID
-        # claim taken above must not leak — tear down what already succeeded before propagating.
+        # already-bound node-facing TCP socket and the `bridge.addr` file it wrote must not
+        # leak — tear down what already succeeded before propagating. The PID claim itself is
+        # unclaimed by `serve()`'s outer wrapper, which covers every failure in this function.
         await hdp_server.close()
-        pid_path.unlink(missing_ok=True)
         raise
 
     stop_event = stop_event or asyncio.Event()

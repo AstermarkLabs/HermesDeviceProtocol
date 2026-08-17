@@ -429,7 +429,16 @@ class ControlServer:
                 ErrorCode.BRIDGE_UNAVAILABLE, "control server has no database connection"
             )["error"]
             return Envelope.new("error", error_payload)
-        await _revocation.revoke_device(
+        affected = await _revocation.revoke_device(
             self._conn, device_id, connections=self._connections, audit=self._audit
         )
+        if affected == 0:
+            # Nothing was actually revoked — unknown device_id, or already revoked. An `error`
+            # envelope rather than a success reply so the operator CLI's reply-type check
+            # (`operations.revoke`) surfaces it through the same path as any other failure
+            # instead of printing "revoked <id>" for a no-op (final-review finding I4).
+            error_payload = err(
+                ErrorCode.NO_MATCHING_DEVICE, f"no live credential for device {device_id}"
+            )["error"]
+            return Envelope.new("error", error_payload)
         return Envelope.new("ctl_devices_revoke_reply", {"ok": True, "device_id": device_id})

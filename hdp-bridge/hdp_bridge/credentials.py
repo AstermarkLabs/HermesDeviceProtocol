@@ -56,10 +56,18 @@ def verify_credential_and_resolve_device(conn: sqlite3.Connection, presented: st
     return None
 
 
-def revoke_credential(conn: sqlite3.Connection, device_id: str) -> None:
+def revoke_credential(conn: sqlite3.Connection, device_id: str) -> int:
+    """Returns the number of live credentials this call actually invalidated.
+
+    Zero means nothing happened — an unknown `device_id`, or one whose credentials were all
+    revoked already. Callers must distinguish that from a real revocation rather than reporting
+    unconditional success: an operator who typoes a device id deserves to be told, and an audit
+    record should describe something that actually occurred (final-review finding I4)."""
     with conn:
-        conn.execute(
+        cursor = conn.execute(
             "UPDATE credentials SET revoked_at = ? WHERE device_id = ? AND revoked_at IS NULL",
             (int(time.time() * 1000), device_id),
         )
+        affected = cursor.rowcount
         conn.execute("UPDATE devices SET state = 'revoked' WHERE device_id = ?", (device_id,))
+    return affected

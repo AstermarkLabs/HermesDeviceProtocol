@@ -17,7 +17,7 @@ import json
 
 import aiohttp
 import pytest
-from harness import start_node, stop_node, wait_for_device
+from harness import start_node, stop_node, wait_for_device, wait_for_log
 from hdp_proto.envelope import Envelope
 from hdp_proto.errors import ErrorCode
 from hermes_device_plugin.transport.base import InvokeRequest
@@ -94,10 +94,15 @@ async def test_ignore_cancel_leaves_clean_state_and_logs_the_late_result(
         # dispatches frames on this connection sequentially (`hdp_reference_node`'s
         # `async for msg in ws` loop awaits each `_handle_invoke` to completion before reading the
         # next frame), so it is still asleep inside the first invocation's `slow-result=4000` and
-        # will not even see a second `invoke` frame until this sleep — and the late result it
+        # will not even see a second `invoke` frame until that sleep — and the late result it
         # triggers — has passed.
-        await asyncio.sleep(4.0)
-        assert "late_result" in "".join(bridge_log)
+        #
+        # Waiting on the log line itself, rather than sleeping a fixed 4s and then asserting,
+        # does both jobs at once and races neither: `late_result` appearing in `bridge_log` *is*
+        # the proof the node's late result has arrived and been dropped, which is also exactly
+        # the moment the node is free to dispatch the second invoke below. The timeout must
+        # comfortably clear the node's own 4s `slow-result` delay.
+        await wait_for_log(bridge_log, "late_result", timeout=8.0)
 
         # `bridge._invocations` was `EmbeddedTransport`'s private pending-invocation table,
         # readable in-process. As of M2 the bridge is a separate `hdp-bridge serve` subprocess —
@@ -143,7 +148,10 @@ async def test_stale_schema_is_rejected_and_logged(bridge, bridge_url, bridge_lo
         result = await bridge.invoke(_echo_request(device.device_id, deadline_ms=2000))
         assert result.ok is False
         assert result.error["code"] == ErrorCode.MALFORMED_RESULT.value
-        assert "schema_drift" in "".join(bridge_log)
+        # Poll rather than assert immediately: `invoke()`'s reply and the daemon's `schema_drift`
+        # log line reach this process by two independent paths (control socket vs. daemon stdout
+        # -> pipe -> conftest's `_drain()` task), with nothing synchronizing them.
+        await wait_for_log(bridge_log, "schema_drift", timeout=2.0)
     finally:
         await stop_node(proc)
 

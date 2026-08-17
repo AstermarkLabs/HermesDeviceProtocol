@@ -37,17 +37,11 @@ def main() -> None:
 
 
 def _run_pair_new() -> None:
-    from . import config
-    from .audit import AuditWriter
-    from .pairing import mint_pairing_code
-    from .store import db as store_db
+    import asyncio
 
-    conn = store_db.connect(config.registry_db_path())
-    code = mint_pairing_code(conn)
-    # No code, no hash — literally nothing about *which* code is ever written to the audit log
-    # (no-plaintext rule, §3.5).
-    AuditWriter(config.hdp_home() / "audit").record("pairing_code_minted")
-    print(code)
+    from . import operations
+
+    print(asyncio.run(operations.pair_new()))
 
 
 def _run_audit_tail() -> None:
@@ -62,44 +56,11 @@ def _run_audit_tail() -> None:
 
 
 def _run_devices_revoke(device_id: str) -> None:
-    """Tries the control socket first (reaches a live connection so the `revoke` frame and socket
-    close actually happen, not just the DB-side credential invalidation); falls back to a direct
-    DB-only revoke if no daemon is reachable — there's nothing live to disconnect in that case
-    anyway, and the credential must still be invalidated so a later daemon start doesn't let the
-    device back in."""
+    """Thin renderer over `operations.revoke` — the daemon-reachable/offline-fallback decision,
+    the audit record, and the did-anything-actually-happen check all live there, shared with
+    `hermes hdp devices revoke` (final-review finding I5)."""
     import asyncio
 
-    async def _via_control_socket() -> bool:
-        from hdp_proto.envelope import Envelope
+    from . import operations
 
-        from .config import control_socket_path
-        from .control import read_frame, write_frame
-
-        try:
-            reader, writer = await asyncio.open_unix_connection(str(control_socket_path()))
-        except (FileNotFoundError, ConnectionRefusedError, OSError):
-            return False
-        await write_frame(
-            writer, Envelope.new("ctl_devices_revoke", {"device_id": device_id}).to_wire()
-        )
-        await read_frame(reader)
-        writer.close()
-        return True
-
-    reached_daemon = asyncio.run(_via_control_socket())
-    if not reached_daemon:
-        from . import config, credentials
-        from .audit import AuditWriter
-        from .store import db as store_db
-
-        conn = store_db.connect(config.registry_db_path())
-        credentials.revoke_credential(conn, device_id)
-        # Task 17 gap-fix: the control-socket path audits via `revocation.revoke_device`
-        # (control.py's `_ctl_devices_revoke`); this offline fallback bypassed that entirely and
-        # left zero audit trail. `via="offline_fallback"` distinguishes this record from an
-        # ordinary operator revoke against a live daemon — same event name, same shape
-        # (`device_id=...`), one extra field.
-        AuditWriter(config.hdp_home() / "audit").record(
-            "revoked", device_id=device_id, via="offline_fallback"
-        )
-    print(f"revoked {device_id}")
+    print(asyncio.run(operations.revoke(device_id)))

@@ -32,14 +32,20 @@ async def revoke_device(
     *,
     connections: dict[str, NodeConnection],
     audit: AuditWriter | None = None,
-) -> None:
-    credentials.revoke_credential(conn, device_id)  # step 1 — committed first, fails closed
+) -> int:
+    """Returns the number of live credentials actually invalidated — `0` for an unknown or
+    already-revoked `device_id`, in which case this is a total no-op: no audit record (nothing
+    happened to record), no `revoke` frame, no socket close. Callers surface the zero to the
+    operator instead of reporting success (final-review finding I4)."""
+    affected = credentials.revoke_credential(conn, device_id)  # step 1 — committed first
+    if affected == 0:
+        return 0
     if audit is not None:
         audit.record("revoked", device_id=device_id)
 
     connection = connections.get(device_id)
     if connection is None:
-        return  # not currently connected — nothing live to disconnect or fail in-flight
+        return affected  # not currently connected — nothing live to disconnect or fail in-flight
 
     # Set *first*, before any further `await` — including step 2's `send_str` below, not just
     # step 3's `close()`. Both awaits yield control back to the event loop, and if the device
@@ -64,3 +70,4 @@ async def revoke_device(
     # needs both observably failed, not just whichever one an `elif` happens to pick. A no-op if
     # `_on_disconnect` (see above) already won the race and popped these entries itself.
     connection._invocations.fail_all_for_device(device_id, reason="revoked", fail_both=True)
+    return affected

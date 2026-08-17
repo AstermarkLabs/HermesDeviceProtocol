@@ -535,6 +535,20 @@ async def test_ctl_devices_revoke_without_device_id_is_no_matching_device(ctl_co
     assert reply.payload["code"] == "no_matching_device"
 
 
+async def test_ctl_devices_revoke_of_an_unknown_device_is_an_error_not_a_success_reply(ctl_conn):
+    """Finding I4: `revoke_credential` used to return `None`, so a revoke that matched zero rows
+    was indistinguishable from one that matched. It now reports its rowcount up through
+    `revocation.revoke_device`, and zero becomes an `error` envelope — which is what lets the
+    operator CLIs stop fail-open-reporting "revoked <id>" for a device that was never paired."""
+    reader, writer = ctl_conn
+    await write_frame(
+        writer, Envelope.new("ctl_devices_revoke", {"device_id": "dev_never_paired"}).to_wire()
+    )
+    reply = Envelope.from_wire(await read_frame(reader))
+    assert reply.type == "error"
+    assert reply.payload["code"] == "no_matching_device"
+
+
 async def test_close_drains_a_connection_still_in_the_kernel_accept_backlog(tmp_path):
     """Isolates the exact race `ControlServer.close()`'s backlog-drain step exists for: a client
     whose `connect()` already completed at the OS level (queued in the listening socket's kernel

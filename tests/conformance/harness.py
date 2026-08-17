@@ -138,3 +138,26 @@ async def wait_for_device(bridge: SocketTransport, *, timeout_s: float = 10.0) -
             return online[0]
         await asyncio.sleep(0.05)
     raise TimeoutError("no node connected within the timeout")
+
+
+async def wait_for_log(lines: list[str], substring: str, *, timeout: float = 2.0) -> None:
+    """Poll the `bridge_log` list (conftest.py's live-updated capture of the `hdp-bridge serve`
+    subprocess's stdout) until `substring` appears, or raise on timeout.
+
+    Exists because a bridge-side log line and an `invoke()` return value travel two *independent*
+    paths: the reply comes back over the control socket, while the log line goes daemon stdout ->
+    OS pipe -> conftest's `_drain()` task -> `lines`. Nothing synchronizes the two, so asserting
+    on `lines` immediately after `await bridge.invoke(...)` returns is a race the test loses
+    whenever the drain task hasn't been scheduled yet. Polling closes it.
+
+    Lives in `harness.py` rather than `conftest.py` (which is where the review filed it) for the
+    reason this module's own docstring gives: `from conftest import ...` is not safe in this
+    suite — two different `conftest` modules collide under pytest's rootdir-relative import mode.
+    """
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + timeout
+    while loop.time() < deadline:
+        if substring in "".join(lines):
+            return
+        await asyncio.sleep(0.02)
+    raise TimeoutError(f"{substring!r} never appeared in the bridge log within {timeout}s")

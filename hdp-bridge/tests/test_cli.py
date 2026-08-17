@@ -64,7 +64,11 @@ def test_devices_revoke_offline_fallback_records_a_revoked_audit_entry(
     monkeypatch.setenv("HERMES_HOME", str(tmp_path))
     # No control socket bound at $HERMES_HOME/hdp/bridge.sock — `_via_control_socket` fails to
     # connect and `_run_devices_revoke` falls through to the DB-only branch under test.
-    store_db.connect(tmp_path / "hdp" / "registry.db")
+    conn = store_db.connect(tmp_path / "hdp" / "registry.db")
+    # A real device + live credential: as of finding I4's fix, revoking a device_id with no live
+    # credential is a reported no-op, not a silent success, so this test has to revoke something
+    # that actually exists for the audit record it asserts on to be produced at all.
+    _insert_device_with_credential(conn, "dev_1")
 
     cli._run_devices_revoke("dev_1")
 
@@ -75,3 +79,51 @@ def test_devices_revoke_offline_fallback_records_a_revoked_audit_entry(
     assert record["event"] == "revoked"
     assert record["device_id"] == "dev_1"
     assert record["via"] == "offline_fallback"
+
+
+def _insert_device_with_credential(conn, device_id: str) -> None:
+    """A minimal `devices` row plus one live `credentials` row — the smallest state in which a
+    revoke has something real to invalidate."""
+    from hdp_bridge import credentials
+
+    with conn:
+        conn.execute(
+            "INSERT INTO devices (device_id, friendly_name, platform, first_paired_at, "
+            "last_seen_at) VALUES (?, ?, ?, 0, 0)",
+            (device_id, "test-node", "linux"),
+        )
+    credentials.issue_credential(conn, device_id)
+
+
+def test_devices_revoke_of_an_unknown_device_reports_no_such_device_and_audits_nothing(
+    tmp_path, monkeypatch, capsys
+):
+    """Finding I4: the offline fallback used to print "revoked <id>" unconditionally, even when
+    the UPDATE touched zero rows. An operator typo now says so, and no `revoked` audit record is
+    written for a revocation that did not happen."""
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    store_db.connect(tmp_path / "hdp" / "registry.db")
+
+    cli._run_devices_revoke("dev_nonexistent")
+
+    assert capsys.readouterr().out.strip() == "no such device dev_nonexistent"
+    assert not list((tmp_path / "hdp" / "audit").glob("audit-*.jsonl"))
+
+
+def test_devices_revoke_twice_reports_no_such_device_the_second_time(
+    tmp_path, monkeypatch, capsys
+):
+    """Already-revoked is the same zero-rows case as never-existed — both are "nothing happened"
+    and neither earns a second audit record."""
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    conn = store_db.connect(tmp_path / "hdp" / "registry.db")
+    _insert_device_with_credential(conn, "dev_1")
+
+    cli._run_devices_revoke("dev_1")
+    capsys.readouterr()
+    cli._run_devices_revoke("dev_1")
+
+    assert capsys.readouterr().out.strip() == "no such device dev_1"
+    audit_files = list((tmp_path / "hdp" / "audit").glob("audit-*.jsonl"))
+    assert len(audit_files) == 1
+    assert len(audit_files[0].read_text().strip().splitlines()) == 1

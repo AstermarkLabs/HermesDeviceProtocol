@@ -8,17 +8,24 @@ never prints: printing is `main()`'s job (this module's operator-CLI entry point
 same function also works when awaited from inside a live event loop in gateway mode (NFR-3) —
 `asyncio.run()` only ever appears in `main()`, never in a function `commands.py` calls.
 
-`status`/`devices` go through `SocketTransport` (a fresh instance per invocation, not the
+`status`/`devices`/`audit` go through `SocketTransport` (a fresh instance per invocation, not the
 `HDPRuntime` singleton's — this is an operator diagnostic, same posture as `device_status_get`
-but CLI-rendered, and must not force the runtime to build as a side effect, per D6). `pair`/
-`devices revoke`/`audit` reuse `hdp_bridge`'s own domain functions
-(`pairing.mint_pairing_code`, `credentials.revoke_credential`, the `ctl_devices_revoke`/
-`ctl_audit_tail` wire verbs) directly — the one place this package legitimately imports from
-`hdp_bridge` (see pyproject.toml's `[tool.uv.sources]` comment). Every such import is
-function-local, not module-level: this module runs as operator-invoked CLI code, not as the
-always-running plugin daemon-thread code, and a module-level import would pull `hdp_bridge` into
-the plugin process on every `hermes plugins list`, which is exactly the posture the brief's
-import exception does *not* grant.
+but CLI-rendered, and must not force the runtime to build as a side effect, per D6). `pair --new`
+and `devices revoke` delegate to `hdp_bridge.operations`, which owns the whole
+daemon-reachable/offline-fallback decision and its audit records for both operator CLIs
+(final-review finding I5) — the one place this package legitimately imports from `hdp_bridge`
+(see pyproject.toml's `[tool.uv.sources]` comment). Every such import is function-local, not
+module-level: this module runs as operator-invoked CLI code, not as the always-running plugin
+daemon-thread code, and a module-level import would pull `hdp_bridge` into the plugin process on
+every `hermes plugins list`, which is exactly the posture the brief's import exception does *not*
+grant.
+
+**Those two are reachable from this module only** (final-review finding I1). `main()` below is
+the `hermes hdp` entry point and calls `asyncio.run()`, so it can only ever execute in a
+short-lived operator CLI process — never inside gateway mode's already-running event loop.
+`commands.py`'s `/hdp` refuses `pair`/`devices revoke` outright and points the operator here, so
+the two mutating operations that open `registry.db` and the audit log directly can never run
+inside the always-running plugin process (Global Constraint #1).
 
 §6.1's hard rule, honoured throughout this file: `ctx._cli_ref` is never read, not even checked
 for `None`. Every command renders from data returned over the control plane or from `hdp_bridge`'s
@@ -71,61 +78,27 @@ async def render_devices() -> str:
 
 
 async def render_pair_new() -> str:
-    """Reuses `hdp_bridge.pairing.mint_pairing_code` directly against `registry.db` — there is no
-    control-plane verb for this (`ctl_pair_mint` is always rejected, `control.py`'s
-    `_REJECTED_VERBS`; `pairing.py`'s own docstring: minting is operator-only, structurally).
-    Same posture as `hdp_bridge/cli.py`'s `_run_pair_new`: no code, no hash, ever reaches the
-    audit log (no-plaintext rule, §3.5) — only the fact that a code was minted."""
-    from hdp_bridge import config as bridge_config
-    from hdp_bridge.audit import AuditWriter
-    from hdp_bridge.pairing import mint_pairing_code
-    from hdp_bridge.store import db as store_db
+    """CLI-only (finding I1) — `/hdp pair --new` no longer reaches this; see `commands.py`.
 
-    conn = store_db.connect(bridge_config.registry_db_path())
-    code = mint_pairing_code(conn)
-    AuditWriter(bridge_config.hdp_home() / "audit").record("pairing_code_minted")
-    return code
+    A thin renderer over `hdp_bridge.operations.pair_new`, which owns the decision logic and the
+    audit record (finding I5). No code, no hash, ever reaches the audit log (no-plaintext rule,
+    §3.5) — only the fact that a code was minted."""
+    from hdp_bridge import operations
+
+    return await operations.pair_new()
 
 
 async def render_devices_revoke(device_id: str) -> str:
-    """Tries the control socket first — reaches a live connection so the `revoke` frame and
-    socket close actually happen — falling back to a direct DB-only revoke if no daemon is
-    reachable. Mirrors `hdp_bridge/cli.py`'s `_run_devices_revoke` glue (FR-18: same verb,
-    different renderer — the mutation itself is `credentials.revoke_credential`/the
-    `ctl_devices_revoke` wire verb, both owned by `hdp_bridge`, never reimplemented here),
-    including that function's audit-gap fix: the DB-only fallback records its own `revoked` audit
-    entry (`via="offline_fallback"`), same event name/shape `revocation.revoke_device` uses on
-    the live-daemon path, so no revocation — reachable or not — is silent."""
-    from hdp_bridge import config as bridge_config
-    from hdp_bridge.control import read_frame, write_frame
-    from hdp_proto.envelope import Envelope
+    """CLI-only (finding I1) — `/hdp devices revoke` no longer reaches this; see `commands.py`.
 
-    async def _via_control_socket() -> bool:
-        try:
-            reader, writer = await asyncio.open_unix_connection(
-                str(bridge_config.control_socket_path())
-            )
-        except (FileNotFoundError, ConnectionRefusedError, OSError):
-            return False
-        await write_frame(
-            writer, Envelope.new("ctl_devices_revoke", {"device_id": device_id}).to_wire()
-        )
-        await read_frame(reader)
-        writer.close()
-        return True
+    A thin renderer over `hdp_bridge.operations.revoke` (FR-18: same operation, a second
+    renderer). Everything that used to be duplicated here line-for-line against
+    `hdp_bridge/cli.py` — the control-socket attempt, the offline-fallback branch, the
+    `via="offline_fallback"` audit record, and the reply/rowcount checks that keep neither path
+    failing open — now lives in that one module (findings I4 and I5)."""
+    from hdp_bridge import operations
 
-    reached_daemon = await _via_control_socket()
-    if not reached_daemon:
-        from hdp_bridge import credentials
-        from hdp_bridge.audit import AuditWriter
-        from hdp_bridge.store import db as store_db
-
-        conn = store_db.connect(bridge_config.registry_db_path())
-        credentials.revoke_credential(conn, device_id)
-        AuditWriter(bridge_config.hdp_home() / "audit").record(
-            "revoked", device_id=device_id, via="offline_fallback"
-        )
-    return f"revoked {device_id}"
+    return await operations.revoke(device_id)
 
 
 async def render_audit() -> str:

@@ -2,7 +2,7 @@
 
 Hermes Device Expansion MVP scaffold.
 
-This repository follows the M0-M4 plan in:
+This repository follows the M0-M4 plan in [oracle-docs](https://github.com/AstermarkLabs/oracle-docs):
 
 - `docs/architecture.md`
 - `docs/design.md`

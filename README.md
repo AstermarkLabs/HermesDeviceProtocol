@@ -112,3 +112,120 @@ the in-scope fault matrix. `make check` is green: ruff, format-check, mypy, and 
    `bridge.addr` cleanup swallows `KeyError`/`OSError` outright (D5: a stale `bridge.addr` is
    harmless, the next process's `start()` overwrites it).
 
+## M2 status
+
+M2 (registry, pairing, and bridge extraction) is implemented: the bridge now lives in its own
+long-lived process (`hdp-bridge serve`) instead of inside the plugin, with a SQLite device
+registry (`hdp_bridge/registry.py`, `store/db.py`, WAL, profile-scoped under `$HERMES_HOME/hdp/`),
+one-time pairing codes and hashed device credentials (`pairing.py`, `credentials.py`), immediate
+revocation with in-flight invocation failure (`revocation.py`, `connection.py`), presence /
+dead-peer detection, an fsync'd append-only audit log (`audit.py`), a Unix-socket control plane
+between plugin and daemon (`control.py`, `transport/socket.py`, mode 0600), daemon lifecycle with
+a PID-as-claim single-instance guard (`daemon.py`), and a two-surface operator UI —
+`hdp-bridge {serve,pair,devices,audit}`, `hermes hdp {status,devices,pair,audit}`, and `/hdp` —
+rendered from one set of logic (FR-18). `make check` is green: ruff, `ruff format --check`, mypy,
+and 265 pytest tests.
+
+**Task 19 (daemon autostart) was cut.** It was the plan's own pre-declared optional cut line
+("may be skipped entirely and M2 still passes its exit gate... implement only if time remains
+after Task 18"). The recorded ruling: given repeated external session-limit interruptions across
+this run (the Task 3, 7, 10, 12, and 15 implementers all hit mid-task usage limits and had to be
+resumed by fresh agents), the task was cut and the run proceeded directly to the final
+whole-branch review, per the plan's own guidance. Cost if wrong: a future session implements
+Task 19 from the same plan file — cheap, additive, no rework of anything already built. The
+shipped MVP answer for starting the bridge is therefore `hdp-bridge serve` run manually in a
+foreground terminal (see `docs/dev-setup.md`).
+
+**Four deviations from the plan/spec as written, all deliberate and documented in code:**
+
+1. **Two SQLite connections in `daemon.py`, not one.** m2-plan.md describes a single
+   `sqlite3.Connection` shared by `Registry`/pairing/credentials; `Registry.__init__` (Task 10)
+   takes a `Path` and opens its own connection internally, so there is no single connection object
+   to share. `_serve_claimed` therefore opens a second, independent connection onto the same file
+   for `NodeConnection` to hand to `credentials.py`/`pairing.py`. Safe for three concrete reasons,
+   spelled out in `daemon.py`'s own comment: (1) WAL mode makes one connection's committed writes
+   immediately visible to the other on the same file; (2) the daemon is single-threaded and
+   single-writer (§3.2), so no concurrent write ever races across the two connections; (3) the one
+   place cross-connection ordering matters — `_handle_hello`'s pairing path, which writes the
+   `devices` row via `registry` before `credentials.issue_credential` writes the FK-referencing
+   `credentials` row via this connection — is deliberately written in that order precisely because
+   the two connections are not one transaction. If `Registry` ever gains an injectable connection,
+   this collapses back to the plan's original single-connection design.
+2. **`POST /hdp/v0/pair` remains absent from the HTTP surface.** m2-plan.md mentions such a route;
+   M2 implements pairing entirely through the WebSocket handshake's `pair:`-prefixed credential.
+   A second HTTP round trip before the upgrade would need its own auth story for no benefit, since
+   the pairing code is already the one-time secret. Recorded as the resolution of that ambiguity
+   (not a silent drop) in `hdp-spec/HDP-0.md` §8 and its Amendments (v0.2) section, which also
+   records `hello.credential` verification, the new optional `welcome.credential`, and `revoke`
+   now being sent — all landed without a wire break (the envelope's `hdp` value is still `"0"`).
+3. **`/hdp pair` and `/hdp devices revoke` are CLI-only** (final-review finding I1). Both open
+   `registry.db` and the audit log directly, which is the plan's sanctioned exception to Global
+   Constraint #1 for *short-lived operator CLI subcommands* — but in gateway mode `/hdp` runs
+   inside the always-running plugin process, which quietly turned a separate-process exception
+   into an in-process one. `/hdp` keeps the read-only verbs (`status`, `devices`, `audit`) and
+   answers the two mutating ones with a pointer to `hermes hdp ...`. This also keeps a plaintext
+   pairing code out of a gateway chat transcript.
+4. **Gateway-mode verification is still substituted, not resolved** — the open loop M1's section
+   deferred to M2. No gateway-mode run was performed in this milestone either (see the gate
+   results below); the substitution is carried forward again rather than closed. It is now the
+   oldest outstanding verification debt in this repo and should be paid at M3.
+
+**Exit gate results (m2-plan.md §8 / the plan's Exit Gate section).** The steps that this repo's
+own entry points can drive were run end to end against a throwaway `HERMES_HOME`; the steps that
+require a real Hermes install or a live gateway were not run, and are marked as such rather than
+assumed.
+
+- **Step 1 — `hdp-bridge serve` (run):** foreground start writes `bridge.addr`, `bridge.pid`, and
+  `bridge.sock`; `bridge.sock` is `srw-------` (0600) as required; all three are removed on clean
+  shutdown, leaving only `registry.db` and `audit/`.
+- **Step 2 — pair (run):** `hdp-bridge pair new` mints a code; `hdp-node connect --pair-code ...
+  --name workshop-node` pairs, and the device appears via the `hermes hdp devices` handler as
+  `state=active online=online` with a fresh `last_seen_at`. Three capabilities
+  (`notifications.send`, `diagnostics.echo`, `device.status`) are advertised and persisted to the
+  `capabilities` table. The node's credential file is written `-rw-------` (0600).
+- **Step 3 — restart both sides (run):** with both daemon and node restarted and no pair code, the
+  node reconnects on its stored credential; `hermes hdp devices` shows the *same* `device_id` with
+  a fresh `last_seen_at`.
+- **Step 4 — revoke (run):** `hdp-bridge devices revoke <id>` prints `revoked <id>`; the connected
+  node logs `revoked by the bridge (revoked by operator); disconnecting and not reconnecting` and
+  exits without retrying; the device shows `state=revoked online=offline`.
+- **Step 5 — reconnect on a revoked credential (run):** `hdp-node connect` on the revoked
+  credential exits non-zero with `authentication rejected by the bridge ... not reconnecting` and
+  a one-line operator message — no traceback, no retry loop.
+- **Step 6 — profile isolation (run, at CLI level, with a substitution):** the literal gate line is
+  `HERMES_HOME=~/.hermes/profiles/coder hermes hdp devices`, which needs a real Hermes install.
+  The equivalent was run directly against the plugin's own `hermes hdp devices` handler with two
+  separate `HERMES_HOME` roots and two daemons: the profile with the paired device lists it, the
+  second profile reports `no paired devices`. `hdp-bridge/tests/test_profile_isolation.py` is the
+  unit-level counterpart (FR-17); the CLI-level check above is the stronger of the two, but it was
+  run against a temporary profile root, not against a real `~/.hermes/profiles/*` profile.
+- **Step 7 — audit (run):** `hdp-bridge audit tail` shows, in order,
+  `daemon_start`, `pairing_code_minted`, `paired`, `daemon_stop`, `daemon_start`, `revoked`,
+  `auth_failed (unknown_credential)` — every security-relevant event of the run above, fsync'd on
+  write (`audit.py`).
+- **Step 8 — manual ritual: NOT RUN.** Bridge-death survivability, the one-hour soak, gateway mode
+  vs CLI mode, and `grep -ci "event loop is closed" ~/.hermes/logs/agent.log` all require the
+  plugin installed into a real Hermes venv (`make dev-install`) and a live gateway session. Not
+  performed in this environment: `make dev-install` mutates the real `hermes-agent` venv, and this
+  machine's `default` and `n8nian` profiles have historically had live, PID-bound gateway sessions
+  (see M0/M1 above) that a second instance could disrupt. The manual ritual is written up in
+  `docs/dev-setup.md` for an operator to execute against a real install.
+- **Also not run:** every step's *literal* `hermes hdp ...` invocation. The verification above
+  calls `hermes_device_plugin.cli.main([...])` — the exact function `register_cli_command` hands
+  Hermes as the `hdp` handler — so the renderers, the control-socket round trip, and the daemon
+  are all genuinely exercised; what is not exercised is Hermes's own command registration and
+  dispatch, which is what an install-backed gate would add.
+- **Environment note found during the gate:** `$HERMES_HOME` deeper than roughly 90 characters
+  makes `control.py`'s `bind()` fail with `OSError: AF_UNIX path too long` and an unhandled
+  traceback (the sockaddr_un limit, 108 bytes). Real but environmental; it is not on any
+  realistic profile path, and no fix was made in this fix wave.
+
+**Final whole-branch review and fix wave.** The final review returned "Ready to merge WITH FIXES"
+with 9 findings: 2 critical (C1 `make check` red, C2 a flaky conformance test) and 7 important
+(I1 gateway-mode constraint violation, I2 FR-11 unasserted, I3 invocation multiplexing regression,
+I4 fail-open revoke CLIs, I5 duplicated CLI domain logic, I6 accept-loop OSError fragility,
+I7 reference-node auth gaps, I8 missing FR-14 backoff jitter, I9 this README section). All 9 were
+addressed in the fix wave (commits `324cabd`, `3fe91b7`, `472a3fd`, `db8eee7`), plus a follow-up
+hardening the reference node's credential-file write with `O_NOFOLLOW` against symlink redirection
+(`5a1e2c9`). Ten Minor findings (M1-M10) were triaged as deferred, not fixed; they are recorded in
+the run's ledger. The full fix-wave write-up is in the run's `final-fix-report.md`.

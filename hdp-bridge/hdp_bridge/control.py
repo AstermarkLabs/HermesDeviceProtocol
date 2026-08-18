@@ -284,6 +284,15 @@ class ControlServer:
         preserves the obvious ordering guarantee for the operator verbs.
         """
         connection_tasks: set[asyncio.Task[None]] = set()
+        # One `write_frame` at a time per connection. `write_frame`'s single `writer.write(...)`
+        # call keeps frames from splitting each other, but `writer.drain()` is not itself safe to
+        # call concurrently on one `StreamWriter` — two callers racing it under backpressure can
+        # trip asyncio's own `assert waiter is None` in `FlowControlMixin._drain_helper`, which
+        # escapes `_invoke_and_reply`'s narrow except clause and orphans that reply (re-review
+        # finding, round 2: I3's off-loop `ctl_invoke` dispatch made this reachable for the first
+        # time — the read loop's own inline replies and an in-flight invoke's reply can now land
+        # on the same writer at once).
+        write_lock = asyncio.Lock()
         try:
             while True:
                 try:
@@ -296,10 +305,13 @@ class ControlServer:
                     error_payload = err(ErrorCode.NOT_IMPLEMENTED, str(exc))["error"]
                     # No `corr`: there is no valid envelope here, so there is no id to echo. The
                     # client logs and drops replies it can't correlate.
-                    await write_frame(writer, Envelope.new("error", error_payload).to_wire())
+                    async with write_lock:
+                        await write_frame(writer, Envelope.new("error", error_payload).to_wire())
                     continue
                 if envelope.type == "ctl_invoke":
-                    task = asyncio.ensure_future(self._invoke_and_reply(envelope, writer))
+                    task = asyncio.ensure_future(
+                        self._invoke_and_reply(envelope, writer, write_lock)
+                    )
                     connection_tasks.add(task)
                     self._invoke_tasks.add(task)
                     task.add_done_callback(connection_tasks.discard)
@@ -307,7 +319,8 @@ class ControlServer:
                     task.add_done_callback(_log_task_exception)
                     continue
                 reply = await self._dispatch(envelope)
-                await write_frame(writer, _correlate(reply, envelope).to_wire())
+                async with write_lock:
+                    await write_frame(writer, _correlate(reply, envelope).to_wire())
         finally:
             # This connection is gone; nothing is left to deliver its invoke replies to.
             for task in connection_tasks:
@@ -315,16 +328,23 @@ class ControlServer:
             self._active_writers.discard(writer)
             writer.close()
 
-    async def _invoke_and_reply(self, envelope: Envelope, writer: asyncio.StreamWriter) -> None:
+    async def _invoke_and_reply(
+        self, envelope: Envelope, writer: asyncio.StreamWriter, write_lock: asyncio.Lock
+    ) -> None:
         """Run one `ctl_invoke` to completion and write its reply.
 
-        Safe to run concurrently with other replies on the same `writer` because `write_frame`
-        emits the 4-byte length header and the body in a single `writer.write(...)` call — two
-        interleaved replies can never split each other's frames. Do not separate those writes.
+        `write_lock` — shared with `_handle`'s read loop and every other in-flight
+        `_invoke_and_reply` on this same connection — serialises the actual `write_frame` call.
+        Frame boundaries alone were never the risk (one `writer.write(...)` per frame can't
+        split); the risk was two callers awaiting `writer.drain()` on the same `StreamWriter` at
+        once, which is not itself safe under backpressure. Holding this lock only around the
+        write keeps concurrent invokes able to run concurrently — it is not the same lock that
+        would reintroduce finding I3's serialization.
         """
         reply = await self._ctl_invoke(envelope)
         try:
-            await write_frame(writer, _correlate(reply, envelope).to_wire())
+            async with write_lock:
+                await write_frame(writer, _correlate(reply, envelope).to_wire())
         except (ConnectionResetError, BrokenPipeError, OSError):
             # The caller disconnected while its invocation was in flight. Nothing to deliver to
             # and nothing to escalate — the invocation's own bookkeeping is already settled.

@@ -197,6 +197,11 @@ def test_backoff_starts_at_one_second_is_capped_at_thirty_and_is_jittered():
 
     assert all(2.0 <= node._backoff_delay(2) <= 2.5 for _ in range(20))
     assert all(4.0 <= node._backoff_delay(3) <= 5.0 for _ in range(20))
-    # The ceiling is on the *returned* delay, jitter included — not just on the base.
-    assert all(node._backoff_delay(attempt) <= 30.0 for attempt in range(1, 20) for _ in range(5))
-    assert node._backoff_delay(20) == 30.0
+    # The ceiling applies to the exponential *base*, not to the jittered result — jitter must
+    # keep spreading attempts out even at the ceiling, or N nodes converge back into lockstep at
+    # steady state, which is the exact condition this backoff exists to prevent (re-review
+    # finding, round 2: an earlier version clamped the sum too, so every attempt >= ~6 returned
+    # exactly 30.0).
+    at_ceiling = [node._backoff_delay(attempt) for attempt in (6, 10, 20) for _ in range(20)]
+    assert all(30.0 <= d <= 30.0 + 30.0 * node._BACKOFF_JITTER_FRACTION for d in at_ceiling)
+    assert len(set(at_ceiling)) > 1, "no jitter at the ceiling — attempts are back in lockstep"

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 
+import pytest
 from hdp_bridge import cli
 from hdp_bridge.store import db as store_db
 
@@ -100,12 +101,15 @@ def test_devices_revoke_of_an_unknown_device_reports_no_such_device_and_audits_n
 ):
     """Finding I4: the offline fallback used to print "revoked <id>" unconditionally, even when
     the UPDATE touched zero rows. An operator typo now says so, and no `revoked` audit record is
-    written for a revocation that did not happen."""
+    written for a revocation that did not happen. Round 2 of I4: the process also exits non-zero,
+    so a caller scripting `hdp-bridge devices revoke $id && next-step` can't proceed past this."""
     monkeypatch.setenv("HERMES_HOME", str(tmp_path))
     store_db.connect(tmp_path / "hdp" / "registry.db")
 
-    cli._run_devices_revoke("dev_nonexistent")
+    with pytest.raises(SystemExit) as exc_info:
+        cli._run_devices_revoke("dev_nonexistent")
 
+    assert exc_info.value.code == 1
     assert capsys.readouterr().out.strip() == "no such device dev_nonexistent"
     assert not list((tmp_path / "hdp" / "audit").glob("audit-*.jsonl"))
 
@@ -119,8 +123,10 @@ def test_devices_revoke_twice_reports_no_such_device_the_second_time(tmp_path, m
 
     cli._run_devices_revoke("dev_1")
     capsys.readouterr()
-    cli._run_devices_revoke("dev_1")
+    with pytest.raises(SystemExit) as exc_info:
+        cli._run_devices_revoke("dev_1")
 
+    assert exc_info.value.code == 1
     assert capsys.readouterr().out.strip() == "no such device dev_1"
     audit_files = list((tmp_path / "hdp" / "audit").glob("audit-*.jsonl"))
     assert len(audit_files) == 1

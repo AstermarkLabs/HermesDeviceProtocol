@@ -160,10 +160,23 @@ def main(argv: list[str] | None = None) -> None:
     """The `hermes hdp ...` operator entry point. `asyncio.run()` only appears here, never in a
     `render_*` function — this is the CLI-only caller; `commands.py`'s `/hdp` awaits the same
     `render_*` functions from inside whatever event loop Hermes's gateway mode already has
-    running."""
+    running.
+
+    Exits non-zero when a `devices revoke` refused or no-op'd (re-review finding I4, round 2) —
+    `hdp_bridge.operations.revoke_failed` is the single source of truth for that check, shared
+    with `hdp-bridge`'s own CLI so the two renderers can't drift on what counts as failure."""
     parser = _build_parser()
     args = parser.parse_args(argv)
-    print(_run(args))
+    message = _run(args)
+    print(message)
+    if (
+        getattr(args, "hdp_command", None) == "devices"
+        and getattr(args, "devices_command", None) == "revoke"
+    ):
+        from hdp_bridge import operations
+
+        if operations.revoke_failed(message):
+            raise SystemExit(1)
 
 
 def register_cli_command(ctx: Any) -> None:

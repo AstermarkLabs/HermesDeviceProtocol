@@ -1,4 +1,4 @@
-# Oracle
+# HermesDeviceProtocol
 
 Hermes Device Expansion MVP scaffold.
 

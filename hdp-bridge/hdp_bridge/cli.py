@@ -58,9 +58,15 @@ def _run_audit_tail() -> None:
 def _run_devices_revoke(device_id: str) -> None:
     """Thin renderer over `operations.revoke` — the daemon-reachable/offline-fallback decision,
     the audit record, and the did-anything-actually-happen check all live there, shared with
-    `hermes hdp devices revoke` (final-review finding I5)."""
+    `hermes hdp devices revoke` (final-review finding I5). Exits non-zero on a refused/no-op
+    revoke rather than always exiting 0 (re-review finding I4, round 2) — a script that does
+    `hdp-bridge devices revoke $id && next-step` must not proceed past a revoke that did nothing.
+    """
     import asyncio
 
     from . import operations
 
-    print(asyncio.run(operations.revoke(device_id)))
+    message = asyncio.run(operations.revoke(device_id))
+    print(message)
+    if operations.revoke_failed(message):
+        raise SystemExit(1)

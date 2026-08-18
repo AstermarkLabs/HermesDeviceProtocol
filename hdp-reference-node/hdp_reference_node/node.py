@@ -125,12 +125,20 @@ async def run(
 
 
 def _backoff_delay(attempt: int) -> float:
-    """FR-14: exponential 1s -> 30s, jittered. `attempt` is 1-based."""
+    """FR-14: exponential 1s -> 30s, jittered. `attempt` is 1-based.
+
+    The 30s ceiling applies to `base` (the exponential term) only, not to `base + jitter` — an
+    earlier version clamped the final sum too, which meant every attempt at the ceiling returned
+    exactly `_MAX_BACKOFF_S`, nullifying jitter at steady state (the exact thundering-herd
+    condition this backoff exists to prevent — re-review finding, round 2). `transport/socket.py`
+    already gets this right: its ceiling is on `_backoff_s` before adding jitter, not on the
+    result.
+    """
     base = min(_MAX_BACKOFF_S, _INITIAL_BACKOFF_S * (2 ** (attempt - 1)))
     jitter = random.uniform(0, base * _BACKOFF_JITTER_FRACTION)  # noqa: S311
     # Not a security context — retry-storm jitter for a reconnect loop, not a cryptographic
     # value. Same call, same reasoning, as `transport/socket.py`'s plugin-side backoff.
-    return min(_MAX_BACKOFF_S, base + jitter)
+    return base + jitter
 
 
 def _resolve_credential(pair_code: str | None, credential_file: Path) -> str:

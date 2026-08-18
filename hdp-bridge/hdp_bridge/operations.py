@@ -46,6 +46,18 @@ async def pair_new() -> str:
     return code
 
 
+def revoke_failed(message: str) -> bool:
+    """True when `revoke()`'s return value describes a failure rather than a completed revoke.
+
+    Both CLI entry points (`hdp_bridge/cli.py`, `hermes_device_plugin/cli.py`) use this to decide
+    their process exit code — `revoke()` itself keeps returning a plain string rather than raising,
+    since that string is also what each CLI prints verbatim. A caller that only prints the message
+    and always exits 0 is fail-open on a security command in exactly the way this module exists to
+    prevent (re-review finding I4, round 2); this predicate is what closes that gap.
+    """
+    return message.startswith(("no such device ", "revoke failed:"))
+
+
 async def revoke(device_id: str) -> str:
     """Revoke `device_id`, returning the line the caller should render.
 

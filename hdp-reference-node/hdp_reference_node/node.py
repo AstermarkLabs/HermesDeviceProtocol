@@ -64,9 +64,10 @@ def _write_credential(credential_file: Path, credential: str) -> None:
     readable by every user on the machine. `os.open` with the mode argument closes that, but only
     for a file that does not already exist — `O_CREAT`'s mode is ignored outright when it does —
     so `fchmod` on the returned descriptor covers the re-pairing case too. Both act on the fd, so
-    there is no window and no path-based race.
+    there is no window and no path-based race. `O_NOFOLLOW` refuses to write through a symlink
+    planted at `credential_file`'s path, so a local attacker can't redirect the secret write.
     """
-    fd = os.open(credential_file, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    fd = os.open(credential_file, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
     with os.fdopen(fd, "w") as handle:
         os.fchmod(fd, 0o600)
         handle.write(credential)

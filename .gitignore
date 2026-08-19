@@ -23,3 +23,5 @@ audit/*.jsonl
 *.swo
 
 docs
+graphify-out/20*
+graphify-out/cache

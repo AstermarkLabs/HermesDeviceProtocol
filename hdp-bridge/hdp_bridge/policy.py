@@ -188,8 +188,15 @@ class PolicyEngine:
         """Resolve against one captured table reference."""
         return self._table.resolve(device_id, capability)
 
-    def reload(self, *, force: bool = False) -> bool:
-        """Parse and validate the on-disk document before atomically replacing the current table."""
+    def reload(self, *, force: bool = False, initial: bool = False) -> bool:
+        """Parse and validate the on-disk document before atomically replacing the current table.
+
+        When ``initial`` is True the caller is asserting this is the very first load at daemon
+        startup: a successful load establishes policy from nothing, so no ``policy_changed``
+        audit event is emitted (the audit log must open with ``daemon_start``, not a spurious
+        change). Rejections are still audited — a bad on-disk policy at startup is operator-
+        visible either way. Subsequent reloads always audit normally.
+        """
         mtime_ns: int | None = None
         content_hash: str | None = None
         try:
@@ -223,13 +230,14 @@ class PolicyEngine:
         with self._lock:
             self._table = table
             self._file_token = token
-        self._record_reload(
-            accepted=True,
-            mtime_ns=mtime_ns,
-            content_hash=content_hash,
-            policy_seq=table.policy_seq,
-            reason=None,
-        )
+        if not initial:
+            self._record_reload(
+                accepted=True,
+                mtime_ns=mtime_ns,
+                content_hash=content_hash,
+                policy_seq=table.policy_seq,
+                reason=None,
+            )
         return True
 
     def _record_reload(

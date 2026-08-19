@@ -123,7 +123,7 @@ async def _serve_claimed(pid_path: Path, stop_event: asyncio.Event | None) -> No
         known_device_ids=registry.known_active_device_ids,
         audit=audit.record,
     )
-    policy.reload(force=True)
+    policy.reload(force=True, initial=True)
     approvals = ApprovalManager(conn)
 
     def make_connection(ws: object) -> NodeConnection:

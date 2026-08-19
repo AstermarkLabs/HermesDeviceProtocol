@@ -201,29 +201,25 @@ async def test_version_mismatch_closes_before_any_reply(bridge_url):
         )
 
 
-async def test_no_matching_device_when_zero_nodes_connected():
-    """In-scope zero-node case (m1-plan.md §7's deferral note). Exercised through `engine.py`'s
-    real device-resolution step — `no_matching_device` is raised there — so this deliberately does
-    not use the `bridge`/`bridge_url` fixtures (no bridge daemon is started at all here).
+async def test_no_matching_device_when_zero_nodes_connected(bridge):
+    """In-scope zero-node case (m1-plan.md §7's deferral note): with the bridge up but no node
+    connected, an invocation must fail with `no_matching_device`.
 
-    Goes through `tools.hdp_echo`, not a bare `await engine.invoke(...)`: `engine.invoke` reaches
-    `runtime.transport` (a `SocketTransport`, as of Task 7), whose `asyncio.Lock` binds to
-    whichever loop first awaits it — `HDPRuntime._serve_until_close_requested` on the dedicated
-    HDP thread's loop, via `transport.start()`. Awaiting `engine.invoke(...)` directly on *this*
-    coroutine's own loop (this test's `asyncio.run`, a different loop entirely) deadlocks
-    acquiring that lock from the wrong loop/thread — silently, as a hang, not an exception. Every
-    real call site reaches `engine.invoke` through `runtime.get_runtime().submit(...)` +
-    `asyncio.wrap_future` (see `tools._run_on_hdp_loop`) specifically to cross onto the HDP loop
-    correctly; this test must do the same instead of bypassing that contract.
+    Historically this exercised `engine.py`'s plugin-side device-resolution step and deliberately
+    did *not* start a bridge. As of M4 (`engine.invoke` now forwards the unresolved request to
+    the daemon, which owns resolution), the plugin can no longer reach `no_matching_device`
+    without a bridge — there is no plugin-side resolution step left. The honest equivalent is to
+    drive the daemon's own resolution path: start the bridge, connect zero nodes, invoke, and
+    assert the daemon returns `no_matching_device` from its empty registry.
     """
-    from hermes_device_plugin import tools
-    from hermes_device_plugin.runtime import get_runtime
-
-    try:
-        raw = await tools.hdp_echo({"payload": {}})
-        result = json.loads(raw)
-        assert result["ok"] is False
-        assert result["error"]["code"] == ErrorCode.NO_MATCHING_DEVICE.value
-    finally:
-        get_runtime().close()
-        get_runtime.reset()
+    result = await bridge.invoke(
+        InvokeRequest(
+            capability="diagnostics.echo",
+            acceptable_versions=(1,),
+            requested_device_id=None,
+            args={"payload": {}},
+            deadline_ms=2000,
+        )
+    )
+    assert result.ok is False
+    assert result.error["code"] == ErrorCode.NO_MATCHING_DEVICE.value

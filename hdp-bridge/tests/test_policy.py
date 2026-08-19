@@ -131,6 +131,31 @@ def test_policy_reload_audits_exact_bytes_for_accepted_and_rejected_changes(tmp_
     assert records[-1]["reason"]
 
 
+def test_policy_reload_does_not_audit_initial_load_as_a_change(tmp_path):
+    """The daemon's startup reload establishes policy from nothing — there is no prior table to
+    'change' from, so the audit log must not open with a spurious policy_changed event ahead of
+    daemon_start. The caller marks that load with initial=True; subsequent reloads still audit
+    normally."""
+    policy_path = tmp_path / "policy.yaml"
+    records = []
+    engine = policy.PolicyEngine(
+        policy_path,
+        known_device_ids=set(),
+        audit=lambda event, **fields: records.append({"event": event, **fields}),
+    )
+    policy_path.write_bytes(b"version: 1\ndefaults: {}\ndevices: {}\n")
+
+    assert engine.reload(force=True, initial=True) is True
+    assert records == []
+
+    # A real change afterwards still audits.
+    policy_path.write_bytes(b"version: 1\ndefaults:\n  diagnostics.echo: deny\ndevices: {}\n")
+    assert engine.reload(force=True) is True
+    assert [r["event"] for r in records] == ["policy_changed"]
+    assert records[-1]["accepted"] is True
+    assert records[-1]["policy_seq"] == 2
+
+
 def test_policy_reload_reads_candidate_bytes_once(tmp_path, monkeypatch):
     policy_path = tmp_path / "policy.yaml"
     policy_path.write_text("version: 1\ndefaults: {}\ndevices: {}\n")

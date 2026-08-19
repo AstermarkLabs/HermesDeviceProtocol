@@ -118,7 +118,11 @@ async def _serve_claimed(pid_path: Path, stop_event: asyncio.Event | None) -> No
     descriptors: dict = {}
     audit = AuditWriter(config.hdp_home() / "audit")
     _ensure_policy_file(config.policy_path())
-    policy = PolicyEngine(config.policy_path())
+    policy = PolicyEngine(
+        config.policy_path(),
+        known_device_ids=registry.known_active_device_ids,
+        audit=audit.record,
+    )
     policy.reload(force=True)
     approvals = ApprovalManager(conn)
 

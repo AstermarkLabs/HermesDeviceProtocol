@@ -28,7 +28,7 @@ def register(ctx: Any) -> None:
         toolset="device",
         schema=schemas.NOTIFICATIONS_SEND,
         handler=tools.device_notifications_send,
-        check_fn=tools.runtime_healthy,
+        check_fn=tools.notifications_available,
         is_async=True,
         description="Send a notification to a paired device.",
     )
@@ -46,7 +46,7 @@ def register(ctx: Any) -> None:
         toolset="device",
         schema=schemas.ECHO,
         handler=tools.hdp_echo,
-        check_fn=tools.runtime_healthy,
+        check_fn=tools.echo_available,
         is_async=True,
         description="Round-trip a JSON payload to a device and back.",
     )

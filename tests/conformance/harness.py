@@ -79,6 +79,7 @@ async def start_node(
     name: str = "conformance-node",
     faults: tuple[str, ...] = (),
     credential_file: Path | None = None,
+    capability_versions: tuple[str, ...] = (),
 ) -> asyncio.subprocess.Process:
     """Launch the real `hdp-node` CLI as a subprocess with the given `--fault` flags, pointed at
     `bridge_url`. The caller is responsible for calling `stop_node` on the result.
@@ -112,6 +113,8 @@ async def start_node(
     ]
     for flag in faults:
         cmd += ["--fault", flag]
+    for capability_version in capability_versions:
+        cmd += ["--capability-version", capability_version]
     return await asyncio.create_subprocess_exec(
         *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT
     )

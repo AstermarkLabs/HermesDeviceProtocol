@@ -7,10 +7,96 @@ No pre-existing `test_cli.py` covered `cli.py` before this task; this file's `pa
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import pytest
 from hdp_bridge import cli
 from hdp_bridge.store import db as store_db
+from hdp_proto.envelope import Envelope
+
+
+def test_approvals_list_renders_daemon_held_pending_records(monkeypatch, capsys):
+    async def request(verb, payload):
+        assert (verb, payload) == ("ctl_list_approvals", {})
+        return Envelope.new(
+            "ctl_list_approvals_reply",
+            {
+                "approvals": [
+                    {
+                        "invocation_id": "inv_1",
+                        "device_id": "dev_1",
+                        "capability": "diagnostics.echo",
+                        "version": 2,
+                    }
+                ]
+            },
+        )
+
+    monkeypatch.setattr("hdp_bridge.operations.control_request", request)
+
+    cli._run_approvals_list()
+
+    assert json.loads(capsys.readouterr().out) == [
+        {
+            "invocation_id": "inv_1",
+            "device_id": "dev_1",
+            "capability": "diagnostics.echo",
+            "version": 2,
+        }
+    ]
+
+
+@pytest.mark.parametrize(("decision", "scope"), [("approve", "session"), ("deny", "one_time")])
+def test_approval_decisions_use_the_control_plane(monkeypatch, capsys, decision: str, scope: str):
+    async def request(verb, payload):
+        assert verb == "ctl_resolve_approval"
+        assert payload == {
+            "invocation_id": "inv_1",
+            "decision": decision,
+            "scope": scope,
+        }
+        return Envelope.new("ctl_resolve_approval_reply", {"ok": True, "state": f"{decision}d"})
+
+    monkeypatch.setattr("hdp_bridge.operations.control_request", request)
+
+    cli._run_approval_resolve("inv_1", decision=decision, scope=scope)
+
+    assert json.loads(capsys.readouterr().out)["ok"] is True
+
+
+def test_policy_show_and_reload_are_read_only_control_plane_clients(monkeypatch, capsys):
+    replies = {
+        "ctl_policy_show": Envelope.new("ctl_policy_show_reply", {"policy_seq": 4, "defaults": {}}),
+        "ctl_policy_reload": Envelope.new("ctl_policy_reload_reply", {"ok": True, "policy_seq": 5}),
+    }
+
+    async def request(verb, payload):
+        assert payload == {}
+        return replies[verb]
+
+    monkeypatch.setattr("hdp_bridge.operations.control_request", request)
+
+    cli._run_policy_control("show")
+    cli._run_policy_control("reload")
+
+    rendered = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
+    assert rendered == [
+        {"defaults": {}, "policy_seq": 4},
+        {"ok": True, "policy_seq": 5},
+    ]
+
+
+def test_policy_validate_checks_a_file_without_replacing_daemon_policy(
+    tmp_path, monkeypatch, capsys
+):
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    store_db.connect(tmp_path / "hdp" / "registry.db")
+    candidate = tmp_path / "candidate.yaml"
+    candidate.write_text("version: 1\ndefaults: {}\ndevices: {}\ndefault_device: {}\n")
+
+    cli._run_policy_validate(Path(candidate))
+
+    assert json.loads(capsys.readouterr().out) == {"ok": True, "policy_seq": 1}
 
 
 def test_pair_new_records_pairing_code_minted_with_no_code_or_hash(tmp_path, monkeypatch, capsys):

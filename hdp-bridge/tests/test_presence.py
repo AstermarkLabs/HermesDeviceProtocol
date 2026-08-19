@@ -9,11 +9,17 @@ drop) — it must NOT set `_disconnect_reason` to anything other than its defaul
 from __future__ import annotations
 
 import asyncio
+import json
 
+import pytest
 from hdp_bridge.connection import NodeConnection
 from hdp_bridge.invocations import DeviceDisconnected, InvocationsMem
 from hdp_bridge.registry import Registry
 from hdp_bridge.store import db
+from hdp_bridge.types import CapabilityRecord, DeviceRecord
+from hdp_proto.capabilities import CapabilityDescriptor
+from hdp_proto.envelope import Envelope
+from hdp_proto.messages import CapabilitiesMsg
 
 
 class _FakeWS:
@@ -28,6 +34,15 @@ class _FakeWS:
         self.closed_with = code
 
 
+def _echo_descriptor(version: int) -> CapabilityDescriptor:
+    return CapabilityDescriptor(
+        name="diagnostics.echo",
+        version=version,
+        input_schema={"type": "object"},
+        output_schema={"type": "object"},
+    )
+
+
 async def test_heartbeat_updates_last_seen_at(tmp_path):
     db_path = tmp_path / "registry.db"
     conn = db.connect(db_path)
@@ -36,18 +51,17 @@ async def test_heartbeat_updates_last_seen_at(tmp_path):
         "first_paired_at, last_seen_at, state) VALUES ('dev_1', 'n', 'p', '', 0, 0, 'active')"
     )
     registry = Registry(db_path)
+    connections = {}
     connection = NodeConnection(
         _FakeWS(),
         conn=conn,
         registry=registry,
         invocations=InvocationsMem(),
-        connections={},
+        connections=connections,
         descriptors={},
     )
     connection.device_id = "dev_1"
-    import json
-
-    from hdp_proto.envelope import Envelope
+    connections["dev_1"] = connection
 
     await connection._handle_frame(json.dumps(Envelope.new("heartbeat", {}).to_wire()))
     row = conn.execute("SELECT last_seen_at FROM devices WHERE device_id = 'dev_1'").fetchone()
@@ -72,7 +86,7 @@ async def test_dead_peer_after_45s_of_silence_closes_and_fails_in_flight(tmp_pat
     connection.device_id = "dev_1"
     connections = {"dev_1": connection}
     connection._connections = connections
-    invocation_id, entry = invocations.mint_for("dev_1")
+    invocation_id, entry = invocations.mint_for("dev_1", connection=connection)
 
     monitor_task = asyncio.create_task(connection._dead_peer_monitor())
     await asyncio.sleep(0.4)
@@ -114,7 +128,7 @@ async def test_dead_peer_timeout_leaves_disconnect_reason_at_default(tmp_path):
     )
     connection.device_id = "dev_1"
     connection._connections = {"dev_1": connection}
-    invocation_id, entry = invocations.mint_for("dev_1")
+    invocation_id, entry = invocations.mint_for("dev_1", connection=connection)
 
     monitor_task = asyncio.create_task(connection._dead_peer_monitor())
     await asyncio.sleep(0.4)
@@ -128,3 +142,125 @@ async def test_dead_peer_timeout_leaves_disconnect_reason_at_default(tmp_path):
         raised = exc
     assert raised is not None
     assert raised.reason == "device_offline"
+
+
+async def test_stale_disconnect_does_not_remove_replacement_or_fail_its_calls(tmp_path):
+    db_path = tmp_path / "registry.db"
+    conn = db.connect(db_path)
+    registry = Registry(db_path)
+    invocations = InvocationsMem()
+    connections = {}
+    old = NodeConnection(
+        _FakeWS(),
+        conn=conn,
+        registry=registry,
+        invocations=invocations,
+        connections=connections,
+        descriptors={},
+    )
+    replacement = NodeConnection(
+        _FakeWS(),
+        conn=conn,
+        registry=registry,
+        invocations=invocations,
+        connections=connections,
+        descriptors={},
+    )
+    old.device_id = replacement.device_id = "dev_1"
+    connections["dev_1"] = replacement
+    old_id, old_entry = invocations.mint_for("dev_1", connection=old)
+    new_id, new_entry = invocations.mint_for("dev_1", connection=replacement)
+
+    await old._on_disconnect()
+
+    assert connections["dev_1"] is replacement
+    assert not invocations.is_pending(old_id)
+    with pytest.raises(DeviceDisconnected):
+        await old_entry.ack_future
+    assert invocations.is_pending(new_id)
+    assert not new_entry.ack_future.done()
+
+
+@pytest.mark.parametrize("stale_capabilities", [(), (_echo_descriptor(2),)])
+async def test_stale_generation_cannot_replace_current_capabilities(tmp_path, stale_capabilities):
+    db_path = tmp_path / "registry.db"
+    conn = db.connect(db_path)
+    registry = Registry(db_path)
+    current = _echo_descriptor(1)
+    registry.register(
+        DeviceRecord(
+            device_id="dev_1",
+            friendly_name="replacement",
+            platform="linux",
+            online=True,
+            capabilities=[
+                CapabilityRecord(
+                    name=current.name,
+                    version=current.version,
+                    input_schema=current.input_schema,
+                    output_schema=current.output_schema,
+                )
+            ],
+        )
+    )
+    connections = {}
+    descriptors = {"dev_1": {(current.name, current.version): current}}
+    old = NodeConnection(
+        _FakeWS(),
+        conn=conn,
+        registry=registry,
+        invocations=InvocationsMem(),
+        connections=connections,
+        descriptors=descriptors,
+    )
+    replacement = NodeConnection(
+        _FakeWS(),
+        conn=conn,
+        registry=registry,
+        invocations=InvocationsMem(),
+        connections=connections,
+        descriptors=descriptors,
+    )
+    old.device_id = replacement.device_id = "dev_1"
+    connections["dev_1"] = replacement
+    message = CapabilitiesMsg(capabilities=stale_capabilities)
+
+    await old._handle_frame(json.dumps(Envelope.new("capabilities", message.to_wire()).to_wire()))
+
+    assert [(cap.name, cap.version) for cap in registry.get("dev_1").capabilities] == [
+        ("diagnostics.echo", 1)
+    ]
+    assert list(descriptors["dev_1"]) == [("diagnostics.echo", 1)]
+
+
+async def test_stale_generation_heartbeat_cannot_update_current_presence(tmp_path):
+    db_path = tmp_path / "registry.db"
+    conn = db.connect(db_path)
+    conn.execute(
+        "INSERT INTO devices (device_id, friendly_name, platform, client_version, "
+        "first_paired_at, last_seen_at, state) VALUES ('dev_1', 'n', 'p', '', 0, 123, 'active')"
+    )
+    connections = {}
+    old = NodeConnection(
+        _FakeWS(),
+        conn=conn,
+        registry=Registry(db_path),
+        invocations=InvocationsMem(),
+        connections=connections,
+        descriptors={},
+    )
+    replacement = NodeConnection(
+        _FakeWS(),
+        conn=conn,
+        registry=Registry(db_path),
+        invocations=InvocationsMem(),
+        connections=connections,
+        descriptors={},
+    )
+    old.device_id = replacement.device_id = "dev_1"
+    connections["dev_1"] = replacement
+
+    await old._handle_frame(json.dumps(Envelope.new("heartbeat", {}).to_wire()))
+
+    row = conn.execute("SELECT last_seen_at FROM devices WHERE device_id = 'dev_1'").fetchone()
+    assert row[0] == 123

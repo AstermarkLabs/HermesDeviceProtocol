@@ -1,7 +1,34 @@
 from __future__ import annotations
 
+import asyncio
+
+import pytest
 from hdp_bridge import approvals
 from hdp_bridge.store import db
+
+
+def test_abandon_removes_pending_approval_without_persisting_a_decision(tmp_path):
+    """A disconnected device cannot leave an unresolvable approval in the operator queue."""
+    conn = db.connect(tmp_path / "registry.db")
+    manager = approvals.ApprovalManager(conn)
+    manager.create(
+        invocation_id="inv_abandoned",
+        device_id="dev_1",
+        capability="diagnostics.echo",
+        version=1,
+        args_summary="(0 fields)",
+        requesting_session=None,
+        risk_class="",
+    )
+
+    assert manager.abandon("inv_abandoned") is True
+    assert manager.list_pending() == []
+    assert (
+        conn.execute(
+            "SELECT COUNT(*) FROM approvals WHERE invocation_id = 'inv_abandoned'"
+        ).fetchone()[0]
+        == 0
+    )
 
 
 def test_expiring_an_unresolved_approval_writes_one_terminal_row(tmp_path):
@@ -70,3 +97,26 @@ def test_session_decision_is_memory_only_and_persistent_decision_creates_grant(t
 
     row = conn.execute("SELECT mode, scope FROM policy_grants").fetchone()
     assert tuple(row) == ("always", "persistent")
+
+
+async def test_invalid_scope_does_not_consume_pending_approval_or_waiter(tmp_path):
+    conn = db.connect(tmp_path / "registry.db")
+    manager = approvals.ApprovalManager(conn)
+    manager.create(
+        invocation_id="inv_1",
+        device_id="dev_1",
+        capability="notifications.send",
+        version=1,
+        args_summary="",
+        requesting_session="session_1",
+        risk_class="",
+    )
+    waiter = asyncio.create_task(manager.wait("inv_1"))
+    await asyncio.sleep(0)
+
+    with pytest.raises(ValueError):
+        manager.resolve("inv_1", approved=True, scope="invalid", decided_by="cli")
+
+    assert [pending.invocation_id for pending in manager.list_pending()] == ["inv_1"]
+    resolution = manager.resolve("inv_1", approved=True, scope="one_time", decided_by="cli")
+    assert (await waiter) is resolution

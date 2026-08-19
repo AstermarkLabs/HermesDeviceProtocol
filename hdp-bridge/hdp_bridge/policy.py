@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import logging
+import os
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import StrEnum
+from hashlib import sha256
 from pathlib import Path
 from threading import Lock
 from typing import Literal
@@ -45,6 +48,7 @@ class PolicyTable:
 
     defaults: tuple[tuple[str, Mode], ...]
     devices: tuple[tuple[str, tuple[tuple[str, Mode], ...]], ...]
+    default_devices: tuple[tuple[str, str], ...]
     policy_seq: int
 
     @classmethod
@@ -71,7 +75,32 @@ class PolicyTable:
                     cls._parse_modes(raw_modes, f"devices.{device_id}", permit_default=True),
                 )
             )
-        return cls(tuple(defaults), tuple(devices), policy_seq)
+        configured_capabilities = {capability for capability, _mode in defaults}
+        configured_capabilities.update(
+            capability
+            for _device_id, modes in devices
+            for capability, _mode in modes
+            if capability != "default"
+        )
+        raw_default_devices = data.get("default_device", {})
+        if not isinstance(raw_default_devices, dict):
+            raise PolicyValidationError("default_device must be a mapping")
+        default_devices: list[tuple[str, str]] = []
+        for capability, device_id in raw_default_devices.items():
+            if not isinstance(capability, str) or _CAPABILITY_RE.fullmatch(capability) is None:
+                raise PolicyValidationError(
+                    f"default_device contains invalid capability {capability!r}"
+                )
+            if capability not in configured_capabilities:
+                raise PolicyValidationError(
+                    f"default_device.{capability} does not appear in policy rules"
+                )
+            if not isinstance(device_id, str) or not device_id:
+                raise PolicyValidationError(
+                    f"default_device.{capability} must name a device identifier"
+                )
+            default_devices.append((capability, device_id))
+        return cls(tuple(defaults), tuple(devices), tuple(default_devices), policy_seq)
 
     @staticmethod
     def _parse_modes(
@@ -115,6 +144,13 @@ class PolicyTable:
                 return Decision(mode, "global_default", self.policy_seq)
         return Decision(Mode.DENY, "fallback", self.policy_seq)
 
+    def default_device_for(self, capability: str) -> str | None:
+        """Return this snapshot's configured target for one capability, if any."""
+        for configured_capability, device_id in self.default_devices:
+            if configured_capability == capability:
+                return device_id
+        return None
+
     def _device_modes(self, device_id: str) -> tuple[tuple[str, Mode], ...] | None:
         for configured_device, modes in self.devices:
             if configured_device == device_id:
@@ -129,11 +165,18 @@ class _NoDuplicateSafeLoader:  # pragma: no cover - completed dynamically when P
 class PolicyEngine:
     """Own the current immutable policy snapshot and safely replace it after validation."""
 
-    def __init__(self, path: Path, *, known_device_ids: set[str] | None = None) -> None:
+    def __init__(
+        self,
+        path: Path,
+        *,
+        known_device_ids: set[str] | Callable[[], set[str]] | None = None,
+        audit: Callable[..., None] | None = None,
+    ) -> None:
         self._path = path
         self._known_device_ids = known_device_ids
+        self._audit = audit
         self._lock = Lock()
-        self._table = PolicyTable((), (), policy_seq=0)
+        self._table = PolicyTable((), (), (), policy_seq=0)
         self._file_token: tuple[int, int, int] | None = None
 
     @property
@@ -147,12 +190,18 @@ class PolicyEngine:
 
     def reload(self, *, force: bool = False) -> bool:
         """Parse and validate the on-disk document before atomically replacing the current table."""
+        mtime_ns: int | None = None
+        content_hash: str | None = None
         try:
-            stat = self._path.stat()
-            token = (stat.st_mtime_ns, stat.st_size, stat.st_ino)
-            if not force and token == self._file_token:
-                return False
-            data = self._load_yaml(self._path.read_bytes())
+            with self._path.open("rb") as policy_file:
+                stat = os.fstat(policy_file.fileno())
+                mtime_ns = stat.st_mtime_ns
+                token = (stat.st_mtime_ns, stat.st_size, stat.st_ino)
+                if not force and token == self._file_token:
+                    return False
+                contents = policy_file.read()
+            content_hash = sha256(contents).hexdigest()
+            data = self._load_yaml(contents)
             if self._known_device_ids is not None:
                 self._validate_known_devices(data)
             table = PolicyTable.from_data(data, policy_seq=self._table.policy_seq + 1)
@@ -163,11 +212,44 @@ class PolicyEngine:
                 self._path,
                 exc,
             )
+            self._record_reload(
+                accepted=False,
+                mtime_ns=mtime_ns,
+                content_hash=content_hash,
+                policy_seq=self._table.policy_seq,
+                reason=str(exc),
+            )
             return False
         with self._lock:
             self._table = table
             self._file_token = token
+        self._record_reload(
+            accepted=True,
+            mtime_ns=mtime_ns,
+            content_hash=content_hash,
+            policy_seq=table.policy_seq,
+            reason=None,
+        )
         return True
+
+    def _record_reload(
+        self,
+        *,
+        accepted: bool,
+        mtime_ns: int | None,
+        content_hash: str | None,
+        policy_seq: int,
+        reason: str | None,
+    ) -> None:
+        if self._audit is not None:
+            self._audit(
+                "policy_changed",
+                accepted=accepted,
+                mtime_ns=mtime_ns,
+                content_sha256=content_hash,
+                policy_seq=policy_seq,
+                reason=reason,
+            )
 
     @staticmethod
     def _load_yaml(contents: bytes) -> object:
@@ -202,10 +284,21 @@ class PolicyEngine:
     def _validate_known_devices(self, data: object) -> None:
         if not isinstance(data, dict):
             return
+        configured = (
+            self._known_device_ids() if callable(self._known_device_ids) else self._known_device_ids
+        )
+        if configured is None:
+            return
         devices = data.get("devices", {})
         if not isinstance(devices, dict):
             return
-        unknown = set(devices) - self._known_device_ids
+        default_devices = data.get("default_device", {})
+        default_ids = (
+            {device_id for device_id in default_devices.values() if isinstance(device_id, str)}
+            if isinstance(default_devices, dict)
+            else set()
+        )
+        unknown = (set(devices) | default_ids) - configured
         if unknown:
             raise PolicyValidationError(
                 f"policy names unknown device(s): {', '.join(sorted(unknown))}"

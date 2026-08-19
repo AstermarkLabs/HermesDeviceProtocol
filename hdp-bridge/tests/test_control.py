@@ -33,7 +33,7 @@ from hdp_bridge.invocations import InvocationsMem
 from hdp_bridge.policy import PolicyTable
 from hdp_bridge.registry import Registry
 from hdp_bridge.store import db
-from hdp_bridge.types import DeviceRecord
+from hdp_bridge.types import CapabilityRecord, DeviceRecord
 from hdp_proto.capabilities import CapabilityDescriptor
 from hdp_proto.envelope import Envelope
 from hdp_proto.messages import Hello, ResultMsg
@@ -248,11 +248,12 @@ def _ctl_invoke_envelope(device_id, *, deadline_ms=2000, capability="diagnostics
     return Envelope.new(
         "ctl_invoke",
         {
-            "device_id": device_id,
             "capability": capability,
-            "version": 1,
+            "acceptable_versions": [1],
+            "requested_device_id": device_id,
             "args": {"payload": {}},
             "deadline_ms": deadline_ms,
+            "meta": {},
         },
     )
 
@@ -610,9 +611,19 @@ async def test_policy_denial_never_sends_an_invoke_frame(tmp_path):
 
     conn = db.connect(tmp_path / "registry.db")
     connection = _Connection()
+    registry = Registry(tmp_path / "registry.db")
+    registry.register(
+        DeviceRecord(
+            device_id="dev_1",
+            friendly_name="node",
+            platform="linux",
+            online=True,
+            capabilities=[CapabilityRecord(name="camera.capture", version=1)],
+        )
+    )
     server = ControlServer(
         tmp_path / "bridge.sock",
-        registry=Registry(tmp_path / "registry.db"),
+        registry=registry,
         invocations=InvocationsMem(),
         connections={"dev_1": connection},
         conn=conn,
@@ -624,11 +635,12 @@ async def test_policy_denial_never_sends_an_invoke_frame(tmp_path):
         Envelope.new(
             "ctl_invoke",
             {
-                "device_id": "dev_1",
                 "capability": "camera.capture",
-                "version": 1,
+                "acceptable_versions": [1],
+                "requested_device_id": "dev_1",
                 "args": {},
                 "deadline_ms": 1000,
+                "meta": {},
             },
         )
     )
@@ -754,3 +766,99 @@ async def test_close_drains_a_connection_still_in_the_kernel_accept_backlog(tmp_
         assert data == b""
     finally:
         raw.close()
+
+
+async def test_correlated_control_cancel_cleans_one_invoke_without_cancelling_peer(tmp_path):
+    class _Writer:
+        def __init__(self):
+            self.data = bytearray()
+
+        def write(self, data):
+            self.data.extend(data)
+
+        async def drain(self):
+            return None
+
+        def close(self):
+            return None
+
+    class _Node:
+        def __init__(self, invocations):
+            self.invocations = invocations
+            self.invocation_id = None
+            self.cancelled = []
+
+        async def send_invoke(self, invocation_id, _request):
+            self.invocation_id = invocation_id
+            self.invocations.mark_acked(invocation_id, connection=self)
+
+        async def send_cancel(self, invocation_id, reason):
+            self.cancelled.append((invocation_id, reason))
+
+    db_path = tmp_path / "registry.db"
+    registry = Registry(db_path)
+    for device_id in ("dev_a", "dev_b"):
+        registry.register(
+            DeviceRecord(
+                device_id=device_id,
+                friendly_name=device_id,
+                platform="linux",
+                online=True,
+                capabilities=[CapabilityRecord(name="diagnostics.echo", version=1)],
+            )
+        )
+    invocations = InvocationsMem()
+    node_a = _Node(invocations)
+    node_b = _Node(invocations)
+    server = ControlServer(
+        tmp_path / "bridge.sock",
+        registry=registry,
+        invocations=invocations,
+        connections={"dev_a": node_a, "dev_b": node_b},
+    )
+    reader = asyncio.StreamReader()
+    writer = _Writer()
+
+    def feed(envelope):
+        body = json.dumps(envelope.to_wire()).encode()
+        reader.feed_data(len(body).to_bytes(4, "big") + body)
+
+    invoke_a = _ctl_invoke_envelope("dev_a", deadline_ms=30_000)
+    invoke_b = _ctl_invoke_envelope("dev_b", deadline_ms=30_000)
+    handle_task = asyncio.create_task(server._handle(reader, writer))
+    feed(invoke_a)
+    feed(invoke_b)
+    for _ in range(50):
+        if node_a.invocation_id and node_b.invocation_id:
+            break
+        await asyncio.sleep(0)
+    assert node_a.invocation_id and node_b.invocation_id
+
+    feed(
+        Envelope.new(
+            "ctl_cancel",
+            {"control_request_id": invoke_a.id, "reason": "caller cancelled"},
+        )
+    )
+    await asyncio.sleep(0.05)
+    for _ in range(50):
+        if node_a.cancelled:
+            break
+        await asyncio.sleep(0)
+    assert not handle_task.done() or handle_task.exception() is None
+    assert node_a.cancelled
+    assert not invocations.is_pending(node_a.invocation_id)
+    assert invocations.is_pending(node_b.invocation_id)
+
+    invocations.resolve(
+        node_b.invocation_id,
+        {"ok": True, "data": {"payload": {}}},
+        connection=node_b,
+    )
+    for _ in range(50):
+        if not invocations.is_pending(node_b.invocation_id):
+            break
+        await asyncio.sleep(0)
+    assert node_b.cancelled == []
+    reader.feed_eof()
+    await handle_task

@@ -19,7 +19,7 @@ from typing import Any, Protocol
 
 @dataclass(frozen=True)
 class InvokeRequest:
-    """One capability invocation, fully resolved by `engine.py` before it reaches the transport.
+    """One unresolved capability invocation for daemon-side live resolution.
 
     Carries no `invocation_id`: that id is **bridge-minted** (FR-28), and at M0/M1 the loopback
     stub *is* the bridge, so the mint happens inside `transport.invoke()`, not here. Keeping the
@@ -28,8 +28,8 @@ class InvokeRequest:
     """
 
     capability: str
-    version: int
-    device_id: str | None
+    acceptable_versions: tuple[int, ...]
+    requested_device_id: str | None
     args: dict[str, Any]
     deadline_ms: int
     meta: dict[str, Any] = field(default_factory=dict)

@@ -186,7 +186,11 @@ def _build_parser() -> argparse.ArgumentParser:
     for decision in ("approve", "deny"):
         resolve = approvals_sub.add_parser(decision)
         resolve.add_argument("invocation_id")
-        resolve.add_argument("--scope", default="one_time")
+        resolve.add_argument(
+            "--scope",
+            choices=("one_time", "session", "device", "persistent"),
+            default="one_time",
+        )
 
     policy = subparsers.add_parser("policy", help="Inspect or reload daemon policy.")
     policy_sub = policy.add_subparsers(dest="policy_command", required=True)

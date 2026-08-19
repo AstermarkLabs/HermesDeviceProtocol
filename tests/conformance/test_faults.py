@@ -28,8 +28,8 @@ pytestmark = pytest.mark.timeout(30)
 def _echo_request(device_id: str, *, deadline_ms: int) -> InvokeRequest:
     return InvokeRequest(
         capability="diagnostics.echo",
-        version=1,
-        device_id=device_id,
+        acceptable_versions=(1,),
+        requested_device_id=device_id,
         args={"payload": {"x": 1}},
         deadline_ms=deadline_ms,
     )

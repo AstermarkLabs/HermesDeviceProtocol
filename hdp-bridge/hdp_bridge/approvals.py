@@ -70,6 +70,7 @@ class ApprovalManager:
         self._pending: dict[str, PendingApproval] = {}
         self._session_grants: set[tuple[str, str, str]] = set()
         self._waiters: dict[str, asyncio.Future[ApprovalResolution]] = {}
+        self._resolutions: dict[str, ApprovalResolution] = {}
 
     def create(
         self,
@@ -115,8 +116,8 @@ class ApprovalManager:
         now: float | None = None,
     ) -> ApprovalResolution:
         """Resolve one pending approval and persist exactly one terminal outcome."""
-        pending = self._take_pending(invocation_id)
         resolved_scope = ApprovalScope(scope)
+        pending = self._take_pending(invocation_id)
         if not approved:
             resolved_scope = None
         state = ApprovalState.APPROVED if approved else ApprovalState.DENIED
@@ -141,8 +142,20 @@ class ApprovalManager:
             expired.append(resolution)
         return expired
 
+    def abandon(self, invocation_id: str) -> bool:
+        """Drop an approval whose invocation became impossible before an operator decision."""
+        pending = self._pending.pop(invocation_id, None)
+        waiter = self._waiters.pop(invocation_id, None)
+        self._resolutions.pop(invocation_id, None)
+        if waiter is not None and not waiter.done():
+            waiter.cancel()
+        return pending is not None
+
     async def wait(self, invocation_id: str) -> ApprovalResolution:
         """Wait without holding a database transaction; expiry is a terminal decision."""
+        completed = self._resolutions.pop(invocation_id, None)
+        if completed is not None:
+            return completed
         pending = self._pending.get(invocation_id)
         if pending is None:
             raise UnknownApprovalError(invocation_id)
@@ -239,3 +252,5 @@ class ApprovalManager:
         waiter = self._waiters.pop(resolution.pending.invocation_id, None)
         if waiter is not None and not waiter.done():
             waiter.set_result(resolution)
+        else:
+            self._resolutions[resolution.pending.invocation_id] = resolution

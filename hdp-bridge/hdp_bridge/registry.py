@@ -67,7 +67,22 @@ class Registry:
         """Insert-or-replace the device row and fully replace its capability set (FR-8's
         full-replacement rule, now persisted)."""
         now_ms = int(time.time() * 1000)
-        with self._conn:
+        # The full replacement must be parsed and serializable before taking SQLite's write
+        # lock. Otherwise a bad later descriptor can hold the lock while JSON serialization
+        # fails and forces a rollback after earlier rows were already inserted.
+        capability_rows = [
+            (
+                device.device_id,
+                cap.name,
+                cap.version,
+                json.dumps(cap.input_schema, allow_nan=False),
+                json.dumps(cap.output_schema, allow_nan=False),
+                now_ms,
+            )
+            for cap in device.capabilities
+        ]
+        self._conn.execute("BEGIN IMMEDIATE")
+        try:
             existing = self._conn.execute(
                 "SELECT first_paired_at FROM devices WHERE device_id = ?", (device.device_id,)
             ).fetchone()
@@ -89,19 +104,21 @@ class Registry:
                 ),
             )
             self._conn.execute("DELETE FROM capabilities WHERE device_id = ?", (device.device_id,))
-            for cap in device.capabilities:
-                self._conn.execute(
-                    "INSERT INTO capabilities (device_id, name, version, input_schema, "
-                    "output_schema, advertised_at) VALUES (?, ?, ?, ?, ?, ?)",
-                    (
-                        device.device_id,
-                        cap.name,
-                        cap.version,
-                        json.dumps(cap.input_schema),
-                        json.dumps(cap.output_schema),
-                        now_ms,
-                    ),
-                )
+            self._conn.executemany(
+                "INSERT INTO capabilities (device_id, name, version, input_schema, "
+                "output_schema, advertised_at) VALUES (?, ?, ?, ?, ?, ?)",
+                capability_rows,
+            )
+        except BaseException:
+            self._conn.rollback()
+            raise
+        else:
+            self._conn.commit()
+
+    def known_active_device_ids(self) -> set[str]:
+        """Return active device ids valid for policy references."""
+        rows = self._conn.execute("SELECT device_id FROM devices WHERE state = 'active'").fetchall()
+        return {row[0] for row in rows}
 
     def deregister(self, device_id: str) -> None:
         with self._conn:

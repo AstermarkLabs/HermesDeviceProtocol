@@ -3,7 +3,7 @@ HERMES_HOME_DIR ?= $(HOME)/.hermes
 PLUGIN_PACKAGE_DIR := $(CURDIR)/hermes-device-plugin/hermes_device_plugin
 PLUGIN_LINK := $(HERMES_HOME_DIR)/plugins/hermes-device
 
-.PHONY: dev-install dev-install-profile dev-uninstall test lint fmt fmt-check typecheck check
+.PHONY: dev-install dev-install-profile dev-uninstall test acceptance lint fmt fmt-check typecheck check
 
 dev-install:
 	mkdir -p "$(HERMES_HOME_DIR)/plugins"
@@ -24,6 +24,9 @@ dev-uninstall:
 test:
 	uv run pytest
 
+acceptance:
+	HDP_RUN_ACCEPTANCE=1 uv run pytest tests/acceptance/test_seed_success_criterion.py
+
 lint:
 	uv run ruff check .
 
@@ -37,4 +40,3 @@ typecheck:
 	uv run mypy
 
 check: lint fmt-check typecheck test
-

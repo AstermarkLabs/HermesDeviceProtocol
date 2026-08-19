@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import json
 import stat
+from unittest.mock import MagicMock, patch
 
 import aiohttp
 import pytest
@@ -117,6 +118,30 @@ async def test_a_non_auth_close_is_still_retried(bridge_stub, tmp_path):
         )
 
 
+@pytest.mark.parametrize("bridge_stub", [_abrupt_close_handler], indirect=True)
+async def test_explicit_credential_reconnects_never_read_or_write_credential_file(bridge_stub):
+    credential_file = MagicMock()
+    credential_file.exists.side_effect = AssertionError("explicit credential read the file")
+    credential_file.read_text.side_effect = AssertionError("explicit credential read the file")
+
+    with (
+        patch.object(node, "_write_credential") as write_credential,
+        pytest.raises(ConnectionError),
+    ):
+        await node.run(
+            bridge_stub,
+            "second-node",
+            FaultConfig(),
+            credential="second-node-secret",
+            credential_file=credential_file,
+            max_reconnect_attempts=2,
+        )
+
+    credential_file.exists.assert_not_called()
+    credential_file.read_text.assert_not_called()
+    write_credential.assert_not_called()
+
+
 async def _pairing_handler(request):
     """Completes a first-time pairing and issues a credential, then holds the socket open."""
     ws = web.WebSocketResponse()
@@ -126,6 +151,47 @@ async def _pairing_handler(request):
     await ws.send_str(json.dumps(Envelope.new("welcome", welcome.to_wire()).to_wire()))
     await ws.close()
     return ws
+
+
+async def _capture_explicit_credential_handler(request):
+    """Capture the hello so the explicit, non-persistent credential contract is observable."""
+    ws = web.WebSocketResponse()
+    await ws.prepare(request)
+    raw = await ws.receive()
+    hello = Envelope.from_wire(json.loads(raw.data))
+    assert hello.payload["credential"] == "second-node-secret"
+    welcome = Welcome(hdp_version=0, device_id="01JB0000000000000000000000", credential="unused")
+    await ws.send_str(json.dumps(Envelope.new("welcome", welcome.to_wire()).to_wire()))
+    await ws.close()
+    return ws
+
+
+@pytest.mark.parametrize("bridge_stub", [_capture_explicit_credential_handler], indirect=True)
+async def test_explicit_credential_bypasses_credential_file_read_and_write(bridge_stub, tmp_path):
+    """D6: a second node's runtime-only credential must leave the stored default untouched."""
+    credential_file = tmp_path / "cred"
+    credential_file.write_text("stored-default")
+
+    with patch.object(node, "_write_credential") as write_credential:
+        await node.run(
+            bridge_stub,
+            "second-node",
+            FaultConfig(),
+            credential="second-node-secret",
+            credential_file=credential_file,
+        )
+
+    assert credential_file.read_text() == "stored-default"
+    write_credential.assert_not_called()
+
+
+def test_explicit_credential_wins_without_reading_the_stored_default(tmp_path):
+    credential_file = tmp_path / "cred"
+    credential_file.write_text("stored-default")
+
+    resolved = node._resolve_credential(None, "second-node-secret", credential_file)
+
+    assert resolved == "second-node-secret"
 
 
 @pytest.mark.parametrize("bridge_stub", [_pairing_handler], indirect=True)

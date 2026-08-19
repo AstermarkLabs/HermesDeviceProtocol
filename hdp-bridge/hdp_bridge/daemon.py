@@ -9,10 +9,12 @@ import os
 from pathlib import Path
 
 from . import config
+from .approvals import ApprovalManager
 from .audit import AuditWriter
 from .connection import NodeConnection
 from .control import ControlServer
 from .invocations import InvocationsMem
+from .policy import PolicyEngine
 from .registry import Registry
 from .server import HdpServer
 from .store import db as store_db
@@ -20,6 +22,28 @@ from .store import db as store_db
 
 class AlreadyRunningError(RuntimeError):
     """Another live hdp-bridge process already holds this profile's PID file."""
+
+
+_DEFAULT_POLICY = """version: 1
+defaults:
+  notifications.send: ask
+  diagnostics.echo: always
+  device.status: always
+  camera.capture: deny
+  location.current: deny
+  screen.capture: deny
+  clipboard.read: deny
+devices: {}
+default_device: {}
+"""
+
+
+def _ensure_policy_file(path: Path) -> None:
+    """Create the conservative daemon-owned policy once, without overwriting operator edits."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if not path.exists():
+        path.write_text(_DEFAULT_POLICY, encoding="utf-8")
+    path.chmod(0o600)
 
 
 def _pid_is_live(pid: int) -> bool:
@@ -93,6 +117,10 @@ async def _serve_claimed(pid_path: Path, stop_event: asyncio.Event | None) -> No
     connections: dict[str, NodeConnection] = {}
     descriptors: dict = {}
     audit = AuditWriter(config.hdp_home() / "audit")
+    _ensure_policy_file(config.policy_path())
+    policy = PolicyEngine(config.policy_path())
+    policy.reload(force=True)
+    approvals = ApprovalManager(conn)
 
     def make_connection(ws: object) -> NodeConnection:
         return NodeConnection(
@@ -120,6 +148,8 @@ async def _serve_claimed(pid_path: Path, stop_event: asyncio.Event | None) -> No
         descriptors=descriptors,
         conn=conn,
         audit=audit,
+        approvals=approvals,
+        policy=policy,
     )
 
     await hdp_server.start()

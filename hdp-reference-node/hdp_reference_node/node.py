@@ -280,8 +280,8 @@ class _NodeSession:
                 ok=False,
                 data=None,
                 error={
-                    "code": "capability_unsupported",
-                    "message": f"no local handler for {capability!r}",
+                    "code": "policy_denied",
+                    "message": f"local policy denies {capability!r}",
                     "hint": "",
                 },
             )

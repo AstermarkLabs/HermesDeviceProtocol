@@ -4,6 +4,7 @@ import json
 import os
 import stat
 
+import pytest
 from hdp_bridge.audit import AuditWriter
 
 
@@ -56,6 +57,21 @@ def test_record_fsyncs_security_relevant_events(tmp_path, monkeypatch):
     monkeypatch.setattr(os, "fsync", _spy_fsync)
     writer = AuditWriter(tmp_path / "audit")
     writer.record("revoked", device_id="dev_1")
+    assert len(calls) == 1
+
+
+@pytest.mark.parametrize("event", ["approval_decided", "policy_changed"])
+def test_record_fsyncs_m3_security_events(tmp_path, monkeypatch, event):
+    calls = []
+    real_fsync = os.fsync
+
+    def _spy_fsync(fd):
+        calls.append(fd)
+        return real_fsync(fd)
+
+    monkeypatch.setattr(os, "fsync", _spy_fsync)
+    AuditWriter(tmp_path / "audit").record(event)
+
     assert len(calls) == 1
 
 

@@ -31,7 +31,9 @@ from hdp_proto.errors import ErrorCode, err
 
 from . import config
 from . import revocation as _revocation
+from .approvals import ApprovalManager, ApprovalScope, ApprovalState, UnknownApprovalError
 from .invocations import DeviceDisconnected
+from .policy import Mode, PolicyEngine
 
 if TYPE_CHECKING:
     from hdp_proto.capabilities import CapabilityDescriptor
@@ -66,6 +68,24 @@ def _invoke_failure(invocation_id: str, code: ErrorCode, detail: str) -> Envelop
         "ctl_invoke_reply",
         {"invocation_id": invocation_id, "ok": False, "error": err(code, detail)["error"]},
     )
+
+
+def _approval_args_summary(args: object, *, byte_limit: int = 512) -> str:
+    """Render approval-safe arguments without ever putting raw values into SQLite or prompts."""
+    if not isinstance(args, dict):
+        return "(0 fields, 0 bytes)"
+    secret_markers = ("token", "secret", "password", "key", "credential", "authorization")
+    parts: list[str] = []
+    for key, value in args.items():
+        name = str(key)
+        rendered = (
+            "<redacted>"
+            if any(marker in name.lower() for marker in secret_markers)
+            else repr(value)
+        )
+        parts.append(f"{name}={rendered[:80]}")
+    summary = " ".join(parts) + f" ({len(args)} fields)"
+    return summary.encode("utf-8")[:byte_limit].decode("utf-8", errors="ignore")
 
 
 def _correlate(reply: Envelope, request: Envelope) -> Envelope:
@@ -121,6 +141,8 @@ class ControlServer:
         descriptors: dict[str, dict[str, CapabilityDescriptor]] | None = None,
         conn: sqlite3.Connection | None = None,
         audit: AuditWriter | None = None,
+        approvals: ApprovalManager | None = None,
+        policy: PolicyEngine | None = None,
     ) -> None:
         self._socket_path = socket_path
         self._registry = registry
@@ -130,6 +152,8 @@ class ControlServer:
             descriptors if descriptors is not None else {}
         )
         self._audit = audit
+        self._approvals = approvals
+        self._policy = policy
         # A raw `sqlite3.Connection`, distinct from `registry`'s own internal one (see
         # `daemon.py`'s NOTE on the two-connections deviation) — needed only by
         # `ctl_devices_revoke`, which operates below `Registry`'s device-record API via
@@ -366,6 +390,10 @@ class ControlServer:
             "ctl_devices_revoke": self._ctl_devices_revoke,
             "ctl_devices_list_detailed": self._ctl_devices_list_detailed,
             "ctl_audit_tail": self._ctl_audit_tail,
+            "ctl_list_approvals": self._ctl_list_approvals,
+            "ctl_resolve_approval": self._ctl_resolve_approval,
+            "ctl_policy_show": self._ctl_policy_show,
+            "ctl_policy_reload": self._ctl_policy_reload,
         }.get(envelope.type)
         if handler is None:
             detail = f"unknown control verb {envelope.type!r}"
@@ -401,6 +429,7 @@ class ControlServer:
         capability = payload.get("capability")
         version = payload.get("version")
         args = payload.get("args") or {}
+        meta = payload.get("meta") if isinstance(payload.get("meta"), dict) else {}
         raw_deadline_ms = payload.get("deadline_ms")
         # `deadline_ms` arrives off the wire, unlike `embedded.py`'s dataclass-typed
         # `InvokeRequest` where it's always a real int. A missing/non-positive value is coerced
@@ -425,6 +454,68 @@ class ControlServer:
             return _invoke_failure("", ErrorCode.DEVICE_OFFLINE, "device is not connected")
 
         invocation_id, entry = self._invocations.mint_for(device_id, capability=capability or "")
+        if self._policy is not None and self._approvals is not None:
+            self._policy.reload()
+            decision = self._policy.table.resolve(device_id, capability or "")
+            requesting_session = meta.get("session_id")
+            if not isinstance(requesting_session, str) or not requesting_session:
+                requesting_session = None
+
+            allowed = decision.mode in {Mode.SESSION, Mode.DEVICE, Mode.ALWAYS}
+            if decision.mode is Mode.ASK:
+                allowed = self._approvals.has_session_grant(
+                    requesting_session, device_id, capability or ""
+                ) or self._approvals.has_database_grant(device_id, capability or "")
+                if not allowed:
+                    pending = self._approvals.create(
+                        invocation_id=invocation_id,
+                        device_id=device_id,
+                        capability=capability or "",
+                        version=version or 0,
+                        args_summary=_approval_args_summary(args),
+                        requesting_session=requesting_session,
+                        risk_class="",
+                    )
+                    if self._audit is not None:
+                        self._audit.record(
+                            "approval_requested",
+                            invocation_id=pending.invocation_id,
+                            device_id=pending.device_id,
+                            capability=pending.capability,
+                            version=pending.version,
+                            args_summary=pending.args_summary,
+                            expires_at=pending.expires_at,
+                        )
+                    resolution = await self._approvals.wait(invocation_id)
+                    if self._audit is not None:
+                        self._audit.record(
+                            "approval_decided",
+                            invocation_id=invocation_id,
+                            state=resolution.state.value,
+                            scope=resolution.scope.value if resolution.scope is not None else None,
+                            decided_by=resolution.decided_by,
+                        )
+                    if resolution.state is not ApprovalState.APPROVED:
+                        self._invocations.expire(invocation_id)
+                        code = (
+                            ErrorCode.APPROVAL_TIMEOUT
+                            if resolution.state is ApprovalState.EXPIRED
+                            else ErrorCode.APPROVAL_DENIED
+                        )
+                        return _invoke_failure(invocation_id, code, "approval was not granted")
+                    allowed = True
+            if not allowed:
+                self._invocations.expire(invocation_id)
+                if self._audit is not None:
+                    self._audit.record(
+                        "policy_denied",
+                        invocation_id=invocation_id,
+                        device_id=device_id,
+                        capability=capability,
+                        source=decision.source,
+                        policy_seq=decision.policy_seq,
+                    )
+                return _invoke_failure(invocation_id, ErrorCode.POLICY_DENIED, "denied by policy")
         req = _InvokeReq(
             capability=capability or "", version=version or 0, args=args, deadline_ms=deadline_ms
         )
@@ -539,6 +630,91 @@ class ControlServer:
         under a different profile's permissions."""
         lines = self._audit.read_today() if self._audit is not None else []
         return Envelope.new("ctl_audit_tail_reply", {"lines": lines})
+
+    async def _ctl_list_approvals(self, envelope: Envelope) -> Envelope:
+        """Return daemon-memory approvals; none are durable while pending."""
+        approvals = self._approvals.list_pending() if self._approvals is not None else []
+        return Envelope.new(
+            "ctl_list_approvals_reply",
+            {
+                "approvals": [
+                    {
+                        "invocation_id": approval.invocation_id,
+                        "device_id": approval.device_id,
+                        "capability": approval.capability,
+                        "version": approval.version,
+                        "args_summary": approval.args_summary,
+                        "requesting_session": approval.requesting_session,
+                        "risk_class": approval.risk_class,
+                        "created_at": approval.created_at,
+                        "expires_at": approval.expires_at,
+                    }
+                    for approval in approvals
+                ]
+            },
+        )
+
+    async def _ctl_resolve_approval(self, envelope: Envelope) -> Envelope:
+        if self._approvals is None:
+            return Envelope.new(
+                "error", err(ErrorCode.NOT_IMPLEMENTED, "approvals unavailable")["error"]
+            )
+        payload = envelope.payload
+        invocation_id = payload.get("invocation_id")
+        decision = payload.get("decision")
+        scope = payload.get("scope", "one_time")
+        if not isinstance(invocation_id, str) or decision not in {"approve", "deny"}:
+            return Envelope.new(
+                "error", err(ErrorCode.APPROVAL_DENIED, "invalid approval decision")["error"]
+            )
+        try:
+            resolution = self._approvals.resolve(
+                invocation_id,
+                approved=decision == "approve",
+                scope=ApprovalScope(scope),
+                decided_by="control_plane",
+            )
+        except (UnknownApprovalError, ValueError):
+            return Envelope.new(
+                "error", err(ErrorCode.APPROVAL_DENIED, "approval is no longer pending")["error"]
+            )
+        return Envelope.new(
+            "ctl_resolve_approval_reply",
+            {
+                "ok": True,
+                "state": resolution.state.value,
+                "scope": resolution.scope.value if resolution.scope is not None else None,
+            },
+        )
+
+    async def _ctl_policy_show(self, envelope: Envelope) -> Envelope:
+        if self._policy is None:
+            return Envelope.new(
+                "error", err(ErrorCode.NOT_IMPLEMENTED, "policy unavailable")["error"]
+            )
+        table = self._policy.table
+        return Envelope.new(
+            "ctl_policy_show_reply",
+            {
+                "policy_seq": table.policy_seq,
+                "defaults": {capability: mode.value for capability, mode in table.defaults},
+                "devices": {
+                    device_id: {capability: mode.value for capability, mode in modes}
+                    for device_id, modes in table.devices
+                },
+            },
+        )
+
+    async def _ctl_policy_reload(self, envelope: Envelope) -> Envelope:
+        if self._policy is None:
+            return Envelope.new(
+                "error", err(ErrorCode.NOT_IMPLEMENTED, "policy unavailable")["error"]
+            )
+        reloaded = self._policy.reload(force=True)
+        return Envelope.new(
+            "ctl_policy_reload_reply",
+            {"ok": reloaded, "policy_seq": self._policy.table.policy_seq},
+        )
 
     async def _ctl_devices_revoke(self, envelope: Envelope) -> Envelope:
         """Operator-only verb (FR-15, §4.4) — the CLI's `hdp-bridge devices revoke` reaches this

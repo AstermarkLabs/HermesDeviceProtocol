@@ -20,6 +20,17 @@ from hdp_reference_node import node
 from hdp_reference_node.faults import FaultConfig
 
 
+async def test_local_policy_refusal_returns_policy_denied():
+    """M3's node-side enforcement has the same policy-denial contract as the bridge."""
+    session = node._NodeSession(None, FaultConfig())  # type: ignore[arg-type]
+
+    result = await session._build_result("camera.capture", {})
+
+    assert result.ok is False
+    assert result.error is not None
+    assert result.error["code"] == "policy_denied"
+
+
 async def _serve(handler) -> tuple[web.AppRunner, str]:
     app = web.Application()
     app.router.add_get("/hdp/v0/socket", handler)

@@ -217,6 +217,7 @@ class SocketTransport:
                 "version": req.version,
                 "args": req.args,
                 "deadline_ms": req.deadline_ms,
+                "meta": req.meta,
             },
         )
         reply = await self._roundtrip(request_env)
@@ -266,10 +267,31 @@ class SocketTransport:
         )
 
     async def list_approvals(self) -> list[PendingApproval]:
-        raise NotImplementedError("approvals are not implemented until M3")
+        reply = await self._roundtrip(Envelope.new("ctl_list_approvals", {}))
+        if reply.type == "error":
+            return []
+        return [
+            PendingApproval(
+                invocation_id=approval["invocation_id"],
+                device_id=approval["device_id"],
+                capability=approval["capability"],
+                version=approval["version"],
+                args_summary=approval["args_summary"],
+                requesting_session=approval.get("requesting_session", ""),
+                risk_class=approval.get("risk_class", ""),
+                created_at=approval["created_at"],
+                expires_at=approval["expires_at"],
+            )
+            for approval in reply.payload.get("approvals", [])
+        ]
 
     async def resolve_approval(self, invocation_id: str, decision: str, scope: str) -> None:
-        raise NotImplementedError("resolve_approval is not implemented until M3")
+        await self._roundtrip(
+            Envelope.new(
+                "ctl_resolve_approval",
+                {"invocation_id": invocation_id, "decision": decision, "scope": scope},
+            )
+        )
 
     async def ctl_audit_tail(self) -> list[dict]:
         """Operator-only verb, deliberately **not** on `BridgeTransport` — never reachable by the
@@ -280,3 +302,11 @@ class SocketTransport:
         if reply.type == "error":
             return []
         return reply.payload.get("lines", [])
+
+    async def ctl_policy_show(self) -> dict:
+        reply = await self._roundtrip(Envelope.new("ctl_policy_show", {}))
+        return {} if reply.type == "error" else reply.payload
+
+    async def ctl_policy_reload(self) -> dict:
+        reply = await self._roundtrip(Envelope.new("ctl_policy_reload", {}))
+        return {} if reply.type == "error" else reply.payload

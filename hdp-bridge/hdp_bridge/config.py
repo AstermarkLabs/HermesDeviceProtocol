@@ -76,3 +76,8 @@ def pid_path() -> Path:
 
 def registry_db_path() -> Path:
     return hdp_home() / "registry.db"
+
+
+def policy_path() -> Path:
+    """`$HERMES_HOME/hdp/policy.yaml`, read only by the bridge daemon."""
+    return hdp_home() / "policy.yaml"

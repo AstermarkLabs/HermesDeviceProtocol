@@ -25,10 +25,12 @@ from aiohttp.test_utils import TestClient, TestServer
 from hdp_bridge import config as bridge_config
 from hdp_bridge import pairing
 from hdp_bridge import server as _server
+from hdp_bridge.approvals import ApprovalManager
 from hdp_bridge.audit import AuditWriter
 from hdp_bridge.connection import NodeConnection
 from hdp_bridge.control import ControlServer, read_frame, write_frame
 from hdp_bridge.invocations import InvocationsMem
+from hdp_bridge.policy import PolicyTable
 from hdp_bridge.registry import Registry
 from hdp_bridge.store import db
 from hdp_bridge.types import DeviceRecord
@@ -576,13 +578,63 @@ async def test_ctl_status_reports_connected_device_count(node_client, ctl_conn, 
     assert reply.payload["detail"] == "1 device(s) connected"
 
 
-async def test_ctl_list_approvals_verb_is_not_implemented_yet(ctl_conn):
-    """M3 adds the handler and the client call together (this task deliberately does not)."""
-    reader, writer = ctl_conn
-    await write_frame(writer, Envelope.new("ctl_list_approvals", {}).to_wire())
-    reply = Envelope.from_wire(await read_frame(reader))
-    assert reply.type == "error"
-    assert reply.payload["code"] == "not_implemented"
+async def test_ctl_list_approvals_returns_an_empty_pending_set(tmp_path):
+    """M3 exposes daemon-held pending approvals over the existing control verb."""
+    server = ControlServer(
+        tmp_path / "bridge.sock",
+        registry=Registry(tmp_path / "registry.db"),
+        invocations=InvocationsMem(),
+        connections={},
+    )
+
+    reply = await server._dispatch(Envelope.new("ctl_list_approvals", {}))
+
+    assert reply.type == "ctl_list_approvals_reply"
+    assert reply.payload["approvals"] == []
+
+
+async def test_policy_denial_never_sends_an_invoke_frame(tmp_path):
+    """M3 enforcement happens before `NodeConnection.send_invoke`, not after a result."""
+
+    class _Policy:
+        table = PolicyTable.from_data({"version": 1, "defaults": {}}, policy_seq=1)
+
+        def reload(self):
+            return False
+
+    class _Connection:
+        sent = False
+
+        async def send_invoke(self, invocation_id, request):
+            self.sent = True
+
+    conn = db.connect(tmp_path / "registry.db")
+    connection = _Connection()
+    server = ControlServer(
+        tmp_path / "bridge.sock",
+        registry=Registry(tmp_path / "registry.db"),
+        invocations=InvocationsMem(),
+        connections={"dev_1": connection},
+        conn=conn,
+        policy=_Policy(),
+        approvals=ApprovalManager(conn),
+    )
+
+    reply = await server._ctl_invoke(
+        Envelope.new(
+            "ctl_invoke",
+            {
+                "device_id": "dev_1",
+                "capability": "camera.capture",
+                "version": 1,
+                "args": {},
+                "deadline_ms": 1000,
+            },
+        )
+    )
+
+    assert reply.payload["error"]["code"] == "policy_denied"
+    assert connection.sent is False
 
 
 async def test_close_force_closes_live_connections(tmp_path):

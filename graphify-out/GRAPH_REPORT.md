@@ -1,118 +1,124 @@
-# Graph Report - .  (2026-08-18)
+# Graph Report - hermes-device-protocol  (2026-08-19)
 
 ## Corpus Check
-- Corpus is ~48,091 words - fits in a single context window. You may not need a graph.
+- 107 files · ~51,392 words
+- Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 1123 nodes · 2565 edges · 80 communities (65 shown, 15 thin omitted)
-- Extraction: 93% EXTRACTED · 7% INFERRED · 0% AMBIGUOUS · INFERRED: 181 edges (avg confidence: 0.53)
-- Token cost: 0 input · 98,882 output
+- 1221 nodes · 2789 edges · 80 communities (64 shown, 16 thin omitted)
+- Extraction: 93% EXTRACTED · 7% INFERRED · 0% AMBIGUOUS · INFERRED: 200 edges (avg confidence: 0.53)
+- Token cost: 0 input · 0 output
+
+## Graph Freshness
+- Built from commit: `441b770c`
+- Run `git rev-parse HEAD` and compare to check if the graph is stale.
+- Run `graphify update .` after code changes (no API cost).
 
 ## Community Hubs (Navigation)
-- Bridge Node Connection Handling
-- Cross-Doc Governance & Capability Rationale
-- M2 Conformance Test Harness
-- Control Plane Frame Dispatch
-- In-Memory Invocation Tracking
-- ULID Minting & Parsing
-- Bridge Transport Base & Status
-- Socket Transport Client Tests
-- Bridge Control Server
-- Hermes /hdp Slash Command
-- HDP Runtime Event Loop
-- Bridge Socket Transport Client
-- SQLite Store & Migrations
-- Capability Descriptor Validation
-- hdp-bridge CLI Revoke Rendering
-- HDP Error Envelope Helpers
-- Bridge Server Bind Lifecycle
-- Plugin Profile Config Paths
-- Bridge aiohttp App & Health
-- Audit Log & Revocation
-- HDPRuntime Singleton
-- Bridge Hello Auth Branch Tests
-- Reference Node Auth Tests
-- Frame Handler Dispatch (Node/Bridge)
-- Control Verb Handlers & Cancel
-- Pairing Code Minting
-- Wire Message Ack/Heartbeat/Progress
-- Plugin Engine Invoke Tests
-- Node Auth Failure & Fault Injection
-- Bridge Daemon Profile Config
-- Device Credential Issuance
-- Invocation Revocation Failure
-- Plugin Async Tool Handlers
-- Reference Node Connect & Backoff
-- Typed Wire Message Dataclasses
-- BridgeTransport Protocol & Approvals
-- Reference Node CLI & Fault Flags
-- hermes hdp CLI Rendering Tests
-- Plugin Tool Registration Tests
-- device_status_get Handler Tests
-- Devices Revoke CLI Fallback
-- hermes hdp CLI Entry Point
-- Plugin Engine & Tool Schemas
-- Bridge Bind Host/Port Config
-- Daemon PID Claim Guard
-- Daemon Serve Bind Failure Tests
-- Operator Revoke Orchestration
-- Registry Schema Tables
-- Bridge Server Wire-Level Tests
-- HDP Envelope & Version Errors
-- ResultMsg Wire Round-Trip
-- InvokeMsg Wire Contract
-- Capabilities Message Wire Format
-- errors.md Conformance Tests
-- hermes hdp Command Registration
-- Welcome Message Credential Field
-- CancelMsg Best-Effort Send
-- uv Workspace Package Manifests
-- device.status@1 Reference Handler
-- diagnostics.echo@1 Reference Handler
-- notifications.send@1 Reference Handler
-- hermes hdp status Rendering
-- Plugin Test Fixtures
-- Repo Scaffold Sanity Test
-- Control Socket Test Fixtures
-- Pending Approval Scaffold
-- Permission Policy Engine Scaffold
-- Reference Node Capabilities Package
-- HDP Frame Handling Rules
-- Plugin Transport Package Init
-- ambiguous_device Error Code
-- approval_denied Error Code
-- approval_timeout Error Code
-- bridge_unavailable Error Code
-- capability_unsupported Error Code
-- no_matching_device Error Code
-- not_implemented Error Code
-- policy_denied Error Code
-- version_incompatible Error Code
-- HDP Binary Payload Rule
+- Registry
+- M2 Status (registry, pairing, bridge extraction)
+- test_faults.py
+- .new
+- InvocationsMem
+- socket.py
+- InprocTransport
+- test_transport_socket.py
+- ControlServer
+- test_plugin_commands.py
+- HDPRuntime
+- SocketTransport
+- connect
+- CapabilityDescriptor
+- NodeConnection
+- err
+- server.py
+- hermes_device_plugin/config.py
+- test_server.py
+- AuditWriter
+- get_runtime
+- Hello
+- test_node_auth.py
+- Envelope
+- ._read_loop
+- AuthFailed
+- Ack
+- InvokeResult
+- FaultConfig
+- hdp_bridge/config.py
+- test_cli.py
+- _InvokeReq
+- tools.py
+- node.py
+- Any
+- BridgeTransport
+- hdp_reference_node/cli.py
+- test_repeated_runtime_start_stop_does_not_leak_fds_or_threads
+- _RecordingCtx
+- test_tools.py
+- test_plugin_cli.py
+- hermes_device_plugin/cli.py
+- engine.py
+- daemon.py
+- ._ctl_invoke
+- test_daemon.py
+- operations.py
+- 001_initial.sql
+- runtime.py
+- envelope.py
+- test_messages.py
+- InvokeMsg
+- Heartbeat
+- ErrorCode
+- hermes_device_plugin/__init__.py
+- Welcome
+- CancelMsg
+- hdp-proto
+- device_status.py
+- diagnostics.py
+- notifications.py
+- render_status
+- tests/conftest.py
+- test_scaffold.py
+- ._ctl_devices_revoke
+- ApprovalManager
+- policy.py
+- capabilities/__init__.py
+- Malformed and Out-of-Sequence Frame Handling
+- transport/__init__.py
+- ambiguous_device error code
+- approval_denied error code
+- approval_timeout error code
+- bridge_unavailable error code
+- capability_unsupported error code
+- no_matching_device error code
+- not_implemented error code
+- policy_denied error code
+- version_incompatible error code
+- Binary Payload Rule (metadata in JSON, binary by content ID, no base64-in-envelope)
 
 ## God Nodes (most connected - your core abstractions)
 1. `NodeConnection` - 73 edges
-2. `InvocationsMem` - 64 edges
-3. `Registry` - 64 edges
-4. `Envelope` - 50 edges
-5. `SocketTransport` - 46 edges
-6. `AuditWriter` - 41 edges
-7. `connect()` - 39 edges
-8. `ControlServer` - 37 edges
+2. `InvocationsMem` - 66 edges
+3. `Registry` - 66 edges
+4. `Envelope` - 54 edges
+5. `SocketTransport` - 51 edges
+6. `ControlServer` - 49 edges
+7. `AuditWriter` - 42 edges
+8. `connect()` - 42 edges
 9. `DeviceRecord` - 28 edges
 10. `CapabilityDescriptor` - 28 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `Dependency Direction Rule (protocol independent, plugin may depend on bridge, bridge must not import plugin)` --semantically_similar_to--> `Deviation: two SQLite connections in daemon.py, not one`  [INFERRED] [semantically similar]
   AGENTS.md → README.md
-- `test_render_pair_new_mints_a_code_and_records_no_plaintext_audit_entry()` --calls--> `registry_db_path()`  [INFERRED]
+- `_register_device()` --calls--> `registry_db_path()`  [INFERRED]
   hermes-device-plugin/tests/test_plugin_cli.py → hdp-bridge/hdp_bridge/config.py
-- `_InvokeRequestLike` --uses--> `CapabilityDescriptor`  [INFERRED]
-  hdp-bridge/hdp_bridge/connection.py → hdp-spec/hdp_proto/capabilities.py
-- `_InvokeRequestLike` --uses--> `Envelope`  [INFERRED]
-  hdp-bridge/hdp_bridge/connection.py → hdp-spec/hdp_proto/envelope.py
-- `_InvokeRequestLike` --uses--> `EnvelopeError`  [INFERRED]
-  hdp-bridge/hdp_bridge/connection.py → hdp-spec/hdp_proto/envelope.py
+- `test_render_devices_revoke_against_a_real_daemon_reaches_the_control_socket()` --calls--> `registry_db_path()`  [INFERRED]
+  hermes-device-plugin/tests/test_plugin_cli.py → hdp-bridge/hdp_bridge/config.py
+- `test_render_devices_revoke_of_an_unknown_device_reports_no_such_device()` --calls--> `registry_db_path()`  [INFERRED]
+  hermes-device-plugin/tests/test_plugin_cli.py → hdp-bridge/hdp_bridge/config.py
+- `test_render_devices_revoke_offline_fallback_records_via_marker()` --calls--> `registry_db_path()`  [INFERRED]
+  hermes-device-plugin/tests/test_plugin_cli.py → hdp-bridge/hdp_bridge/config.py
 
 ## Import Cycles
 - 3-file cycle: `hermes-device-plugin/hermes_device_plugin/__init__.py -> hermes-device-plugin/hermes_device_plugin/tools.py -> hermes-device-plugin/hermes_device_plugin/engine.py -> hermes-device-plugin/hermes_device_plugin/__init__.py`
@@ -124,282 +130,278 @@
 - **Three MVP HDP Capabilities Advertised by Reference Node** — hdp_spec_capabilities_device_status_1, hdp_spec_capabilities_diagnostics_echo_1, hdp_spec_capabilities_notifications_send_1, hdp_spec_hdp_0_capability_descriptors [EXTRACTED 0.95]
 - **hermes-device Plugin Tools Provided by plugin.yaml** — hermes_device_plugin_hermes_device_plugin_plugin_yaml_manifest, hermes_device_plugin_tool_device_notifications_send, hermes_device_plugin_tool_device_status_get, hermes_device_plugin_tool_hdp_echo [EXTRACTED 0.95]
 
-## Communities (80 total, 15 thin omitted)
+## Communities (80 total, 16 thin omitted)
 
-### Community 0 - "Bridge Node Connection Handling"
-Cohesion: 0.05
-Nodes (44): NodeConnection, Connection, WebSocketResponse, Per-connection lifecycle for one node's WebSocket. One `NodeConnection` per…, Started alongside `run()`'s own read loop and reaped in that same `finally`, on…, M2 auth (§3, §4.3): a `hello` must carry a credential — either an existing…, Append now, drop anything outside the 60s window, and report whether the…, Wraps one `aiohttp.web.WebSocketResponse` for the lifetime of one node… (+36 more)
+### Community 0 - "Registry"
+Cohesion: 0.11
+Nodes (28): _InvokeRequestLike, Protocol, Per-connection lifecycle for one node's WebSocket. One `NodeConnection` per…, Plugin↔bridge Unix-socket control plane (ADR-0004, HDP-0.md §2's "same…, Path, SQLite-backed device registry (§3, §3.1). `online` state is never persisted —…, No pairing exists yet (M2 pairing work) — a device enters this table only by…, Insert-or-replace the device row and fully replace its capability set (FR-8's… (+20 more)
 
-### Community 1 - "Cross-Doc Governance & Capability Rationale"
+### Community 1 - "M2 Status (registry, pairing, bridge extraction)"
 Cohesion: 0.06
 Nodes (42): Dependency Direction Rule (protocol independent, plugin may depend on bridge, bridge must not import plugin), make check (lint, format, typecheck, tests), Repository Guidelines (AGENTS.md), Working Style (CLAUDE.md), CI Workflow (make check), device.status@1 capability, device.status@1 is deliberately not what device_status_get calls, diagnostics.echo@1 capability (+34 more)
 
-### Community 2 - "M2 Conformance Test Harness"
+### Community 2 - "test_faults.py"
 Cohesion: 0.10
 Nodes (38): Process, bridge(), bridge_log(), _bridge_proc(), bridge_url(), _hermes_home(), fixture, Shared fixtures for the M2 conformance suite (m1-plan.md §7, m2-plan.md). HDP… (+30 more)
 
-### Community 3 - "Control Plane Frame Dispatch"
+### Community 3 - ".new"
+Cohesion: 0.11
+Nodes (50): read_frame(), write_frame(), Send `ctl_devices_revoke` and return the daemon's reply envelope, or `None` if…, _revoke_via_control_socket(), _connect_and_hello(), ctl_conn(), _ctl_invoke(), _ctl_invoke_envelope() (+42 more)
+
+### Community 4 - "InvocationsMem"
+Cohesion: 0.07
+Nodes (30): InvocationsMem, PendingInvocation, Any, The bridge-side pending-invocation table — id → in-flight state. Backs real…, Fail every pending invocation regardless of device — used on transport shutdown…, A device's connection dropped (or was revoked): fail every invocation still…, Remove and fail every pending entry (all of them when `device_id` is `None`).…, Tracks in-flight invocations. Empty by construction; entries live only between… (+22 more)
+
+### Community 5 - "socket.py"
+Cohesion: 0.18
+Nodes (12): BridgeStatus, CapabilityInfo, DeviceInfo, PendingApproval, `BridgeTransport` — the ADR-0004 extraction seam. `engine.py` depends on this…, An HDP `pending_approval` state (seed §17). Unreachable at M0 — the stub never…, _LoopbackInvocations, _LoopbackRegistry (+4 more)
+
+### Community 6 - "InprocTransport"
 Cohesion: 0.14
-Nodes (39): read_frame(), write_frame(), _connect_and_hello(), _ctl_invoke(), _ctl_invoke_envelope(), `hdp_bridge.control` — the plugin↔bridge Unix-socket control plane.…, Finding I3, server half: `_handle` used to `await self._dispatch(...)` inline…, The corollary finding I3 names: the read loop must keep servicing other verbs —… (+31 more)
+Nodes (10): InprocTransport, PendingApproval, Implements `BridgeTransport` (verified structurally by the tests, not by…, Real at M0: this is what `HDPRuntime` calls on its owned loop, and the shape…, The M0 loopback stub in isolation — no server, no socket, no node (design §6.4)., test_device_info_carries_fr13_fields_with_safe_defaults(), test_invoke_round_trips_through_the_real_codec_and_succeeds(), test_list_devices_is_empty_at_m0() (+2 more)
 
-### Community 4 - "In-Memory Invocation Tracking"
-Cohesion: 0.08
-Nodes (28): InvocationsMem, PendingInvocation, Any, The bridge-side pending-invocation table — id → in-flight state. Backs real…, Fail every pending invocation regardless of device — used on transport shutdown…, A device's connection dropped (or was revoked): fail every invocation still…, Remove and fail every pending entry (all of them when `device_id` is `None`).…, Tracks in-flight invocations. Empty by construction; entries live only between… (+20 more)
-
-### Community 5 - "ULID Minting & Parsing"
-Cohesion: 0.10
-Nodes (30): _decode_crockford(), _encode_crockford(), InvalidULIDError, is_valid(), new(), parse(), ValueError, Hand-rolled ULID mint/parse — stdlib only, no `ulid` dependency (SDR-3). A ULID… (+22 more)
-
-### Community 6 - "Bridge Transport Base & Status"
-Cohesion: 0.11
-Nodes (19): BridgeStatus, DeviceInfo, InvokeRequest, `BridgeTransport` — the ADR-0004 extraction seam. `engine.py` depends on this…, One capability invocation, fully resolved by `engine.py` before it reaches the…, InprocTransport, _LoopbackInvocations, _LoopbackRegistry (+11 more)
-
-### Community 7 - "Socket Transport Client Tests"
+### Community 7 - "test_transport_socket.py"
 Cohesion: 0.15
-Nodes (25): Implements `BridgeTransport` (verified structurally by the tests, not by…, SocketTransport, bridge_daemon(), fake_control_server(), _FakeControlServer, _invoke_request(), fixture, `SocketTransport` — the plugin-side client of `hdp_bridge/control.py`'s Unix-… (+17 more)
+Nodes (22): InvokeRequest, One capability invocation, fully resolved by `engine.py` before it reaches the…, bridge_daemon(), fake_control_server(), _FakeControlServer, _invoke_request(), fixture, `SocketTransport` — the plugin-side client of `hdp_bridge/control.py`'s Unix-… (+14 more)
 
-### Community 8 - "Bridge Control Server"
-Cohesion: 0.11
-Nodes (21): ControlServer, _correlate(), _invoke_failure(), _InvokeReq, _log_task_exception(), Any, StreamReader, StreamWriter (+13 more)
+### Community 8 - "ControlServer"
+Cohesion: 0.16
+Nodes (13): ControlServer, _correlate(), _log_task_exception(), StreamReader, StreamWriter, `add_done_callback` hook for every fire-and-forget task this module spawns.…, Two independent mechanisms — not a poll loop guessing how many event-loop ticks…, Read loop for one control connection. `ctl_invoke` is dispatched *off* this… (+5 more)
 
-### Community 9 - "Hermes /hdp Slash Command"
+### Community 9 - "test_plugin_commands.py"
 Cohesion: 0.12
-Nodes (23): _dispatch(), handle_hdp_command(), Any, Hermes `/hdp status|devices|audit` slash command — the **read-only** half of…, `args` is accepted as either a raw string (split on whitespace here) or an…, Registers `/hdp` (design §2's confinement rule — this module is one of the…, register_command(), _hermes_home() (+15 more)
+Nodes (22): handle_hdp_command(), Any, Hermes `/hdp status|devices|audit` slash command — the **read-only** half of…, `args` is accepted as either a raw string (split on whitespace here) or an…, Registers `/hdp` (design §2's confinement rule — this module is one of the…, register_command(), _hermes_home(), fixture (+14 more)
 
-### Community 10 - "HDP Runtime Event Loop"
-Cohesion: 0.11
-Nodes (17): AbstractEventLoop, HDPRuntime, Any, Future, T, Explicit teardown for tests (`lazy_singleton`'s `.reset()` only drops the…, Owns a daemon thread and the `asyncio` loop running on it. Constructed exactly…, `await self.transport.start()` runs to completion before anything checks… (+9 more)
+### Community 10 - "HDPRuntime"
+Cohesion: 0.15
+Nodes (9): AbstractEventLoop, HDPRuntime, Any, Future, T, Explicit teardown for tests (`lazy_singleton`'s `.reset()` only drops the…, Owns a daemon thread and the `asyncio` loop running on it. Constructed exactly…, `await self.transport.start()` runs to completion before anything checks… (+1 more)
 
-### Community 11 - "Bridge Socket Transport Client"
-Cohesion: 0.11
-Nodes (13): CapabilityInfo, _bridge_unavailable(), Future, StreamReader, StreamWriter, M2 Unix-socket bridge transport — the client half of `hdp_bridge/control.py`'s…, Attempt to (re)connect. Must be called with `self._lock` held. Returns `True`…, Demultiplex every reply on one connection into the future that is waiting for… (+5 more)
+### Community 11 - "SocketTransport"
+Cohesion: 0.13
+Nodes (11): PendingApproval, StreamWriter, Attempt to (re)connect. Must be called with `self._lock` held. Returns `True`…, Send one request and await its reply, holding no lock while waiting. The lock…, Operator-only verb, deliberately **not** on `BridgeTransport` — never reachable…, Implements `BridgeTransport` (verified structurally by the tests, not by…, Eagerly opens the connection once, matching…, SocketTransport (+3 more)
 
-### Community 12 - "SQLite Store & Migrations"
+### Community 12 - "connect"
+Cohesion: 0.08
+Nodes (46): _hash(), issue_credential(), Connection, Device credential issuance, verification, and revocation (FR-12, §4.3, §4.4)., Returns the credential in plaintext. The caller (the `hello` handler, or `pair…, Returns the device_id the credential belongs to, or None if it matches no live…, Returns the number of live credentials this call actually invalidated. Zero…, revoke_credential() (+38 more)
+
+### Community 13 - "CapabilityDescriptor"
 Cohesion: 0.14
-Nodes (18): _apply_pragmas(), connect(), _migrate(), Connection, Path, RuntimeError, SQLite connection factory and forward-only migration runner (§3.1, §3.2)., The database's `schema_version` is higher than this build of `hdp_bridge` knows… (+10 more)
+Nodes (21): CapabilityDescriptor, Any, ValueError, Capability descriptors and output-schema validation. `CapabilityDescriptor` is…, Raised by `validate_output` when `data` does not match `output_schema`. The…, One entry in a `capabilities` message's full-replacement list (HDP-0.md §2, §6)., Never `cls(**d)` — read fields by name, tolerate unknown fields, matching the…, Validate `data` against `descriptor.output_schema`. Raises… (+13 more)
 
-### Community 13 - "Capability Descriptor Validation"
-Cohesion: 0.15
-Nodes (19): Any, ValueError, Capability descriptors and output-schema validation. `CapabilityDescriptor` is…, Raised by `validate_output` when `data` does not match `output_schema`. The…, Never `cls(**d)` — read fields by name, tolerate unknown fields, matching the…, Validate `data` against `descriptor.output_schema`. Raises…, SchemaValidationError, _validate() (+11 more)
+### Community 14 - "NodeConnection"
+Cohesion: 0.16
+Nodes (7): NodeConnection, Started alongside `run()`'s own read loop and reaped in that same `finally`, on…, M2 auth (§3, §4.3): a `hello` must carry a credential — either an existing…, Append now, drop anything outside the 60s window, and report whether the…, Wraps one `aiohttp.web.WebSocketResponse` for the lifetime of one node…, _Harness, One `Registry`/`InvocationsMem`/`connections`/`descriptors` set, shared between…
 
-### Community 14 - "hdp-bridge CLI Revoke Rendering"
-Cohesion: 0.15
-Nodes (19): main(), Thin renderer over `operations.revoke` — the daemon-reachable/offline-fallback…, _run_audit_tail(), _run_devices_revoke(), _run_pair_new(), True when `revoke()`'s return value describes a failure rather than a completed…, revoke_failed(), _insert_device_with_credential() (+11 more)
+### Community 15 - "err"
+Cohesion: 0.13
+Nodes (14): BaseException, Best-effort cancel, mirroring `EmbeddedTransport.cancel` — safe to call…, err(), Error, ok(), Any, The closed HDP error-code taxonomy and the model-facing result envelope.…, Build the failure half of the model-facing result envelope. `detail` becomes… (+6 more)
 
-### Community 15 - "HDP Error Envelope Helpers"
-Cohesion: 0.15
-Nodes (16): BaseException, err(), Error, ErrorCode, ok(), Any, The closed HDP error-code taxonomy and the model-facing result envelope.…, Build the failure half of the model-facing result envelope. `detail` becomes… (+8 more)
+### Community 16 - "server.py"
+Cohesion: 0.09
+Nodes (32): Application, ConnectionFactory, _blobs_reserved(), _bound_port(), build_app(), HdpServer, _health(), _make_socket_handler() (+24 more)
 
-### Community 16 - "Bridge Server Bind Lifecycle"
-Cohesion: 0.14
-Nodes (17): ConnectionFactory, HdpServer, Path, Owns the `AppRunner`/`TCPSite` pair and the `bridge.addr` discovery file., _write_bridge_addr(), _noop_connection_factory(), `HdpServer.start()`/`close()` bind-lifecycle edge cases — specifically the two…, Global Constraint: `hdp_bridge` must never import from `hermes_device_plugin` —… (+9 more)
-
-### Community 17 - "Plugin Profile Config Paths"
+### Community 17 - "hermes_device_plugin/config.py"
 Cohesion: 0.14
 Nodes (18): bridge_addr_path(), control_socket_path(), hdp_allow_remote(), hdp_bind_host(), hdp_bind_port(), hdp_home(), hermes_home(), Path (+10 more)
 
-### Community 18 - "Bridge aiohttp App & Health"
+### Community 18 - "test_server.py"
+Cohesion: 0.13
+Nodes (9): SQLite store helpers., client(), _connect_and_hello(), _Harness, fixture, Direct wire-level tests for `hdp_bridge.server` — a fake "node" is a raw…, The same shared-state wiring `EmbeddedTransport` used to own at M1: one…, test_hello_welcome_handshake_registers_the_device() (+1 more)
+
+### Community 19 - "AuditWriter"
+Cohesion: 0.08
+Nodes (25): AuditWriter, Path, Append-only JSONL audit writer (§3.5, §6.3). `O_APPEND|O_CREAT`, 0600, one JSON…, Today's audit records, parsed. Backs `control.py`'s `ctl_audit_tail` verb —…, Connection, WebSocketResponse, Connection, Path (+17 more)
+
+### Community 20 - "get_runtime"
+Cohesion: 0.18
+Nodes (14): get_runtime(), The one `HDPRuntime` for this process, built at first use. Do not call this…, `check_fn` for `device_notifications_send` and `hdp_echo`. Per ADR-0003,…, runtime_healthy(), _clean_runtime_singleton(), fixture, The real M0 deliverable (docs/m0-plan.md §6.5): `HDPRuntime` called from all…, Every test starts and ends with no HDP thread alive, so leak assertions are… (+6 more)
+
+### Community 21 - "Hello"
+Cohesion: 0.24
+Nodes (11): _FakeWS, `_handle_hello`'s M2 auth branch (§3, §4.3, §4.4): M2 does not accept unpaired…, _read_audit_records(), test_hello_with_a_returning_credential_resolves_the_same_device_id(), test_hello_with_a_revoked_credential_is_auth_failed(), test_hello_with_a_valid_pairing_code_pairs_and_returns_a_credential(), test_hello_with_an_invalid_pairing_code_is_auth_failed(), test_hello_with_an_unknown_credential_is_auth_failed() (+3 more)
+
+### Community 22 - "test_node_auth.py"
 Cohesion: 0.15
-Nodes (17): Application, _blobs_reserved(), _bound_port(), build_app(), _health(), _make_socket_handler(), Any, WebSocketResponse (+9 more)
+Nodes (13): AppRunner, _abrupt_close_handler(), _auth_failed_handler(), bridge_stub(), _pairing_handler(), fixture, The reference node's M2 auth behaviour (final-review findings I7 and I8).…, Completes a first-time pairing and issues a credential, then holds the socket… (+5 more)
 
-### Community 19 - "Audit Log & Revocation"
-Cohesion: 0.16
-Nodes (12): AuditWriter, Path, Append-only JSONL audit writer (§3.5, §6.3). `O_APPEND|O_CREAT`, 0600, one JSON…, Today's audit records, parsed. Backs `control.py`'s `ctl_audit_tail` verb —…, Operator-initiated revocation (FR-15, §4.4) — immediate and total, four steps…, Exercises O_APPEND directly: two separate `record()` calls (two separate…, `os.fsync` is actually invoked for events in the security-relevant subset, not…, test_no_plaintext_credential_ever_reaches_the_audit_file() (+4 more)
-
-### Community 20 - "HDPRuntime Singleton"
-Cohesion: 0.15
-Nodes (16): get_runtime(), `HDPRuntime` — the pattern the whole architecture bets on (ADR-0002,…, The one `HDPRuntime` for this process, built at first use. Do not call this…, lazy_singleton(), T, Stdlib fallback for `plugins.plugin_utils.lazy_singleton`, used only when no…, _clean_runtime_singleton(), fixture (+8 more)
-
-### Community 21 - "Bridge Hello Auth Branch Tests"
-Cohesion: 0.23
-Nodes (12): _FakeWS, `_handle_hello`'s M2 auth branch (§3, §4.3, §4.4): M2 does not accept unpaired…, _read_audit_records(), test_hello_with_a_previously_consumed_pairing_code_is_auth_failed(), test_hello_with_a_returning_credential_resolves_the_same_device_id(), test_hello_with_a_revoked_credential_is_auth_failed(), test_hello_with_a_valid_pairing_code_pairs_and_returns_a_credential(), test_hello_with_an_invalid_pairing_code_is_auth_failed() (+4 more)
-
-### Community 22 - "Reference Node Auth Tests"
-Cohesion: 0.12
-Nodes (15): AppRunner, Python HDP reference node package., _abrupt_close_handler(), _auth_failed_handler(), bridge_stub(), _pairing_handler(), fixture, The reference node's M2 auth behaviour (final-review findings I7 and I8).… (+7 more)
-
-### Community 23 - "Frame Handler Dispatch (Node/Bridge)"
-Cohesion: 0.19
-Nodes (7): Operator-only verb (FR-15, §4.4) — the CLI's `hdp-bridge devices revoke`…, _NodeSession, Any, Per-connection dispatch state: which invocation ids have been cancelled by the…, M2 (HDP-0.md Amendments (v0.2)): `revoke` is sent for real now — at M1 it was a…, Envelope, An HDP/0 frame. `payload` is opaque to this layer — Hermes…
-
-### Community 24 - "Control Verb Handlers & Cancel"
+### Community 23 - "Envelope"
 Cohesion: 0.14
-Nodes (8): Best-effort cancel, mirroring `EmbeddedTransport.cancel` — safe to call…, Operator-only verb (`hermes hdp devices` at Task 17 was ultimately built…, Operator-only verb backing `hermes hdp audit` / `/hdp audit` — read-only, but…, `Server.close()` alone leaves already-accepted connections open — without this,…, test_close_force_closes_live_connections(), Any, Return a plain `dict`, never a string — serialization belongs to the transport…, Mint a fresh envelope: new ULID `id`, current-time `ts`. Convenience for…
+Nodes (9): Operator-only verb (`hermes hdp devices` at Task 17 was ultimately built…, Return daemon-memory approvals; none are durable while pending., _NodeSession, Any, Per-connection dispatch state: which invocation ids have been cancelled by the…, M2 (HDP-0.md Amendments (v0.2)): `revoke` is sent for real now — at M1 it was a…, Envelope, Return a plain `dict`, never a string — serialization belongs to the transport… (+1 more)
 
-### Community 25 - "Pairing Code Minting"
-Cohesion: 0.22
-Nodes (15): pair_new(), Mint a pairing code and return it in plaintext. There is no control-plane verb…, consume_pairing_code(), _hash_code(), mint_pairing_code(), Connection, _random_code(), Pairing-code minting and atomic consumption (FR-11, §4.1). Minting is operator-… (+7 more)
+### Community 24 - "._read_loop"
+Cohesion: 0.40
+Nodes (5): _bridge_unavailable(), Future, StreamReader, Demultiplex every reply on one connection into the future that is waiting for…, _read_frame()
 
-### Community 26 - "Wire Message Ack/Heartbeat/Progress"
-Cohesion: 0.16
-Nodes (8): Ack, Heartbeat, ProgressMsg, Any, Either direction's `ack` frame. Empty payload — the envelope's `corr` carries…, Node → Bridge. Declared per HDP-0.md §2; no M1 producer or consumer., Either direction. Application-level heartbeat, belt-and-suspenders on top of…, _require_dict()
+### Community 25 - "AuthFailed"
+Cohesion: 0.40
+Nodes (5): AuthFailed, Exception, The bridge rejected this node's credential. Deliberately **not** an `OSError`…, Finding I7.3, the whole bug in one line: the old code raised `ConnectionError`,…, test_auth_failed_is_terminal_and_never_retried()
 
-### Community 27 - "Plugin Engine Invoke Tests"
+### Community 27 - "InvokeResult"
 Cohesion: 0.29
 Nodes (12): InvokeResult, The transport's answer to an `InvokeRequest`. Exactly one of `data`/`error` is…, _device(), _FakeRuntime, _FakeTransport, _patched(), `engine.invoke()`'s resolution tree against a fake `BridgeTransport` — no…, test_invoke_propagates_transport_error() (+4 more)
 
-### Community 28 - "Node Auth Failure & Fault Injection"
+### Community 28 - "FaultConfig"
+Cohesion: 0.14
+Nodes (14): ClientWebSocketResponse, FaultConfig, Fault injection for the conformance suite (m1-plan.md §7). Every fault is…, Parse a list of `--fault` flag values, e.g. `["never-ack", "slow-result=4000"]`., parametrize, Finding I7.1: `Path.write_text` created this file at the process umask —…, `O_CREAT`'s mode argument is ignored when the file already exists — which is…, Finding I7.2: `revoke` used to be a documented no-op ("no action needed ... at… (+6 more)
+
+### Community 29 - "hdp_bridge/config.py"
+Cohesion: 0.20
+Nodes (17): bridge_addr_path(), control_socket_path(), hdp_home(), hermes_home(), pid_path(), policy_path(), Path, Profile-scoped paths, timeouts, and defaults for the standalone `hdp-bridge`… (+9 more)
+
+### Community 30 - "test_cli.py"
 Cohesion: 0.17
-Nodes (15): ClientWebSocketResponse, FaultConfig, AuthFailed, Exception, The bridge rejected this node's credential. Deliberately **not** an `OSError`…, parametrize, Finding I7.1: `Path.write_text` created this file at the process umask —…, `O_CREAT`'s mode argument is ignored when the file already exists — which is… (+7 more)
+Nodes (17): main(), Thin renderer over `operations.revoke` — the daemon-reachable/offline-fallback…, _run_audit_tail(), _run_devices_revoke(), _run_pair_new(), _insert_device_with_credential(), `hdp-bridge` CLI — `pair new`'s audit call site (Task 16) and `audit tail`. No…, Finding I4: the offline fallback used to print "revoked <id>" unconditionally,… (+9 more)
 
-### Community 29 - "Bridge Daemon Profile Config"
-Cohesion: 0.23
-Nodes (14): bridge_addr_path(), control_socket_path(), hdp_home(), hermes_home(), pid_path(), Path, Profile-scoped paths, timeouts, and defaults for the standalone `hdp-bridge`…, The active Hermes profile's state root. Read fresh on every call — never cache… (+6 more)
+### Community 31 - "_InvokeReq"
+Cohesion: 0.16
+Nodes (11): _InvokeReq, Satisfies `connection.py`'s `_InvokeRequestLike` `Protocol` — `ctl_invoke`'s…, DeviceDisconnected, Exception, Set as the exception on whichever future (ack or result) is still pending when…, _FakeWS, Presence (FR-16) — heartbeat-driven `last_seen_at` and 45s dead-peer detection.…, The dead-peer monitor drives an ordinary disconnect, not a revocation.… (+3 more)
 
-### Community 30 - "Device Credential Issuance"
-Cohesion: 0.29
-Nodes (14): _hash(), issue_credential(), Connection, Device credential issuance, verification, and revocation (FR-12, §4.3, §4.4)., Returns the credential in plaintext. The caller (the `hello` handler, or `pair…, Returns the device_id the credential belongs to, or None if it matches no live…, Returns the number of live credentials this call actually invalidated. Zero…, revoke_credential() (+6 more)
+### Community 32 - "tools.py"
+Cohesion: 0.27
+Nodes (12): _echo(), _handler(), _notifications_send(), Any, T, The three async tool handlers. Every handler has the same shape (FR-1): `async…, Wrap `fn` (which returns a *parsed* model-facing result dict, or raises) into a…, Run `coro` on the HDP loop and await its answer on *the caller's* loop. The two… (+4 more)
 
-### Community 31 - "Invocation Revocation Failure"
-Cohesion: 0.17
-Nodes (11): DeviceDisconnected, Exception, Set as the exception on whichever future (ack or result) is still pending when…, Connection, Returns the number of live credentials actually invalidated — `0` for an…, revoke_device(), _FakeWS, Operator-initiated revocation (FR-15, §4.4) — the four-step order enforced in… (+3 more)
-
-### Community 32 - "Plugin Async Tool Handlers"
-Cohesion: 0.22
-Nodes (14): _echo(), _handler(), _notifications_send(), Any, T, The three async tool handlers. Every handler has the same shape (FR-1): `async…, `check_fn` for `device_notifications_send` and `hdp_echo`. Per ADR-0003,…, Wrap `fn` (which returns a *parsed* model-facing result dict, or raises) into a… (+6 more)
-
-### Community 33 - "Reference Node Connect & Backoff"
+### Community 33 - "node.py"
 Cohesion: 0.22
 Nodes (11): The node-side second enforcement point (docs/design.md §4). Trivial at M1:…, _backoff_delay(), _connect_and_serve(), Path, The reference node: connects to an HDP bridge over WebSocket, advertises its…, FR-14: exponential 1s -> 30s, jittered. `attempt` is 1-based. The 30s ceiling…, Write the bridge-issued credential 0600, with no world-readable window at any…, Connect, advertise, dispatch forever, reconnecting with exponential backoff on… (+3 more)
 
-### Community 34 - "Typed Wire Message Dataclasses"
-Cohesion: 0.18
-Nodes (8): ErrorMsg, Typed payload dataclasses for each HDP/0 message type (hdp-spec/HDP-0.md §2).…, Either direction. Same shape `hdp_proto.errors.err()` produces for the model-…, Bridge → Node. Declared per HDP-0.md §3.3; unused until M2's credential-…, _require_str(), _require_str_or_none(), RevokeMsg, test_hello_rejects_malformed_hdp_versions()
-
-### Community 35 - "BridgeTransport Protocol & Approvals"
+### Community 34 - "Any"
 Cohesion: 0.14
-Nodes (5): BridgeTransport, PendingApproval, Protocol, An HDP `pending_approval` state (seed §17). Unreachable at M0 — the stub never…, The eight operations `engine.py` and the plugin's diagnostics/status surface…
+Nodes (15): _capabilities_from_wire(), CapabilitiesMsg, ErrorMsg, ProgressMsg, Any, Typed payload dataclasses for each HDP/0 message type (hdp-spec/HDP-0.md §2).…, Either direction's `capabilities` frame: a full-set replacement, never a delta…, Node → Bridge. Declared per HDP-0.md §2; no M1 producer or consumer. (+7 more)
 
-### Community 36 - "Reference Node CLI & Fault Flags"
-Cohesion: 0.21
-Nodes (8): build_parser(), _default_bridge_url(), main(), ArgumentParser, `hdp-node` — the reference node's CLI (m1-plan.md §8 step 1: `hdp-node connect…, Fault injection for the conformance suite (m1-plan.md §7). Every fault is…, Parse a list of `--fault` flag values, e.g. `["never-ack", "slow-result=4000"]`., `python -m hdp_reference_node` entrypoint — equivalent to the `hdp-node`…
+### Community 35 - "BridgeTransport"
+Cohesion: 0.18
+Nodes (3): BridgeTransport, Protocol, The eight operations `engine.py` and the plugin's diagnostics/status surface…
 
-### Community 37 - "hermes hdp CLI Rendering Tests"
-Cohesion: 0.21
-Nodes (11): Calls `ctl_audit_tail` over the control socket rather than reading…, render_audit(), render_devices(), bridge_daemon(), fixture, `hermes hdp {status,devices,pair,audit}` (Task 17). Named `test_plugin_cli.py`,…, test_render_audit_against_a_real_daemon_contains_daemon_start(), test_render_audit_reports_unreachable_with_no_daemon() (+3 more)
+### Community 36 - "hdp_reference_node/cli.py"
+Cohesion: 0.27
+Nodes (7): build_parser(), _default_bridge_url(), main(), ArgumentParser, `hdp-node` — the reference node's CLI (m1-plan.md §8 step 1: `hdp-node connect…, Python HDP reference node package., `python -m hdp_reference_node` entrypoint — equivalent to the `hdp-node`…
 
-### Community 38 - "Plugin Tool Registration Tests"
+### Community 37 - "test_repeated_runtime_start_stop_does_not_leak_fds_or_threads"
+Cohesion: 0.33
+Nodes (8): skipif, _fd_count(), _hdp_thread_count(), M1-1's risk mitigation (m1-plan.md §9): the embedded aiohttp server's…, `HDPRuntime.close()` already blocks on `Thread.join()`, but the loop thread…, test_repeated_runtime_start_stop_does_not_leak_fds_or_threads(), _wait_for_no_hdp_threads(), timeout
+
+### Community 38 - "_RecordingCtx"
 Cohesion: 0.21
 Nodes (7): `register(ctx)` — FR-1's "exactly three tools" and FR-2's "no check_fn on…, Task 17 / FR-18: two more renderers of the same underlying operations,…, D6 / ADR-0006: registration is metadata only. Building HDPRuntime as a side…, _RecordingCtx, test_register_also_registers_the_hdp_cli_command_and_slash_command(), test_register_does_not_spawn_the_hdp_runtime_thread(), test_register_registers_exactly_three_async_device_tools()
 
-### Community 39 - "device_status_get Handler Tests"
+### Community 39 - "test_tools.py"
 Cohesion: 0.23
 Nodes (11): _assert_structured_failure(), _clean_runtime_singleton(), fixture, parametrize, FR-1: every handler returns parseable JSON and never propagates an exception,…, `device_status_get` bypasses `engine.invoke` (FR-2) — its deepest reachable…, FR-2 / M0 exit gate step 6: exactly `{"ok": true, "data": {"devices": []}}`…, test_device_status_get_succeeds_with_zero_nodes() (+3 more)
 
-### Community 40 - "Devices Revoke CLI Fallback"
-Cohesion: 0.25
-Nodes (11): registry_db_path(), CLI-only (finding I1) — `/hdp devices revoke` no longer reaches this; see…, render_devices_revoke(), No daemon reachable — `render_devices_revoke` falls back to the direct DB-only…, Finding I4, offline-fallback half: no live credential means nothing was…, Finding I4, live-daemon half: both CLIs used to `await read_frame(...)` and…, _register_device(), test_render_devices_revoke_against_a_real_daemon_reaches_the_control_socket() (+3 more)
+### Community 40 - "test_plugin_cli.py"
+Cohesion: 0.16
+Nodes (17): CLI-only (finding I1) — `/hdp devices revoke` no longer reaches this; see…, render_devices(), render_devices_revoke(), bridge_daemon(), fixture, `hermes hdp {status,devices,pair,audit}` (Task 17). Named `test_plugin_cli.py`,…, No daemon reachable — `render_devices_revoke` falls back to the direct DB-only…, Finding I4, offline-fallback half: no live credential means nothing was… (+9 more)
 
-### Community 41 - "hermes hdp CLI Entry Point"
+### Community 41 - "hermes_device_plugin/cli.py"
+Cohesion: 0.16
+Nodes (18): _build_parser(), main(), ArgumentParser, `hermes hdp {status,devices,pair,audit}` — the CLI-native renderer of `hdp-…, Calls `ctl_audit_tail` over the control socket rather than reading…, The `hermes hdp ...` operator entry point. `asyncio.run()` only appears here,…, CLI-only (finding I1) — `/hdp pair --new` no longer reaches this; see…, render_approvals() (+10 more)
+
+### Community 42 - "engine.py"
+Cohesion: 0.33
+Nodes (6): invoke(), _policy_check_stub(), Any, `invoke()` — the one path every device tool shares (design §2.3). Ten numbered…, Step 4's call site — the allow-all stub, present from day one (design §2.3)…, Resolve a device, check policy, invoke, and return the model-facing JSON result…
+
+### Community 43 - "daemon.py"
+Cohesion: 0.13
+Nodes (19): Event, hdp_allow_remote(), hdp_bind_host(), hdp_bind_port(), The host the aiohttp node-facing server binds to. Read fresh on every call…, The port the aiohttp node-facing server binds to. `0` (test convention)…, NFR-4's guard: binding to a non-loopback host is refused unless this is set., AlreadyRunningError (+11 more)
+
+### Community 44 - "._ctl_invoke"
+Cohesion: 0.29
+Nodes (6): _approval_args_summary(), _invoke_failure(), Any, The plugin-reachable half of the ack-timeout/execution-deadline race — a…, A failed `ctl_invoke_reply`, mirroring `embedded.py`'s `_failure` helper.…, Render approval-safe arguments without ever putting raw values into SQLite or…
+
+### Community 45 - "test_daemon.py"
 Cohesion: 0.24
-Nodes (10): _build_parser(), main(), ArgumentParser, `hermes hdp {status,devices,pair,audit}` — the CLI-native renderer of `hdp-…, The `hermes hdp ...` operator entry point. `asyncio.run()` only appears here,…, CLI-only (finding I1) — `/hdp pair --new` no longer reaches this; see…, render_pair_new(), _run() (+2 more)
+Nodes (11): serve(), A partial-bind failure (`hdp_server.start()` succeeds, `control.start()`…, The PID claim happens before *any* binding. A failure anywhere between the…, A `bridge.pid` file that isn't a parseable integer (corrupted, truncated, ...)…, _read_audit_records(), test_check_and_claim_pid_treats_a_malformed_pid_file_as_no_claim(), test_serve_binds_control_socket_and_writes_pid(), test_serve_cleans_up_a_stale_pid_from_a_dead_process() (+3 more)
 
-### Community 42 - "Plugin Engine & Tool Schemas"
+### Community 46 - "operations.py"
 Cohesion: 0.20
-Nodes (8): invoke(), _policy_check_stub(), Any, `invoke()` — the one path every device tool shares (design §2.3). Ten numbered…, Step 4's call site — the allow-all stub, present from day one (design §2.3)…, Resolve a device, check policy, invoke, and return the model-facing JSON result…, Hermes Device Plugin package. `register(ctx)` below, plus `cli.py` and…, LLM-facing tool schemas — plain dicts, imported by nothing else in this…
+Nodes (9): HDP bridge daemon package., _error_detail(), pair_new(), Operator-surface orchestration, owned by `hdp_bridge` and shared by both…, Mint a pairing code and return it in plaintext. There is no control-plane verb…, True when `revoke()`'s return value describes a failure rather than a completed…, Revoke `device_id`, returning the line the caller should render. Prefers the…, revoke() (+1 more)
 
-### Community 43 - "Bridge Bind Host/Port Config"
-Cohesion: 0.20
-Nodes (10): Event, hdp_allow_remote(), hdp_bind_host(), hdp_bind_port(), The host the aiohttp node-facing server binds to. Read fresh on every call…, The port the aiohttp node-facing server binds to. `0` (test convention)…, NFR-4's guard: binding to a non-loopback host is refused unless this is set., main() (+2 more)
-
-### Community 44 - "Daemon PID Claim Guard"
-Cohesion: 0.24
-Nodes (9): AlreadyRunningError, _check_and_claim_pid(), _pid_is_live(), RuntimeError, `hdp-bridge serve` — the foreground daemon entrypoint (§5.5). PID-file…, Another live hdp-bridge process already holds this profile's PID file., Treat `pid_path` as a *claim* to verify, not a fact to trust. If it names a…, A `bridge.pid` file that isn't a parseable integer (corrupted, truncated, ...)… (+1 more)
-
-### Community 45 - "Daemon Serve Bind Failure Tests"
-Cohesion: 0.31
-Nodes (9): serve(), A partial-bind failure (`hdp_server.start()` succeeds, `control.start()`…, The PID claim happens before *any* binding. A failure anywhere between the…, _read_audit_records(), test_serve_binds_control_socket_and_writes_pid(), test_serve_cleans_up_a_stale_pid_from_a_dead_process(), test_serve_refuses_to_start_when_a_live_process_holds_the_pid_file(), test_serve_tears_down_node_socket_if_control_bind_fails() (+1 more)
-
-### Community 46 - "Operator Revoke Orchestration"
-Cohesion: 0.28
-Nodes (7): HDP bridge daemon package., _error_detail(), Operator-surface orchestration, owned by `hdp_bridge` and shared by both…, Revoke `device_id`, returning the line the caller should render. Prefers the…, Send `ctl_devices_revoke` and return the daemon's reply envelope, or `None` if…, revoke(), _revoke_via_control_socket()
-
-### Community 47 - "Registry Schema Tables"
+### Community 47 - "001_initial.sql"
 Cohesion: 0.28
 Nodes (8): approvals, capabilities, credentials, devices, invocations, pairing_codes, policy_grants, schema_version
 
-### Community 48 - "Bridge Server Wire-Level Tests"
-Cohesion: 0.25
-Nodes (4): _connect_and_hello(), Direct wire-level tests for `hdp_bridge.server` — a fake "node" is a raw…, test_hello_welcome_handshake_registers_the_device(), test_malformed_frame_gets_an_error_reply_and_stays_open()
+### Community 48 - "runtime.py"
+Cohesion: 0.40
+Nodes (4): `HDPRuntime` — the pattern the whole architecture bets on (ADR-0002,…, lazy_singleton(), T, Stdlib fallback for `plugins.plugin_utils.lazy_singleton`, used only when no…
 
-### Community 49 - "HDP Envelope & Version Errors"
-Cohesion: 0.28
-Nodes (8): EnvelopeError, ValueError, The HDP/0 envelope: `{"hdp", "type", "id", "ts", "corr", "payload"}` — see…, Raised by `Envelope.from_wire` on any structurally or semantically invalid…, The frame's `hdp` field names a version we do not speak. Per HDP-0.md §3, this…, The frame's `type` field is missing or not in `KNOWN_TYPES`. Per HDP-0.md §5,…, UnknownTypeError, UnsupportedVersionError
+### Community 49 - "envelope.py"
+Cohesion: 0.08
+Nodes (40): EnvelopeError, ValueError, The HDP/0 envelope: `{"hdp", "type", "id", "ts", "corr", "payload"}` — see…, Raised by `Envelope.from_wire` on any structurally or semantically invalid…, The frame's `hdp` field names a version we do not speak. Per HDP-0.md §3, this…, The frame's `type` field is missing or not in `KNOWN_TYPES`. Per HDP-0.md §5,…, UnknownTypeError, UnsupportedVersionError (+32 more)
 
-### Community 50 - "ResultMsg Wire Round-Trip"
-Cohesion: 0.28
+### Community 50 - "test_messages.py"
+Cohesion: 0.24
 Nodes (6): Node → Bridge. `ok=True` carries `data`; `ok=False` carries `error` shaped like…, ResultMsg, parametrize, test_from_wire_tolerates_unknown_fields(), test_result_msg_rejects_non_bool_ok(), test_round_trip()
 
-### Community 51 - "InvokeMsg Wire Contract"
-Cohesion: 0.32
-Nodes (5): _InvokeRequestLike, Protocol, InvokeMsg, Bridge → Node. `corr` (on the envelope, not here) carries the bridge-minted…, test_invoke_msg_rejects_missing_deadline()
-
-### Community 52 - "Capabilities Message Wire Format"
+### Community 51 - "InvokeMsg"
 Cohesion: 0.33
-Nodes (5): CapabilityDescriptor, One entry in a `capabilities` message's full-replacement list (HDP-0.md §2, §6)., _capabilities_from_wire(), CapabilitiesMsg, Either direction's `capabilities` frame: a full-set replacement, never a delta…
+Nodes (4): InvokeMsg, Bridge → Node. `corr` (on the envelope, not here) carries the bridge-minted…, _require_int(), test_invoke_msg_rejects_missing_deadline()
 
-### Community 53 - "errors.md Conformance Tests"
-Cohesion: 0.43
-Nodes (6): _parse_errors_md(), FR-32: `hdp-spec/errors.md` (the normative doc) must be identical to…, Catches the inverse drift: a code declared in errors.md but removed from…, test_errors_md_code_set_and_order_match_error_code(), test_errors_md_has_no_orphaned_entries(), test_errors_md_hints_match_hints_dict()
-
-### Community 54 - "hermes hdp Command Registration"
+### Community 53 - "ErrorCode"
 Cohesion: 0.29
-Nodes (7): Any, Registers `hermes hdp {status,devices,pair,audit}` (design §2's confinement…, register_cli_command(), Any, Register the three device tools in toolset `device`, all `is_async=True`…, register(), test_register_cli_command_registers_hdp()
+Nodes (9): ErrorCode, StrEnum, Stable declaration order — this is the order the M1 conformance test diffs…, _parse_errors_md(), FR-32: `hdp-spec/errors.md` (the normative doc) must be identical to…, Catches the inverse drift: a code declared in errors.md but removed from…, test_errors_md_code_set_and_order_match_error_code(), test_errors_md_has_no_orphaned_entries() (+1 more)
 
-### Community 55 - "Welcome Message Credential Field"
-Cohesion: 0.40
-Nodes (4): Bridge → Node, reply to a successful `hello`. `credential` (M2, §4.3) is…, _require_int(), Welcome, test_welcome_credential_defaults_to_none_and_round_trips_present_as_null()
+### Community 54 - "hermes_device_plugin/__init__.py"
+Cohesion: 0.18
+Nodes (9): Any, Registers `hermes hdp {status,devices,pair,audit}` (design §2's confinement…, register_cli_command(), Any, Hermes Device Plugin package. `register(ctx)` below, plus `cli.py` and…, Register the three device tools in toolset `device`, all `is_async=True`…, register(), LLM-facing tool schemas — plain dicts, imported by nothing else in this… (+1 more)
 
-### Community 56 - "CancelMsg Best-Effort Send"
+### Community 55 - "Welcome"
 Cohesion: 0.40
+Nodes (4): _revoking_handler(), Bridge → Node, reply to a successful `hello`. `credential` (M2, §4.3) is…, Welcome, test_welcome_credential_defaults_to_none_and_round_trips_present_as_null()
+
+### Community 56 - "CancelMsg"
+Cohesion: 0.33
 Nodes (3): Best-effort — HDP-0.md §7: the caller has already removed the pending-table…, CancelMsg, Bridge → Node, sent best-effort on timeout or explicit cancellation.
 
-### Community 57 - "uv Workspace Package Manifests"
+### Community 57 - "hdp-proto"
 Cohesion: 0.80
 Nodes (5): hdp-bridge, hdp-proto, hdp-reference-node, hermes-device-plugin, hermes-device-protocol
 
-### Community 58 - "device.status@1 Reference Handler"
+### Community 58 - "device_status.py"
 Cohesion: 0.50
 Nodes (3): handle(), Any, `device.status@1` (hdp-spec/capabilities/device.status@1.md). Deliberately…
 
-### Community 59 - "diagnostics.echo@1 Reference Handler"
+### Community 59 - "diagnostics.py"
 Cohesion: 0.50
 Nodes (3): handle(), Any, `diagnostics.echo@1` (hdp-spec/capabilities/diagnostics.echo@1.md) — a pure…
 
-### Community 60 - "notifications.send@1 Reference Handler"
+### Community 60 - "notifications.py"
 Cohesion: 0.50
 Nodes (3): handle(), Any, `notifications.send@1` (hdp-spec/capabilities/notifications.send@1.md). Prints…
 
-### Community 61 - "hermes hdp status Rendering"
+### Community 61 - "render_status"
 Cohesion: 0.50
 Nodes (4): render_status(), test_render_status_reports_healthy_against_a_real_daemon(), test_render_status_reports_unreachable_with_no_daemon(), test_hdp_status_delegates_to_render_status()
 
-### Community 62 - "Plugin Test Fixtures"
+### Community 62 - "tests/conftest.py"
 Cohesion: 0.50
 Nodes (3): _hermes_home(), fixture, Test-wide fixtures for `hermes_device_plugin`. Real Hermes always sets…
 
-### Community 63 - "Repo Scaffold Sanity Test"
+### Community 63 - "test_scaffold.py"
 Cohesion: 0.50
 Nodes (3): Scaffold sanity tests., Keep `pytest` green before milestone implementation tests are added., test_scaffold_exists()
 
-### Community 64 - "Control Socket Test Fixtures"
-Cohesion: 0.67
-Nodes (3): ctl_conn(), node_client(), fixture
+### Community 65 - "ApprovalManager"
+Cohesion: 0.08
+Nodes (27): ApprovalManager, ApprovalResolution, ApprovalScope, ApprovalState, PendingApproval, Connection, StrEnum, In-memory approval lifecycle with terminal SQLite decision records. (+19 more)
+
+### Community 66 - "policy.py"
+Cohesion: 0.08
+Nodes (24): Decision, Mode, _NoDuplicateSafeLoader, PolicyEngine, PolicyTable, PolicyValidationError, Path, StrEnum (+16 more)
 
 ## Knowledge Gaps
 - **25 isolated node(s):** `schema_version`, `pairing_codes`, `policy_grants`, `approvals`, `invocations` (+20 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **15 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **16 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `SocketTransport` connect `Socket Transport Client Tests` to `M2 Conformance Test Harness`, `BridgeTransport Protocol & Approvals`, `hermes hdp CLI Rendering Tests`, `Bridge Transport Base & Status`, `hermes hdp CLI Entry Point`, `HDP Runtime Event Loop`, `Bridge Socket Transport Client`, `HDP Error Envelope Helpers`, `HDP Envelope & Version Errors`, `HDPRuntime Singleton`, `Frame Handler Dispatch (Node/Bridge)`, `Plugin Engine Invoke Tests`, `hermes hdp status Rendering`?**
-  _High betweenness centrality (0.109) - this node is a cross-community bridge._
-- **Why does `Envelope` connect `Frame Handler Dispatch (Node/Bridge)` to `Bridge Node Connection Handling`, `Control Plane Frame Dispatch`, `ULID Minting & Parsing`, `Bridge Transport Base & Status`, `Socket Transport Client Tests`, `Bridge Control Server`, `Bridge Socket Transport Client`, `Operator Revoke Orchestration`, `HDP Envelope & Version Errors`, `InvokeMsg Wire Contract`, `Bridge Hello Auth Branch Tests`, `Control Verb Handlers & Cancel`, `Node Auth Failure & Fault Injection`?**
-  _High betweenness centrality (0.107) - this node is a cross-community bridge._
-- **Why does `NodeConnection` connect `Bridge Node Connection Handling` to `Control Plane Frame Dispatch`, `In-Memory Invocation Tracking`, `Bridge Control Server`, `Bridge Server Bind Lifecycle`, `Bridge aiohttp App & Health`, `Audit Log & Revocation`, `Bridge Hello Auth Branch Tests`, `Frame Handler Dispatch (Node/Bridge)`, `Invocation Revocation Failure`, `Typed Wire Message Dataclasses`, `Bridge Bind Host/Port Config`, `Daemon PID Claim Guard`, `Bridge Server Wire-Level Tests`, `HDP Envelope & Version Errors`, `ResultMsg Wire Round-Trip`, `InvokeMsg Wire Contract`, `Capabilities Message Wire Format`, `Welcome Message Credential Field`, `CancelMsg Best-Effort Send`?**
-  _High betweenness centrality (0.106) - this node is a cross-community bridge._
+- **Why does `Envelope` connect `Envelope` to `Registry`, `.new`, `socket.py`, `InprocTransport`, `test_transport_socket.py`, `ControlServer`, `SocketTransport`, `NodeConnection`, `err`, `test_server.py`, `Hello`, `._read_loop`, `AuthFailed`, `_InvokeReq`, `._ctl_invoke`, `operations.py`, `envelope.py`, `test_messages.py`, `._ctl_devices_revoke`?**
+  _High betweenness centrality (0.111) - this node is a cross-community bridge._
+- **Why does `InvocationsMem` connect `InvocationsMem` to `Registry`, `.new`, `ControlServer`, `daemon.py`, `connect`, `NodeConnection`, `test_server.py`, `AuditWriter`, `Hello`, `_InvokeReq`?**
+  _High betweenness centrality (0.105) - this node is a cross-community bridge._
+- **Why does `NodeConnection` connect `NodeConnection` to `Registry`, `.new`, `InvocationsMem`, `ControlServer`, `connect`, `CapabilityDescriptor`, `server.py`, `test_server.py`, `AuditWriter`, `Hello`, `Envelope`, `_InvokeReq`, `Any`, `daemon.py`, `envelope.py`, `test_messages.py`, `InvokeMsg`, `Welcome`, `CancelMsg`?**
+  _High betweenness centrality (0.099) - this node is a cross-community bridge._
 - **Are the 25 inferred relationships involving `NodeConnection` (e.g. with `AuditWriter` and `InvocationsMem`) actually correct?**
   _`NodeConnection` has 25 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 10 inferred relationships involving `InvocationsMem` (e.g. with `_InvokeRequestLike` and `NodeConnection`) actually correct?**

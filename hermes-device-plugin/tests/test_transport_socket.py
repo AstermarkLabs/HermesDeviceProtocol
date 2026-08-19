@@ -82,22 +82,53 @@ async def test_cancel_on_unknown_invocation_does_not_raise(bridge_daemon):
     await transport.close()
 
 
-async def test_list_approvals_raises_not_implemented_without_a_round_trip(bridge_daemon):
-    """M3 adds both sides together — until then this is a local raise, not a wire call, exactly
-    matching `EmbeddedTransport`'s M1 behavior."""
+async def test_resolve_approval_sends_the_pending_decision(monkeypatch):
     transport = SocketTransport()
-    await transport.start()
-    with pytest.raises(NotImplementedError):
-        await transport.list_approvals()
-    await transport.close()
+
+    async def _roundtrip(request):
+        assert request.type == "ctl_resolve_approval"
+        assert request.payload == {
+            "invocation_id": "inv_1",
+            "decision": "approve",
+            "scope": "session",
+        }
+        return Envelope.new("ctl_resolve_approval_reply", {"ok": True})
+
+    monkeypatch.setattr(transport, "_roundtrip", _roundtrip)
+
+    await transport.resolve_approval("inv_1", "approve", "session")
 
 
-async def test_resolve_approval_raises_not_implemented_without_a_round_trip(bridge_daemon):
+async def test_list_approvals_decodes_the_control_plane_response(monkeypatch):
     transport = SocketTransport()
-    await transport.start()
-    with pytest.raises(NotImplementedError):
-        await transport.resolve_approval("inv_1", "approve", "once")
-    await transport.close()
+
+    async def _roundtrip(request):
+        assert request.type == "ctl_list_approvals"
+        return Envelope.new(
+            "ctl_list_approvals_reply",
+            {
+                "approvals": [
+                    {
+                        "invocation_id": "inv_1",
+                        "device_id": "dev_1",
+                        "capability": "notifications.send",
+                        "version": 1,
+                        "args_summary": "title='done'",
+                        "requesting_session": "session_1",
+                        "risk_class": "",
+                        "created_at": 1,
+                        "expires_at": 2,
+                    }
+                ]
+            },
+        )
+
+    monkeypatch.setattr(transport, "_roundtrip", _roundtrip)
+
+    approvals = await transport.list_approvals()
+
+    assert approvals[0].invocation_id == "inv_1"
+    assert approvals[0].args_summary == "title='done'"
 
 
 async def test_start_before_daemon_is_up_does_not_raise(tmp_path, monkeypatch):

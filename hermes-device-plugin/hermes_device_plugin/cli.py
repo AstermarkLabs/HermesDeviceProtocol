@@ -123,6 +123,48 @@ async def render_audit() -> str:
     return "\n".join(json.dumps(line) for line in lines)
 
 
+async def render_approvals() -> str:
+    from .transport.socket import SocketTransport
+
+    transport = SocketTransport()
+    await transport.start()
+    try:
+        approvals = await transport.list_approvals()
+    finally:
+        await transport.close()
+    if not approvals:
+        return "no pending approvals"
+    return "\n".join(
+        f"{approval.invocation_id}\t{approval.device_id}\t{approval.capability}@{approval.version}\t"
+        f"{approval.args_summary}\t{approval.expires_at}"
+        for approval in approvals
+    )
+
+
+async def resolve_approval(invocation_id: str, decision: str, scope: str) -> str:
+    from .transport.socket import SocketTransport
+
+    transport = SocketTransport()
+    await transport.start()
+    try:
+        await transport.resolve_approval(invocation_id, decision, scope)
+    finally:
+        await transport.close()
+    return f"{'approved' if decision == 'approve' else 'denied'} {invocation_id}"
+
+
+async def render_policy(*, reload: bool = False) -> str:
+    from .transport.socket import SocketTransport
+
+    transport = SocketTransport()
+    await transport.start()
+    try:
+        policy = await (transport.ctl_policy_reload() if reload else transport.ctl_policy_show())
+    finally:
+        await transport.close()
+    return json.dumps(policy, sort_keys=True) if policy else "policy unavailable"
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="hermes hdp")
     subparsers = parser.add_subparsers(dest="hdp_command", required=True)
@@ -137,6 +179,19 @@ def _build_parser() -> argparse.ArgumentParser:
     pair.add_argument("--new", action="store_true", help="Mint a new pairing code.")
 
     subparsers.add_parser("audit", help="Print today's audit records.")
+
+    approvals = subparsers.add_parser("approvals", help="List or resolve pending approvals.")
+    approvals_sub = approvals.add_subparsers(dest="approvals_command", required=True)
+    approvals_sub.add_parser("list")
+    for decision in ("approve", "deny"):
+        resolve = approvals_sub.add_parser(decision)
+        resolve.add_argument("invocation_id")
+        resolve.add_argument("--scope", default="one_time")
+
+    policy = subparsers.add_parser("policy", help="Inspect or reload daemon policy.")
+    policy_sub = policy.add_subparsers(dest="policy_command", required=True)
+    policy_sub.add_parser("show")
+    policy_sub.add_parser("reload")
     return parser
 
 
@@ -153,6 +208,12 @@ def _run(args: argparse.Namespace) -> str:
         return "hermes hdp pair requires --new"
     if args.hdp_command == "audit":
         return asyncio.run(render_audit())
+    if args.hdp_command == "approvals":
+        if args.approvals_command == "list":
+            return asyncio.run(render_approvals())
+        return asyncio.run(resolve_approval(args.invocation_id, args.approvals_command, args.scope))
+    if args.hdp_command == "policy":
+        return asyncio.run(render_policy(reload=args.policy_command == "reload"))
     raise ValueError(f"unknown hdp subcommand: {args.hdp_command!r}")  # pragma: no cover
 
 

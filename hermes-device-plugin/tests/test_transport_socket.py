@@ -47,8 +47,8 @@ async def test_invoke_against_zero_connected_devices_is_device_offline(bridge_da
     await transport.start()
     req = InvokeRequest(
         capability="diagnostics.echo",
-        version=1,
-        device_id="dev_nonexistent",
+        acceptable_versions=(1,),
+        requested_device_id="dev_nonexistent",
         args={"payload": {}},
         deadline_ms=1000,
     )
@@ -82,22 +82,125 @@ async def test_cancel_on_unknown_invocation_does_not_raise(bridge_daemon):
     await transport.close()
 
 
-async def test_list_approvals_raises_not_implemented_without_a_round_trip(bridge_daemon):
-    """M3 adds both sides together — until then this is a local raise, not a wire call, exactly
-    matching `EmbeddedTransport`'s M1 behavior."""
+async def test_resolve_approval_sends_the_pending_decision(monkeypatch):
     transport = SocketTransport()
-    await transport.start()
-    with pytest.raises(NotImplementedError):
-        await transport.list_approvals()
-    await transport.close()
+
+    async def _roundtrip(request):
+        assert request.type == "ctl_resolve_approval"
+        assert request.payload == {
+            "invocation_id": "inv_1",
+            "decision": "approve",
+            "scope": "session",
+        }
+        return Envelope.new("ctl_resolve_approval_reply", {"ok": True})
+
+    monkeypatch.setattr(transport, "_roundtrip", _roundtrip)
+
+    await transport.resolve_approval("inv_1", "approve", "session")
 
 
-async def test_resolve_approval_raises_not_implemented_without_a_round_trip(bridge_daemon):
+async def test_resolve_approval_propagates_control_error(monkeypatch):
     transport = SocketTransport()
-    await transport.start()
-    with pytest.raises(NotImplementedError):
-        await transport.resolve_approval("inv_1", "approve", "once")
-    await transport.close()
+
+    async def _roundtrip(_request):
+        return Envelope.new(
+            "error",
+            {"code": "approval_denied", "message": "no longer pending", "hint": "retry"},
+        )
+
+    monkeypatch.setattr(transport, "_roundtrip", _roundtrip)
+
+    with pytest.raises(RuntimeError, match="no longer pending"):
+        await transport.resolve_approval("inv_gone", "approve", "session")
+
+
+async def test_cancelled_invoke_sends_correlated_control_cancel(monkeypatch):
+    transport = SocketTransport()
+    started = asyncio.Event()
+    cancel_requests = []
+
+    async def _roundtrip(request):
+        if request.type == "ctl_invoke":
+            started.set()
+            await asyncio.Future()
+        cancel_requests.append(request)
+        return Envelope.new("ctl_cancel_reply", {"cancelled": True})
+
+    monkeypatch.setattr(transport, "_roundtrip", _roundtrip)
+    request = InvokeRequest(
+        capability="diagnostics.echo",
+        acceptable_versions=(1,),
+        requested_device_id=None,
+        args={"payload": {}},
+        deadline_ms=1000,
+    )
+    task = asyncio.create_task(transport.invoke(request))
+    await started.wait()
+
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+    assert len(cancel_requests) == 1
+    assert cancel_requests[0].type == "ctl_cancel"
+    assert cancel_requests[0].payload["control_request_id"]
+
+
+async def test_cancelled_invoke_does_not_hang_when_cancel_reply_never_arrives(monkeypatch):
+    transport = SocketTransport()
+    started = asyncio.Event()
+
+    async def _roundtrip(request):
+        if request.type == "ctl_invoke":
+            started.set()
+        await asyncio.Future()
+
+    monkeypatch.setattr(transport, "_roundtrip", _roundtrip)
+    request = InvokeRequest(
+        capability="diagnostics.echo",
+        acceptable_versions=(1,),
+        requested_device_id=None,
+        args={"payload": {}},
+        deadline_ms=1000,
+    )
+    task = asyncio.create_task(transport.invoke(request))
+    await started.wait()
+
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await asyncio.wait_for(task, timeout=1)
+
+
+async def test_list_approvals_decodes_the_control_plane_response(monkeypatch):
+    transport = SocketTransport()
+
+    async def _roundtrip(request):
+        assert request.type == "ctl_list_approvals"
+        return Envelope.new(
+            "ctl_list_approvals_reply",
+            {
+                "approvals": [
+                    {
+                        "invocation_id": "inv_1",
+                        "device_id": "dev_1",
+                        "capability": "notifications.send",
+                        "version": 1,
+                        "args_summary": "title='done'",
+                        "requesting_session": "session_1",
+                        "risk_class": "",
+                        "created_at": 1,
+                        "expires_at": 2,
+                    }
+                ]
+            },
+        )
+
+    monkeypatch.setattr(transport, "_roundtrip", _roundtrip)
+
+    approvals = await transport.list_approvals()
+
+    assert approvals[0].invocation_id == "inv_1"
+    assert approvals[0].args_summary == "title='done'"
 
 
 async def test_start_before_daemon_is_up_does_not_raise(tmp_path, monkeypatch):
@@ -119,8 +222,8 @@ async def test_invoke_after_daemon_stops_returns_bridge_unavailable_promptly(bri
 
     req = InvokeRequest(
         capability="diagnostics.echo",
-        version=1,
-        device_id="dev_nonexistent",
+        acceptable_versions=(1,),
+        requested_device_id="dev_nonexistent",
         args={"payload": {}},
         deadline_ms=1000,
     )
@@ -228,8 +331,8 @@ async def fake_control_server(tmp_path, monkeypatch):
 def _invoke_request(device_id: str) -> InvokeRequest:
     return InvokeRequest(
         capability="diagnostics.echo",
-        version=1,
-        device_id=device_id,
+        acceptable_versions=(1,),
+        requested_device_id=device_id,
         args={"payload": {}},
         deadline_ms=10_000,
     )

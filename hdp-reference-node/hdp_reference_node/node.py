@@ -13,10 +13,14 @@ import json
 import logging
 import os
 import random
+import re
+from collections.abc import Sequence
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
 import aiohttp
+from hdp_proto.capabilities import CapabilityDescriptor
 from hdp_proto.envelope import Envelope, EnvelopeError
 from hdp_proto.messages import Hello, ResultMsg, Welcome
 
@@ -32,6 +36,8 @@ _HANDLERS = {
     diagnostics.DESCRIPTOR.name: diagnostics.handle,
     device_status.DESCRIPTOR.name: device_status.handle,
 }
+_DESCRIPTOR_BY_NAME = {descriptor.name: descriptor for descriptor in _DESCRIPTORS}
+_CAPABILITY_VERSION_PATTERN = re.compile(r"^(?P<name>[^@]+)@(?P<version>[1-9][0-9]*)$")
 
 _INITIAL_BACKOFF_S = 1.0
 _MAX_BACKOFF_S = 30.0
@@ -73,13 +79,51 @@ def _write_credential(credential_file: Path, credential: str) -> None:
         handle.write(credential)
 
 
+def descriptors_for_overrides(overrides: Sequence[str]) -> tuple[CapabilityDescriptor, ...]:
+    """Build the advertised descriptor set for repeatable ``NAME@N`` CLI overrides.
+
+    Each named capability's override versions replace its built-in set. The reference node has
+    only v1 implementations, so conformance-only versions intentionally clone that capability's
+    v1 schemas and continue to use its name-keyed handler. Production calls this with an empty
+    sequence and advertises only the three shipped ``@1`` descriptors.
+    """
+    versions_by_name: dict[str, set[int]] = {}
+    for raw in overrides:
+        match = _CAPABILITY_VERSION_PATTERN.fullmatch(raw)
+        if match is None:
+            raise ValueError(
+                f"invalid --capability-version {raw!r}; expected known capability NAME@N "
+                "with a positive integer version"
+            )
+        name = match.group("name")
+        descriptor = _DESCRIPTOR_BY_NAME.get(name)
+        if descriptor is None:
+            raise ValueError(f"unknown capability in --capability-version: {name!r}")
+        version = int(match.group("version"))
+        versions = versions_by_name.setdefault(name, set())
+        if version in versions:
+            raise ValueError(f"duplicate --capability-version: {name}@{version}")
+        versions.add(version)
+
+    advertised: list[CapabilityDescriptor] = []
+    for descriptor in _DESCRIPTORS:
+        versions = versions_by_name.get(descriptor.name)
+        if versions is None:
+            advertised.append(descriptor)
+        else:
+            advertised.extend(replace(descriptor, version=version) for version in sorted(versions))
+    return tuple(advertised)
+
+
 async def run(
     url: str,
     name: str,
     faults: FaultConfig,
     *,
     pair_code: str | None = None,
+    credential: str | None = None,
     credential_file: Path = Path("./.hdp-node-credential"),
+    descriptors: tuple[CapabilityDescriptor, ...] = _DESCRIPTORS,
     max_reconnect_attempts: int | None = None,
 ) -> None:
     """Connect, advertise, dispatch forever, reconnecting with exponential backoff on an
@@ -88,14 +132,13 @@ async def run(
     call `run` again. `max_reconnect_attempts` is `None` for the real CLI (retry forever); tests
     pass a small number so a deliberately uncooperative bridge cannot hang a test suite.
 
-    M2 auth (hdp-spec/HDP-0.md's Amendments (v0.2)): `credential_file` is checked first on every
-    connect attempt, including reconnects — if it already holds a stored credential (from a
-    previous pairing, on this run or an earlier one), that credential is sent as-is and
-    `pair_code` is ignored. Only when no stored credential exists is `pair_code` used, prefixed
-    `pair:`, to complete a first-time pairing; the credential the bridge issues in response is
-    written to `credential_file` immediately so every subsequent reconnect in this `run()` call
-    (and every future invocation of this CLI against the same `--credential-file`) uses it
-    instead of the one-time pairing code, which the bridge has already consumed.
+    M2 auth (hdp-spec/HDP-0.md's Amendments (v0.2)): an explicit `credential` is process-local
+    and bypasses `credential_file` for both reads and writes (M4 D6's multi-node escape hatch).
+    Otherwise `credential_file` is checked first on every connect attempt, including reconnects.
+    If it already holds a stored credential, that credential is sent as-is and `pair_code` is
+    ignored. Only when no stored credential exists is `pair_code` used, prefixed `pair:`, to
+    complete a first-time pairing; the credential issued in response is written immediately so
+    every subsequent reconnect uses it instead of the consumed one-time pairing code.
 
     Two M2 conditions end `run` for good rather than reconnecting, because reconnecting could
     only present a credential the bridge has already refused: an `auth_failed` close during the
@@ -106,7 +149,15 @@ async def run(
     attempt = 0
     while max_reconnect_attempts is None or attempt < max_reconnect_attempts:
         try:
-            await _connect_and_serve(url, name, faults, pair_code, credential_file)
+            await _connect_and_serve(
+                url,
+                name,
+                faults,
+                pair_code,
+                credential,
+                credential_file,
+                descriptors,
+            )
             return
         except AuthFailed as exc:
             # Terminal, never retried: the credential this node holds is not one the bridge will
@@ -141,7 +192,13 @@ def _backoff_delay(attempt: int) -> float:
     return base + jitter
 
 
-def _resolve_credential(pair_code: str | None, credential_file: Path) -> str:
+def _resolve_credential(
+    pair_code: str | None, credential: str | None, credential_file: Path
+) -> str:
+    if credential is not None:
+        if not credential:
+            raise SystemExit("--credential must not be empty")
+        return credential
     if credential_file.exists():
         stored = credential_file.read_text().strip()
         if stored:
@@ -155,12 +212,21 @@ def _resolve_credential(pair_code: str | None, credential_file: Path) -> str:
 
 
 async def _connect_and_serve(
-    url: str, name: str, faults: FaultConfig, pair_code: str | None, credential_file: Path
+    url: str,
+    name: str,
+    faults: FaultConfig,
+    pair_code: str | None,
+    credential: str | None,
+    credential_file: Path,
+    descriptors: tuple[CapabilityDescriptor, ...],
 ) -> None:
-    credential = _resolve_credential(pair_code, credential_file)
+    resolved_credential = _resolve_credential(pair_code, credential, credential_file)
     async with aiohttp.ClientSession() as session, session.ws_connect(url, heartbeat=15.0) as ws:
         hello = Hello(
-            hdp_versions=(0,), device_name=name, capabilities=_DESCRIPTORS, credential=credential
+            hdp_versions=(0,),
+            device_name=name,
+            capabilities=descriptors,
+            credential=resolved_credential,
         )
         await ws.send_str(json.dumps(Envelope.new("hello", hello.to_wire()).to_wire()))
 
@@ -179,7 +245,7 @@ async def _connect_and_serve(
             raise ConnectionError(f"expected welcome, got {welcome_envelope.type!r}")
         welcome = Welcome.from_wire(welcome_envelope.payload)
         logger.info("connected as device_id=%s", welcome.device_id)
-        if welcome.credential is not None:
+        if welcome.credential is not None and credential is None:
             # First-time pairing just completed — persist the newly-issued credential so every
             # future connect (this run's own reconnects, and any later invocation of this CLI
             # against the same --credential-file) authenticates as a returning device instead.
@@ -250,7 +316,14 @@ class _NodeSession:
     async def _handle_invoke(self, envelope: Envelope) -> None:
         invocation_id = envelope.corr
         capability = envelope.payload.get("capability")
+        version = envelope.payload.get("version")
         args = envelope.payload.get("args", {})
+        logger.info(
+            "received invoke invocation_id=%s capability=%s version=%s",
+            invocation_id,
+            capability,
+            version,
+        )
 
         if self._faults.drop_connection_mid_call:
             await self._ws.close()
@@ -280,8 +353,8 @@ class _NodeSession:
                 ok=False,
                 data=None,
                 error={
-                    "code": "capability_unsupported",
-                    "message": f"no local handler for {capability!r}",
+                    "code": "policy_denied",
+                    "message": f"local policy denies {capability!r}",
                     "hint": "",
                 },
             )

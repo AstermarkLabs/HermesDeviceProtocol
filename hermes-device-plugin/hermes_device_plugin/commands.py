@@ -35,7 +35,7 @@ from typing import Any
 
 from . import cli
 
-_USAGE = "usage: /hdp {status,devices,audit}"
+_USAGE = "usage: /hdp {status,devices,audit,approvals,policy}"
 _CLI_ONLY = (
     "{verb} is available only from the operator CLI: run `{command}` in a terminal. "
     "It writes to the device registry and audit log directly, which the always-running "
@@ -77,6 +77,20 @@ async def _dispatch(argv: list[str]) -> str:
 
     if command == "audit":
         return await cli.render_audit()
+
+    if command == "approvals":
+        if not rest or rest[0] == "list":
+            return await cli.render_approvals()
+        if rest[0] in {"approve", "deny"} and len(rest) >= 2:
+            scope = rest[3] if len(rest) >= 4 and rest[2] == "--scope" else "one_time"
+            return await cli.resolve_approval(rest[1], rest[0], scope)
+        return (
+            "usage: /hdp approvals {list|approve <invocation_id> [--scope <scope>]|"
+            "deny <invocation_id>}"
+        )
+
+    if command == "policy":
+        return await cli.render_policy(reload=bool(rest and rest[0] == "reload"))
 
     return f"unknown /hdp subcommand: {command!r} — {_USAGE}"
 

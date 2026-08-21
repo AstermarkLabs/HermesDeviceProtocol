@@ -19,6 +19,39 @@ Top-level shape:
 - `tests/`: cross-package unit, conformance, and M4 acceptance suites.
 - `android/`: reserved for M5+.
 
+## M4 real-Hermes acceptance
+
+The seed success criterion runs through an unmodified real Hermes process, the plugin, the
+standalone bridge, and the reference node. Normal `make test` runs remain hermetic: the
+credentialed test skips unless it is explicitly selected with `make acceptance` and these values:
+
+```bash
+export HDP_ACCEPTANCE_PROVIDER=<openrouter|openai|anthropic|nous>
+export HDP_ACCEPTANCE_MODEL=<provider-model-id>
+# Export the API-key variable required by the selected provider.
+make acceptance
+```
+
+The protected-main CI job uses a runner labelled `self-hosted`, `linux`, `x64`, and `hermes-m4`.
+That runner provides Hermes v0.20.0 at commit
+`069551d19bc572744ed570dc51b82ee4b0efb6c8` under `~/.hermes/hermes-agent`, its Python 3.11.15
+environment, and `hermes` on `PATH`. Repository variables select
+`HDP_ACCEPTANCE_PROVIDER`/`HDP_ACCEPTANCE_MODEL`; the single
+`HDP_ACCEPTANCE_PROVIDER_API_KEY` secret is exposed only to the final acceptance step and only
+under the selected provider's expected environment-variable name. The test creates a temporary
+`HERMES_HOME`, verifies that the executable reports the prepared checkout as its install
+directory, and asserts that checkout is clean before and after.
+
+The green acceptance job does not replace the manual release ritual:
+
+- Run gateway mode, not only `hermes chat -q`; the two modes take different async branches.
+- Run `HERMES_HOME=~/.hermes/profiles/coder hermes hdp devices` to verify profile isolation.
+- Confirm `grep -ci "event loop is closed" ~/.hermes/logs/agent.log` returns `0`.
+- With two nodes connected, kill and restart the bridge mid-conversation; confirm chat survives
+  and candidate resolution is rebuilt from SQLite and reconnected nodes.
+- Soak for one hour while nodes connect, re-advertise, and disconnect; check file descriptors,
+  threads, registry capability state, and pending invocations for growth.
+
 ## M0 status
 
 M0 (plugin spike) is implemented and passed its exit gate (m0-plan.md §8) against a real Hermes

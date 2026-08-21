@@ -1,3 +1,4 @@
+import pytest
 from hdp_proto.errors import ErrorCode, err, ok
 
 
@@ -25,6 +26,26 @@ def test_err_accepts_an_exception_as_detail():
 def test_err_hint_override():
     result = err(ErrorCode.NOT_IMPLEMENTED, "x", hint="custom hint")
     assert result["error"]["hint"] == "custom hint"
+
+
+def test_err_carries_structured_context_without_overwriting_core_fields():
+    result = err(
+        ErrorCode.VERSION_INCOMPATIBLE,
+        "no overlap",
+        extras={"node_supports": [99], "plugin_supports": [1, 2]},
+    )
+
+    assert result["error"] == {
+        "code": "version_incompatible",
+        "message": "no overlap",
+        "hint": "No mutually supported capability version. Call device_status_get to see the "
+        "device's advertised versions.",
+        "node_supports": [99],
+        "plugin_supports": [1, 2],
+    }
+
+    with pytest.raises(ValueError, match="reserved error field"):
+        err(ErrorCode.DEVICE_OFFLINE, "x", extras={"code": "wrong"})
 
 
 def test_error_codes_are_unique_string_values():

@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
+import logging
 import threading
 from collections.abc import Coroutine
 from typing import Any, TypeVar
@@ -29,12 +30,69 @@ try:
 except ImportError:  # pragma: no cover — bare `pytest` runs with no Hermes on sys.path
     from ._singleton import lazy_singleton
 
-from .transport.base import BridgeTransport
+from .transport.base import BridgeStatus, BridgeTransport, DeviceInfo
 from .transport.socket import SocketTransport
 
 T = TypeVar("T")
 
 _HDP_THREAD_NAME = "hdp-runtime"
+_AVAILABILITY_POLL_INTERVAL_S = 5.0
+_AVAILABILITY_REFRESH_TIMEOUT_S = 0.5
+
+logger = logging.getLogger(__name__)
+
+
+class _CapabilityAvailability:
+    """Lock-protected capability snapshot read synchronously by Hermes ``check_fn`` calls.
+
+    ``None`` is the startup state and intentionally means visible. Tool discovery must not
+    construct the runtime, and hiding a tool before the first live bridge sample would make an
+    unknown state look authoritatively unavailable.
+    """
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._available: frozenset[str] | None = None
+
+    def is_available(self, capability: str) -> bool:
+        with self._lock:
+            available = self._available
+        return available is None or capability in available
+
+    def update(self, status: BridgeStatus, devices: list[DeviceInfo]) -> None:
+        available: frozenset[str]
+        if not status.healthy:
+            available = frozenset()
+        else:
+            available = frozenset(
+                capability.name
+                for device in devices
+                if device.online and device.state == "active"
+                for capability in device.capabilities
+            )
+        with self._lock:
+            self._available = available
+
+    def reset_unknown(self) -> None:
+        with self._lock:
+            self._available = None
+
+
+_availability = _CapabilityAvailability()
+
+
+def capability_available(capability: str) -> bool:
+    """Return the latest visibility hint without creating or contacting the runtime."""
+    return _availability.is_available(capability)
+
+
+def _update_availability(status: BridgeStatus, devices: list[DeviceInfo]) -> None:
+    """Publish one complete live bridge sample (also the focused-test seam)."""
+    _availability.update(status, devices)
+
+
+def _reset_availability_for_tests() -> None:
+    _availability.reset_unknown()
 
 
 class HDPRuntime:
@@ -76,6 +134,12 @@ class HDPRuntime:
         time, including before `start()` even begins, and this coroutine simply won't look at it
         until `start()` is done."""
         await self.transport.start()
+        # Let a caller that triggered lazy construction submit its original operation before the
+        # first advisory poll. The transport supports multiplexing, but discovery should never
+        # add latency to the operation that caused the runtime to exist in the first place.
+        next_availability_poll = asyncio.get_running_loop().time() + min(
+            0.25, _AVAILABILITY_POLL_INTERVAL_S
+        )
         # noqa: ASYNC110 — ruff's suggested fix (`asyncio.Event`) isn't safe here: `close()` sets
         # `_close_requested` from a *different OS thread*, and `asyncio.Event.set()` is not
         # thread-safe without routing through `call_soon_threadsafe` — which is exactly the
@@ -83,7 +147,35 @@ class HDPRuntime:
         # above). A `threading.Event`, polled, is the correct primitive for a flag set from
         # another thread and read from a coroutine.
         while not self._close_requested.is_set():  # noqa: ASYNC110
+            now = asyncio.get_running_loop().time()
+            if now >= next_availability_poll:
+                await self._refresh_availability()
+                next_availability_poll = now + _AVAILABILITY_POLL_INTERVAL_S
             await asyncio.sleep(0.05)
+
+    async def _refresh_availability(self) -> None:
+        """Publish one bounded live sample, retaining the last hint when sampling fails.
+
+        A timed-out transport call is cancelled by ``asyncio.timeout`` so advisory discovery can
+        never pin the runtime thread past shutdown. Unknown therefore stays visible until the
+        first complete sample, and a later transient failure preserves the last complete sample.
+        An explicit unhealthy status is a complete sample and still hides capability tools.
+        """
+        try:
+            async with asyncio.timeout(_AVAILABILITY_REFRESH_TIMEOUT_S):
+                status = await self.transport.status()
+                devices = await self.transport.list_devices()
+        except TimeoutError:
+            logger.warning(
+                "timed out refreshing HDP capability availability; retaining last snapshot"
+            )
+            return
+        except Exception:  # noqa: BLE001
+            logger.exception(
+                "failed to refresh HDP capability availability; retaining last snapshot"
+            )
+            return
+        _update_availability(status, devices)
 
     @property
     def loop(self) -> asyncio.AbstractEventLoop:
@@ -114,5 +206,5 @@ class HDPRuntime:
 @lazy_singleton
 def get_runtime() -> HDPRuntime:
     """The one `HDPRuntime` for this process, built at first use. Do not call this from a
-    `check_fn` — see `tools.runtime_healthy`, which must not force construction (D6)."""
+    `check_fn` — see `tools.notifications_available`, which must not force construction (D6)."""
     return HDPRuntime()

@@ -30,8 +30,8 @@ async def test_invoke_round_trips_through_the_real_codec_and_succeeds():
     await transport.start()
     request = InvokeRequest(
         capability="notifications.send",
-        version=1,
-        device_id=None,
+        acceptable_versions=(1,),
+        requested_device_id=None,
         args={"title": "t", "body": "b"},
         deadline_ms=1000,
     )

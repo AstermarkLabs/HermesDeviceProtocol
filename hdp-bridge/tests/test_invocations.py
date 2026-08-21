@@ -146,3 +146,34 @@ async def test_fail_all_fails_every_pending_invocation_regardless_of_device():
         await entry_a.ack_future
     with pytest.raises(DeviceDisconnected):
         await entry_b.ack_future
+
+
+async def test_connection_scoped_failure_does_not_touch_replacement_dispatch():
+    old_connection = object()
+    replacement_connection = object()
+    invocations = InvocationsMem()
+    old_id, old_entry = invocations.mint_for("dev_a", connection=old_connection)
+    new_id, new_entry = invocations.mint_for("dev_a", connection=replacement_connection)
+
+    failed = invocations.fail_all_for_connection(old_connection)
+
+    assert failed == [old_id]
+    with pytest.raises(DeviceDisconnected):
+        await old_entry.ack_future
+    assert invocations.is_pending(new_id)
+    assert not new_entry.ack_future.done()
+
+
+async def test_ack_and_result_must_come_from_dispatch_connection():
+    owner = object()
+    stale = object()
+    invocations = InvocationsMem()
+    invocation_id, entry = invocations.mint_for("dev_a", connection=owner)
+
+    assert invocations.mark_acked(invocation_id, connection=stale) is False
+    assert invocations.resolve(invocation_id, {"ok": True}, connection=stale) is False
+    assert not entry.ack_future.done()
+    assert invocations.is_pending(invocation_id)
+
+    assert invocations.mark_acked(invocation_id, connection=owner) is True
+    assert invocations.resolve(invocation_id, {"ok": True}, connection=owner) is True

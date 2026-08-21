@@ -17,6 +17,8 @@ _FSYNC_EVENTS = frozenset(
         "daemon_start",
         "daemon_stop",
         "rejected_control_verb",
+        "approval_decided",
+        "policy_changed",
     }
 )
 

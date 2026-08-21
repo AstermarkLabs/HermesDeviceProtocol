@@ -83,6 +83,15 @@ def test_unknown_type_raises_the_specific_subclass(overrides):
         Envelope.from_wire(_valid_wire(**overrides))
 
 
+@pytest.mark.parametrize(
+    "message_type",
+    ["ctl_policy_show", "ctl_policy_show_reply", "ctl_policy_reload", "ctl_policy_reload_reply"],
+)
+def test_operator_policy_control_types_are_known(message_type):
+    """M3 policy inspection stays on the daemon control plane, never a plugin file read."""
+    assert Envelope.from_wire(_valid_wire(type=message_type)).type == message_type
+
+
 def test_both_subclasses_are_still_catchable_as_envelope_error():
     with pytest.raises(EnvelopeError):
         Envelope.from_wire(_valid_wire(hdp="1"))

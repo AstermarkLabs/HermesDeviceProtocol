@@ -46,6 +46,22 @@ async def pair_new() -> str:
     return code
 
 
+async def control_request(verb: str, payload: dict) -> Envelope:
+    """Make one operator control-plane request without importing the plugin transport."""
+    try:
+        reader, writer = await asyncio.open_unix_connection(str(config.control_socket_path()))
+    except (FileNotFoundError, ConnectionRefusedError, OSError) as exc:
+        from hdp_proto.errors import ErrorCode, err
+
+        return Envelope.new("error", err(ErrorCode.BRIDGE_UNAVAILABLE, exc)["error"])
+    try:
+        request = Envelope.new(verb, payload)
+        await write_frame(writer, request.to_wire())
+        return Envelope.from_wire(await read_frame(reader))
+    finally:
+        writer.close()
+
+
 def revoke_failed(message: str) -> bool:
     """True when `revoke()`'s return value describes a failure rather than a completed revoke.
 

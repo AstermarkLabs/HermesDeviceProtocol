@@ -18,7 +18,7 @@ from typing import Any, TypeVar
 from hdp_proto.errors import ErrorCode, err, ok
 
 from . import engine
-from .runtime import get_runtime
+from .runtime import capability_available, get_runtime
 
 logger = logging.getLogger(__name__)
 
@@ -27,18 +27,24 @@ T = TypeVar("T")
 Handler = Callable[..., Awaitable[str]]
 
 
-def runtime_healthy() -> bool:
-    """`check_fn` for `device_notifications_send` and `hdp_echo`.
+def notifications_available() -> bool:
+    """Visibility hint for ``notifications.send``; never an invocation gate.
 
-    Per ADR-0003, `check_fn` is a **hint with a staleness window, never a gate** — no code path
-    in `engine.py` consults it or anything derived from it. It must also never force the
-    `HDPRuntime` singleton to build (D6): building it as a side effect of `hermes plugins list`
-    would make the tool count observed there a different test than it looks like. Nothing at M0
-    can actually fail before the runtime exists, so this is honestly `True` until the runtime is
-    built and can report otherwise — M4 wires this to `HDPRuntime`'s real health signal and
-    writes the docstring text that documents the hint-not-gate contract (m0-plan.md §5.2).
+    Hermes may cache this result for about 90 seconds. ``device_status_get`` is the authoritative
+    current answer. Unknown startup state stays visible, and this synchronous read never creates
+    the runtime. Invocation independently resolves live state and does not consume this snapshot.
     """
-    return True
+    return capability_available("notifications.send")
+
+
+def echo_available() -> bool:
+    """Visibility hint for ``diagnostics.echo``; never an invocation gate.
+
+    Hermes may cache this result for about 90 seconds. ``device_status_get`` is the authoritative
+    current answer. Unknown startup state stays visible, and this synchronous read never creates
+    the runtime. Invocation independently resolves live state and does not consume this snapshot.
+    """
+    return capability_available("diagnostics.echo")
 
 
 def _handler(fn: Callable[..., Awaitable[dict[str, Any]]]) -> Handler:
@@ -102,7 +108,27 @@ async def _status_get_body() -> dict[str, Any]:
     serialization is `_handler`'s job, not this function's.
     """
     devices = await get_runtime().transport.list_devices()
-    return ok({"devices": [d.device_id for d in devices]})
+    return ok(
+        {
+            "devices": [
+                {
+                    "device_id": device.device_id,
+                    "friendly_name": device.friendly_name,
+                    "platform": device.platform,
+                    "online": device.online,
+                    "state": device.state,
+                    "client_version": device.client_version,
+                    "first_paired_at": device.first_paired_at,
+                    "last_seen_at": device.last_seen_at,
+                    "capabilities": [
+                        {"name": capability.name, "version": capability.version}
+                        for capability in device.capabilities
+                    ],
+                }
+                for device in devices
+            ]
+        }
+    )
 
 
 async def _echo(args: dict[str, Any], **kwargs: Any) -> dict[str, Any]:

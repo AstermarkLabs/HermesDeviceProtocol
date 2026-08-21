@@ -82,7 +82,7 @@ class InprocTransport:
         # InvokeRequest docstring). The pending-table discipline is exercised even though
         # nothing here can actually time out or be cancelled yet.
         invocation_id, _entry = self._invocations.mint_for(
-            req.device_id or "loopback", capability=req.capability
+            req.requested_device_id or "loopback", capability=req.capability
         )
 
         # Round-trip through the real codec so this stub exercises hdp_proto end to end, even

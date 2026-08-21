@@ -58,6 +58,10 @@ CONTROL_TYPES = frozenset(
         "ctl_devices_list_detailed_reply",
         "ctl_audit_tail",
         "ctl_audit_tail_reply",
+        "ctl_policy_show",
+        "ctl_policy_show_reply",
+        "ctl_policy_reload",
+        "ctl_policy_reload_reply",
         # Always rejected with `auth_failed`, from any connection (control.py's `_REJECTED_VERBS`)
         # — still a *known* type so the rejection happens at the dispatch layer where it can be
         # audited, not silently at the codec layer as an unparseable frame.

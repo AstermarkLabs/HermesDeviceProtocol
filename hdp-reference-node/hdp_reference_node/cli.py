@@ -48,7 +48,8 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Bridge WebSocket URL. Defaults to discovering $HERMES_HOME/hdp/bridge.addr.",
     )
-    connect.add_argument(
+    credentials = connect.add_mutually_exclusive_group()
+    credentials.add_argument(
         "--pair-code",
         default=None,
         dest="pair_code",
@@ -56,6 +57,15 @@ def build_parser() -> argparse.ArgumentParser:
             "First-time pairing code (M2, m2-plan.md §4). Required on a node's very first "
             "connection unless --credential-file already holds a stored credential from a "
             "previous pairing."
+        ),
+    )
+    credentials.add_argument(
+        "--credential",
+        default=None,
+        help=(
+            "Existing device credential to use for this process only. When provided, the "
+            "credential file is neither read nor written, allowing multiple nodes to run "
+            "without changing the stored default credential."
         ),
     )
     connect.add_argument(
@@ -66,6 +76,17 @@ def build_parser() -> argparse.ArgumentParser:
             "Path this reference node reads its stored device credential from, and writes the "
             "bridge-issued credential to on a successful first-time pairing (M2). Defaults to "
             "./.hdp-node-credential for the reference implementation's convenience."
+        ),
+    )
+    connect.add_argument(
+        "--capability-version",
+        action="append",
+        default=[],
+        dest="capability_versions",
+        metavar="NAME@N",
+        help=(
+            "Conformance-only advertised capability version override, repeatable. Overrides "
+            "replace the built-in version set for each named capability."
         ),
     )
     connect.add_argument(
@@ -90,19 +111,32 @@ def main(argv: list[str] | None = None) -> None:
         url = args.url or _default_bridge_url()
         faults = FaultConfig.parse(args.faults)
         try:
+            descriptors = node.descriptors_for_overrides(args.capability_versions)
+        except ValueError as exc:
+            parser.error(str(exc))
+        try:
             asyncio.run(
                 node.run(
                     url,
                     args.name,
                     faults,
                     pair_code=args.pair_code,
+                    credential=args.credential,
                     credential_file=Path(args.credential_file),
+                    descriptors=descriptors,
                 )
             )
         except node.AuthFailed as exc:
             # A terminal, operator-actionable condition (revoked or unknown credential, expired
             # pairing code) — a one-line diagnosis and a nonzero exit, not a traceback.
-            raise SystemExit(
-                f"{exc}. Re-pair with `hdp-bridge pair new` and `--pair-code`, "
-                f"after removing {args.credential_file}."
-            ) from exc
+            if args.credential is not None:
+                remediation = (
+                    "Verify the process-only `--credential` value or re-pair this node; "
+                    "the shared credential file was not used or changed."
+                )
+            else:
+                remediation = (
+                    "Re-pair with `hdp-bridge pair new` and `--pair-code`, "
+                    f"after removing {args.credential_file}."
+                )
+            raise SystemExit(f"{exc}. {remediation}") from exc

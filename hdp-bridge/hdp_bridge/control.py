@@ -23,19 +23,19 @@ import socket
 import sqlite3
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
-from hdp_proto.capabilities import SchemaValidationError, validate_output
+from hdp_proto.capabilities import CapabilityDescriptor, SchemaValidationError, validate_output
 from hdp_proto.envelope import Envelope, EnvelopeError
 from hdp_proto.errors import ErrorCode, err
 
 from . import config
 from . import revocation as _revocation
-from .invocations import DeviceDisconnected
+from .approvals import ApprovalManager, ApprovalScope, ApprovalState, UnknownApprovalError
+from .invocations import DeviceDisconnected, PendingInvocation
+from .policy import Decision, Mode, PolicyEngine, PolicyTable
 
 if TYPE_CHECKING:
-    from hdp_proto.capabilities import CapabilityDescriptor
-
     from .audit import AuditWriter
     from .connection import NodeConnection
     from .invocations import InvocationsMem
@@ -45,6 +45,9 @@ logger = logging.getLogger(__name__)
 
 _MAX_FRAME_BYTES = 16 * 1024 * 1024
 _REJECTED_VERBS = frozenset({"ctl_policy_set", "ctl_pair_mint"})
+_SENSITIVE_CAPABILITIES = frozenset(
+    {"camera.capture", "location.current", "screen.capture", "clipboard.read"}
+)
 
 
 @dataclass(frozen=True)
@@ -59,13 +62,120 @@ class _InvokeReq:
     deadline_ms: int
 
 
-def _invoke_failure(invocation_id: str, code: ErrorCode, detail: str) -> Envelope:
+@dataclass(frozen=True)
+class _ResolvedTarget:
+    """One invocation's live selection and immutable dispatch descriptor."""
+
+    device_id: str
+    connection: NodeConnection
+    version: int
+    descriptor: CapabilityDescriptor
+
+
+@dataclass(frozen=True)
+class _ValidatedInvoke:
+    """A control invocation after its untrusted payload has passed shape validation."""
+
+    capability: str
+    acceptable_versions: list[int]
+    requested_device_id: str | None
+    args: dict[str, Any]
+    deadline_ms: int
+    meta: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class _ResolutionFailure:
+    reply: Envelope
+    device_id: str | None = None
+
+
+def _invoke_failure(
+    invocation_id: str,
+    code: ErrorCode,
+    detail: str,
+    *,
+    extras: dict[str, Any] | None = None,
+) -> Envelope:
     """A failed `ctl_invoke_reply`, mirroring `embedded.py`'s `_failure` helper. `invocation_id`
     is `""` for the two failures that happen before an id is minted."""
     return Envelope.new(
         "ctl_invoke_reply",
-        {"invocation_id": invocation_id, "ok": False, "error": err(code, detail)["error"]},
+        {
+            "invocation_id": invocation_id,
+            "ok": False,
+            "error": err(code, detail, extras=extras)["error"],
+        },
     )
+
+
+def _malformed_invoke(detail: str) -> Envelope:
+    """Use the control protocol's generic malformed-envelope reply for an invalid payload."""
+    return Envelope.new(
+        "error",
+        err(ErrorCode.NOT_IMPLEMENTED, f"malformed ctl_invoke: {detail}")["error"],
+    )
+
+
+def _validate_invoke_payload(payload: dict[str, Any]) -> _ValidatedInvoke | Envelope:
+    capability = payload.get("capability")
+    if not isinstance(capability, str) or not capability:
+        return _malformed_invoke("capability must be a non-empty string")
+
+    acceptable_versions = payload.get("acceptable_versions")
+    if not isinstance(acceptable_versions, list) or not acceptable_versions:
+        return _malformed_invoke("acceptable_versions must be a non-empty list")
+    if any(
+        not isinstance(version, int) or isinstance(version, bool) or version <= 0
+        for version in acceptable_versions
+    ):
+        return _malformed_invoke("acceptable_versions must contain positive integers")
+    if len(set(acceptable_versions)) != len(acceptable_versions):
+        return _malformed_invoke("acceptable_versions must not contain duplicates")
+
+    requested_device_id = payload.get("requested_device_id")
+    if requested_device_id is not None and (
+        not isinstance(requested_device_id, str) or not requested_device_id
+    ):
+        return _malformed_invoke("requested_device_id must be null or a non-empty string")
+
+    args = payload.get("args")
+    if not isinstance(args, dict):
+        return _malformed_invoke("args must be an object")
+    meta = payload.get("meta")
+    if not isinstance(meta, dict):
+        return _malformed_invoke("meta must be an object")
+
+    deadline_ms = payload.get("deadline_ms")
+    if not isinstance(deadline_ms, int) or isinstance(deadline_ms, bool) or deadline_ms <= 0:
+        return _malformed_invoke("deadline_ms must be a positive integer")
+
+    return _ValidatedInvoke(
+        capability=capability,
+        acceptable_versions=acceptable_versions,
+        requested_device_id=requested_device_id,
+        args=args,
+        deadline_ms=deadline_ms,
+        meta=meta,
+    )
+
+
+def _approval_args_summary(args: object, *, byte_limit: int = 512) -> str:
+    """Render approval-safe arguments without ever putting raw values into SQLite or prompts."""
+    if not isinstance(args, dict):
+        return "(0 fields, 0 bytes)"
+    secret_markers = ("token", "secret", "password", "key", "credential", "authorization")
+    parts: list[str] = []
+    for key, value in args.items():
+        name = str(key)
+        rendered = (
+            "<redacted>"
+            if any(marker in name.lower() for marker in secret_markers)
+            else repr(value)
+        )
+        parts.append(f"{name}={rendered[:80]}")
+    summary = " ".join(parts) + f" ({len(args)} fields)"
+    return summary.encode("utf-8")[:byte_limit].decode("utf-8", errors="ignore")
 
 
 def _correlate(reply: Envelope, request: Envelope) -> Envelope:
@@ -95,6 +205,21 @@ def _log_task_exception(task: asyncio.Task) -> None:
         logger.error("control-plane task failed: %r", exc, exc_info=exc)
 
 
+async def _cancel_and_drain(*futures: asyncio.Future[Any]) -> None:
+    """Cancel unfinished lifecycle futures and consume every terminal exception."""
+    for future in futures:
+        if not future.done():
+            future.cancel()
+    await asyncio.gather(*futures, return_exceptions=True)
+
+
+def _raise_if_cancelling() -> None:
+    """Surface a cancel request that an await of an already-done future did not suspend for."""
+    task = asyncio.current_task()
+    if task is not None and task.cancelling():
+        raise asyncio.CancelledError
+
+
 async def read_frame(reader: asyncio.StreamReader) -> dict:
     header = await reader.readexactly(4)
     length = int.from_bytes(header, "big")
@@ -118,18 +243,22 @@ class ControlServer:
         registry: Registry,
         invocations: InvocationsMem,
         connections: dict[str, NodeConnection],
-        descriptors: dict[str, dict[str, CapabilityDescriptor]] | None = None,
+        descriptors: dict[str, dict[tuple[str, int], CapabilityDescriptor]] | None = None,
         conn: sqlite3.Connection | None = None,
         audit: AuditWriter | None = None,
+        approvals: ApprovalManager | None = None,
+        policy: PolicyEngine | None = None,
     ) -> None:
         self._socket_path = socket_path
         self._registry = registry
         self._invocations = invocations
         self._connections = connections
-        self._descriptors: dict[str, dict[str, CapabilityDescriptor]] = (
+        self._descriptors: dict[str, dict[tuple[str, int], CapabilityDescriptor]] = (
             descriptors if descriptors is not None else {}
         )
         self._audit = audit
+        self._approvals = approvals
+        self._policy = policy
         # A raw `sqlite3.Connection`, distinct from `registry`'s own internal one (see
         # `daemon.py`'s NOTE on the two-connections deviation) — needed only by
         # `ctl_devices_revoke`, which operates below `Registry`'s device-record API via
@@ -284,6 +413,7 @@ class ControlServer:
         preserves the obvious ordering guarantee for the operator verbs.
         """
         connection_tasks: set[asyncio.Task[None]] = set()
+        request_tasks: dict[str, asyncio.Task[None]] = {}
         # One `write_frame` at a time per connection. `write_frame`'s single `writer.write(...)`
         # call keeps frames from splitting each other, but `writer.drain()` is not itself safe to
         # call concurrently on one `StreamWriter` — two callers racing it under backpressure can
@@ -313,10 +443,25 @@ class ControlServer:
                         self._invoke_and_reply(envelope, writer, write_lock)
                     )
                     connection_tasks.add(task)
+                    request_tasks[envelope.id] = task
                     self._invoke_tasks.add(task)
                     task.add_done_callback(connection_tasks.discard)
                     task.add_done_callback(self._invoke_tasks.discard)
+                    task.add_done_callback(
+                        lambda _task, request_id=envelope.id: request_tasks.pop(request_id, None)
+                    )
                     task.add_done_callback(_log_task_exception)
+                    continue
+                if envelope.type == "ctl_cancel" and isinstance(
+                    envelope.payload.get("control_request_id"), str
+                ):
+                    request_id = envelope.payload["control_request_id"]
+                    invoke_task = request_tasks.get(request_id)
+                    if invoke_task is not None:
+                        invoke_task.cancel()
+                    reply = Envelope.new("ctl_cancel_reply", {"cancelled": invoke_task is not None})
+                    async with write_lock:
+                        await write_frame(writer, _correlate(reply, envelope).to_wire())
                     continue
                 reply = await self._dispatch(envelope)
                 async with write_lock:
@@ -366,6 +511,10 @@ class ControlServer:
             "ctl_devices_revoke": self._ctl_devices_revoke,
             "ctl_devices_list_detailed": self._ctl_devices_list_detailed,
             "ctl_audit_tail": self._ctl_audit_tail,
+            "ctl_list_approvals": self._ctl_list_approvals,
+            "ctl_resolve_approval": self._ctl_resolve_approval,
+            "ctl_policy_show": self._ctl_policy_show,
+            "ctl_policy_reload": self._ctl_policy_reload,
         }.get(envelope.type)
         if handler is None:
             detail = f"unknown control verb {envelope.type!r}"
@@ -389,82 +538,548 @@ class ControlServer:
         return Envelope.new("ctl_list_devices_reply", {"devices": devices})
 
     async def _ctl_invoke(self, envelope: Envelope) -> Envelope:
-        """The plugin-reachable half of the ack-timeout/execution-deadline race — a faithful port
-        of `EmbeddedTransport.invoke` (hermes_device_plugin/transport/embedded.py), adapted to
-        operate on this server's own `_connections`/`_invocations`/`_descriptors` rather than an
-        `EmbeddedTransport` instance's. See that file's docstring/comments for why each step is
-        ordered the way it is (FR-30's removal-before-cancel rule, the ack/deadline split, the
-        output-schema validation) — none of that reasoning is repeated here, only the code.
-        """
-        payload = envelope.payload
-        device_id = payload.get("device_id")
-        capability = payload.get("capability")
-        version = payload.get("version")
-        args = payload.get("args") or {}
-        raw_deadline_ms = payload.get("deadline_ms")
-        # `deadline_ms` arrives off the wire, unlike `embedded.py`'s dataclass-typed
-        # `InvokeRequest` where it's always a real int. A missing/non-positive value is coerced
-        # to `0` explicitly (not `or 0`'s incidental effect) so the execution-deadline
-        # `wait_for` below fails fast with `invocation_timeout` instead of hanging or crashing on
-        # a malformed frame — the ack race still runs and can still fail with `device_offline`
-        # first, exactly as it would for a legitimately-short deadline.
-        deadline_ms_is_valid = (
-            isinstance(raw_deadline_ms, int)
-            and not isinstance(raw_deadline_ms, bool)
-            and raw_deadline_ms > 0
-        )
-        deadline_ms = raw_deadline_ms if deadline_ms_is_valid else 0
-
-        if not device_id:
-            return _invoke_failure(
-                "", ErrorCode.NO_MATCHING_DEVICE, "invoke requires a resolved device_id"
+        """Resolve live state, authorize one snapshot, dispatch, then validate."""
+        validated = _validate_invoke_payload(envelope.payload)
+        if isinstance(validated, Envelope):
+            return self._audit_invoke_failure(
+                validated,
+                capability=envelope.payload.get("capability"),
+                requested_device_id=envelope.payload.get("requested_device_id"),
             )
+        capability = validated.capability
+        acceptable_versions = validated.acceptable_versions
+        requested_device_id = validated.requested_device_id
+        args = validated.args
+        meta = validated.meta
+        deadline_ms = validated.deadline_ms
 
-        connection = self._connections.get(device_id)
-        if connection is None:
-            return _invoke_failure("", ErrorCode.DEVICE_OFFLINE, "device is not connected")
+        # Capture one immutable policy snapshot before its first consumer (default-device
+        # selection). The same object is used for authorization after selection and throughout
+        # an ASK wait, even if a hot reload replaces PolicyEngine.table in the meantime.
+        policy_table = None
+        if self._policy is not None:
+            self._policy.reload()
+            policy_table = self._policy.table
 
-        invocation_id, entry = self._invocations.mint_for(device_id, capability=capability or "")
-        req = _InvokeReq(
-            capability=capability or "", version=version or 0, args=args, deadline_ms=deadline_ms
+        resolved = self._resolve_target(
+            capability=capability,
+            acceptable_versions=acceptable_versions,
+            requested_device_id=requested_device_id,
+            policy_table=policy_table,
         )
-        await connection.send_invoke(invocation_id, req)
+        if isinstance(resolved, _ResolutionFailure):
+            return self._audit_invoke_failure(
+                resolved.reply,
+                capability=capability,
+                requested_device_id=requested_device_id,
+                selected_device_id=resolved.device_id,
+                policy_table=policy_table,
+                args=args,
+            )
+        device_id = resolved.device_id
+        version = resolved.version
+        connection = resolved.connection
+
+        invocation_id, entry = self._invocations.mint_for(
+            device_id,
+            capability=capability,
+            version=version,
+            descriptor=resolved.descriptor,
+            connection=connection,
+        )
+        decision = None
+        if policy_table is not None:
+            decision = policy_table.resolve(device_id, capability)
+            if capability in _SENSITIVE_CAPABILITIES or decision.mode is Mode.ASK:
+                self._record_sensitive_invocation(
+                    invocation_id=invocation_id,
+                    resolved=resolved,
+                    decision=decision,
+                    args=args,
+                )
+            requesting_session = meta.get("session_id")
+            if not isinstance(requesting_session, str) or not requesting_session:
+                requesting_session = None
+
+            allowed = decision.mode in {Mode.SESSION, Mode.DEVICE, Mode.ALWAYS}
+            if decision.mode is Mode.ASK and self._approvals is not None:
+                allowed = self._approvals.has_session_grant(
+                    requesting_session, device_id, capability
+                ) or self._approvals.has_database_grant(device_id, capability)
+                if not allowed:
+                    pending = self._approvals.create(
+                        invocation_id=invocation_id,
+                        device_id=device_id,
+                        capability=capability,
+                        version=version,
+                        args_summary=_approval_args_summary(args),
+                        requesting_session=requesting_session,
+                        risk_class="",
+                    )
+                    if self._audit is not None:
+                        self._audit.record(
+                            "approval_requested",
+                            invocation_id=pending.invocation_id,
+                            device_id=pending.device_id,
+                            capability=pending.capability,
+                            version=pending.version,
+                            args_summary=pending.args_summary,
+                            requesting_session=pending.requesting_session,
+                            risk_class=pending.risk_class,
+                            expires_at=pending.expires_at,
+                        )
+                    approval_task = asyncio.create_task(self._approvals.wait(invocation_id))
+                    disconnect_future = entry.disconnect_future
+                    if disconnect_future is None:  # pragma: no cover - minted entries always set it
+                        raise RuntimeError("pending invocation has no disconnect signal")
+                    try:
+                        done, _pending = await asyncio.wait(
+                            {approval_task, disconnect_future},
+                            return_when=asyncio.FIRST_COMPLETED,
+                        )
+                    except asyncio.CancelledError:
+                        self._approvals.abandon(invocation_id)
+                        self._invocations.expire(invocation_id)
+                        await _cancel_and_drain(
+                            approval_task,
+                            entry.ack_future,
+                            entry.result_future,
+                            disconnect_future,
+                        )
+                        self._record_cancelled_invocation(
+                            invocation_id=invocation_id,
+                            resolved=resolved,
+                            decision=decision,
+                            requested_device_id=requested_device_id,
+                            args=args,
+                        )
+                        raise
+                    if disconnect_future in done:
+                        self._approvals.abandon(invocation_id)
+                        reason = disconnect_future.result()
+                        # `fail_all_for_device` also fails whichever lifecycle future is still
+                        # outstanding. ASK is waiting on the separate disconnect signal, so it
+                        # must drain those unused futures or asyncio reports their exceptions as
+                        # unretrieved after this request returns.
+                        await _cancel_and_drain(
+                            approval_task,
+                            entry.ack_future,
+                            entry.result_future,
+                        )
+                        code = (
+                            ErrorCode.REVOKED if reason == "revoked" else ErrorCode.DEVICE_OFFLINE
+                        )
+                        return self._audit_invoke_failure(
+                            _invoke_failure(
+                                invocation_id,
+                                code,
+                                "device disconnected while awaiting approval",
+                            ),
+                            capability=capability,
+                            requested_device_id=requested_device_id,
+                            resolved=resolved,
+                            decision=decision,
+                            policy_table=policy_table,
+                            args=args,
+                        )
+                    resolution = approval_task.result()
+                    if self._audit is not None:
+                        self._audit.record(
+                            "approval_decided",
+                            invocation_id=invocation_id,
+                            state=resolution.state.value,
+                            scope=resolution.scope.value if resolution.scope is not None else None,
+                            decided_by=resolution.decided_by,
+                        )
+                    if resolution.state is not ApprovalState.APPROVED:
+                        self._invocations.expire(invocation_id)
+                        code = (
+                            ErrorCode.APPROVAL_TIMEOUT
+                            if resolution.state is ApprovalState.EXPIRED
+                            else ErrorCode.APPROVAL_DENIED
+                        )
+                        return self._audit_invoke_failure(
+                            _invoke_failure(invocation_id, code, "approval was not granted"),
+                            capability=capability,
+                            requested_device_id=requested_device_id,
+                            resolved=resolved,
+                            decision=decision,
+                            policy_table=policy_table,
+                            args=args,
+                        )
+                    allowed = True
+            if not allowed:
+                self._invocations.expire(invocation_id)
+                if self._audit is not None:
+                    self._audit.record(
+                        "policy_denied",
+                        invocation_id=invocation_id,
+                        device_id=device_id,
+                        capability=capability,
+                        source=decision.source,
+                        policy_seq=decision.policy_seq,
+                    )
+                return self._audit_invoke_failure(
+                    _invoke_failure(invocation_id, ErrorCode.POLICY_DENIED, "denied by policy"),
+                    capability=capability,
+                    requested_device_id=requested_device_id,
+                    resolved=resolved,
+                    decision=decision,
+                    policy_table=policy_table,
+                    args=args,
+                )
+        req = _InvokeReq(capability=capability, version=version, args=args, deadline_ms=deadline_ms)
+        try:
+            await connection.send_invoke(invocation_id, req)
+            _raise_if_cancelling()
+        except asyncio.CancelledError:
+            await self._abort_dispatched(invocation_id, entry, connection)
+            self._record_cancelled_invocation(
+                invocation_id=invocation_id,
+                resolved=resolved,
+                decision=decision,
+                requested_device_id=requested_device_id,
+                args=args,
+            )
+            raise
+        except Exception as exc:
+            await self._abort_dispatched(invocation_id, entry, connection, send_cancel=False)
+            return self._audit_invoke_failure(
+                _invoke_failure(
+                    invocation_id,
+                    ErrorCode.DEVICE_OFFLINE,
+                    f"failed to transmit invocation: {exc}",
+                ),
+                capability=capability,
+                requested_device_id=requested_device_id,
+                resolved=resolved,
+                decision=decision,
+                policy_table=policy_table,
+                args=args,
+            )
 
         # Ack timeout (5s), strictly less than the execution deadline (hdp-spec/HDP-0.md §7).
         try:
+            # A cancel can arrive after `send_invoke` returns but before this task begins its ack
+            # wait. Yield once so task cancellation is observed even when the ack future is
+            # already done (awaiting an already-done future does not itself suspend).
+            await asyncio.sleep(0)
             await asyncio.wait_for(entry.ack_future, timeout=config.ACK_TIMEOUT_S)
+            _raise_if_cancelling()
+        except asyncio.CancelledError:
+            await self._abort_dispatched(invocation_id, entry, connection)
+            self._record_cancelled_invocation(
+                invocation_id=invocation_id,
+                resolved=resolved,
+                decision=decision,
+                requested_device_id=requested_device_id,
+                args=args,
+            )
+            raise
         except TimeoutError:
             self._invocations.expire(invocation_id)  # remove first — FR-30's ordering rule
-            await connection.send_cancel(invocation_id, "ack timeout")
-            return _invoke_failure(
-                invocation_id, ErrorCode.DEVICE_OFFLINE, "device did not ack within the timeout"
+            with contextlib.suppress(Exception):
+                await connection.send_cancel(invocation_id, "ack timeout")
+            return self._audit_invoke_failure(
+                _invoke_failure(
+                    invocation_id,
+                    ErrorCode.DEVICE_OFFLINE,
+                    "device did not ack within the timeout",
+                ),
+                capability=capability,
+                requested_device_id=requested_device_id,
+                resolved=resolved,
+                decision=decision,
+                policy_table=policy_table,
+                args=args,
             )
         except DeviceDisconnected as exc:
             # `connection.py`'s disconnect handler (or `revocation.revoke_device`) already
             # removed the pending entry. `exc.reason` distinguishes an operator revocation
             # (`"revoked"`, FR-15) from an ordinary mid-call disconnect (`"device_offline"`).
             code = ErrorCode.REVOKED if exc.reason == "revoked" else ErrorCode.DEVICE_OFFLINE
-            return _invoke_failure(invocation_id, code, "device disconnected before acking")
+            return self._audit_invoke_failure(
+                _invoke_failure(invocation_id, code, "device disconnected before acking"),
+                capability=capability,
+                requested_device_id=requested_device_id,
+                resolved=resolved,
+                decision=decision,
+                policy_table=policy_table,
+                args=args,
+            )
 
         deadline_s = deadline_ms / 1000
         try:
             result_payload = await asyncio.wait_for(entry.result_future, timeout=deadline_s)
+            _raise_if_cancelling()
+        except asyncio.CancelledError:
+            await self._abort_dispatched(invocation_id, entry, connection)
+            self._record_cancelled_invocation(
+                invocation_id=invocation_id,
+                resolved=resolved,
+                decision=decision,
+                requested_device_id=requested_device_id,
+                args=args,
+            )
+            raise
         except TimeoutError:
             self._invocations.expire(invocation_id)  # remove first — FR-30's ordering rule
-            await connection.send_cancel(invocation_id, "execution deadline exceeded")
-            return _invoke_failure(
-                invocation_id,
-                ErrorCode.INVOCATION_TIMEOUT,
-                "device did not return a result within its deadline",
+            with contextlib.suppress(Exception):
+                await connection.send_cancel(invocation_id, "execution deadline exceeded")
+            return self._audit_invoke_failure(
+                _invoke_failure(
+                    invocation_id,
+                    ErrorCode.INVOCATION_TIMEOUT,
+                    "device did not return a result within its deadline",
+                ),
+                capability=capability,
+                requested_device_id=requested_device_id,
+                resolved=resolved,
+                decision=decision,
+                policy_table=policy_table,
+                args=args,
             )
         except DeviceDisconnected as exc:
             code = ErrorCode.REVOKED if exc.reason == "revoked" else ErrorCode.DEVICE_OFFLINE
-            return _invoke_failure(invocation_id, code, "device disconnected mid-call")
+            return self._audit_invoke_failure(
+                _invoke_failure(invocation_id, code, "device disconnected mid-call"),
+                capability=capability,
+                requested_device_id=requested_device_id,
+                resolved=resolved,
+                decision=decision,
+                policy_table=policy_table,
+                args=args,
+            )
 
-        return self._to_invoke_reply(invocation_id, device_id, capability, result_payload)
+        reply = self._to_invoke_reply(invocation_id, entry, result_payload)
+        return self._audit_invoke_failure(
+            reply,
+            capability=capability,
+            requested_device_id=requested_device_id,
+            resolved=resolved,
+            decision=decision,
+            policy_table=policy_table,
+            args=args,
+        )
+
+    def _audit_invoke_failure(
+        self,
+        reply: Envelope,
+        *,
+        capability: object,
+        requested_device_id: object,
+        resolved: _ResolvedTarget | None = None,
+        selected_device_id: str | None = None,
+        decision: Decision | None = None,
+        policy_table: PolicyTable | None = None,
+        args: dict[str, Any] | None = None,
+    ) -> Envelope:
+        error = reply.payload if reply.type == "error" else reply.payload.get("error")
+        code = error.get("code") if isinstance(error, dict) else None
+        if self._audit is None or not isinstance(code, str) or code == ErrorCode.AMBIGUOUS_DEVICE:
+            return reply
+        fields: dict[str, Any] = {
+            "invocation_id": reply.payload.get("invocation_id", ""),
+            "code": code,
+            "capability": capability if isinstance(capability, str) else None,
+            "requested_device_id": (
+                requested_device_id if isinstance(requested_device_id, str) else None
+            ),
+            "device_id": (resolved.device_id if resolved is not None else selected_device_id),
+            "version": resolved.version if resolved is not None else None,
+            "policy_seq": policy_table.policy_seq if policy_table is not None else None,
+            "source": decision.source if decision is not None else None,
+        }
+        if args is not None:
+            fields["args"] = args
+        self._audit.record("invocation_failed", **fields)
+        return reply
+
+    def _record_sensitive_invocation(
+        self,
+        *,
+        invocation_id: str,
+        resolved: _ResolvedTarget,
+        decision: Decision,
+        args: dict[str, Any],
+    ) -> None:
+        if self._audit is not None:
+            self._audit.record(
+                "sensitive_invocation",
+                invocation_id=invocation_id,
+                device_id=resolved.device_id,
+                capability=resolved.descriptor.name,
+                version=resolved.version,
+                policy_seq=decision.policy_seq,
+                source=decision.source,
+                args=args,
+            )
+
+    def _record_cancelled_invocation(
+        self,
+        *,
+        invocation_id: str,
+        resolved: _ResolvedTarget,
+        decision: Decision | None,
+        requested_device_id: str | None,
+        args: dict[str, Any],
+    ) -> None:
+        if self._audit is not None:
+            self._audit.record(
+                "invocation_failed",
+                invocation_id=invocation_id,
+                code=ErrorCode.BRIDGE_UNAVAILABLE.value,
+                reason="control_client_cancelled",
+                capability=resolved.descriptor.name,
+                requested_device_id=requested_device_id,
+                device_id=resolved.device_id,
+                version=resolved.version,
+                policy_seq=decision.policy_seq if decision is not None else None,
+                source=decision.source if decision is not None else None,
+                args=args,
+            )
+
+    async def _abort_dispatched(
+        self,
+        invocation_id: str,
+        entry: PendingInvocation,
+        connection: NodeConnection,
+        *,
+        send_cancel: bool = True,
+    ) -> None:
+        """Remove a cancelled/failed dispatch, then best-effort cancel and drain its futures."""
+        self._invocations.expire(invocation_id)
+        if send_cancel:
+            with contextlib.suppress(Exception):
+                await connection.send_cancel(invocation_id, "control request cancelled")
+        futures = [entry.ack_future, entry.result_future]
+        if entry.disconnect_future is not None:
+            futures.append(entry.disconnect_future)
+        await _cancel_and_drain(*futures)
+
+    def _resolve_target(
+        self,
+        *,
+        capability: str,
+        acceptable_versions: list[int],
+        requested_device_id: str | None,
+        policy_table: PolicyTable | None,
+    ) -> _ResolvedTarget | _ResolutionFailure:
+        """Resolve one target synchronously so registry and connection state cannot interleave."""
+        if requested_device_id:
+            connection = self._connections.get(requested_device_id)
+            record = self._registry.get(requested_device_id)
+            if connection is None or record is None:
+                return _ResolutionFailure(
+                    _invoke_failure(
+                        "",
+                        ErrorCode.DEVICE_OFFLINE,
+                        "the requested device is not active and online",
+                    ),
+                    requested_device_id,
+                )
+            if record.state != "active":
+                return _ResolutionFailure(
+                    _invoke_failure(
+                        "",
+                        ErrorCode.DEVICE_OFFLINE,
+                        "the requested device is not active and online",
+                    ),
+                    requested_device_id,
+                )
+            capabilities = [cap for cap in record.capabilities if cap.name == capability]
+            if not capabilities:
+                return _ResolutionFailure(
+                    _invoke_failure(
+                        "",
+                        ErrorCode.CAPABILITY_UNSUPPORTED,
+                        "the requested device does not advertise this capability",
+                    ),
+                    requested_device_id,
+                )
+            selected_record = record
+        else:
+            candidates = sorted(
+                (
+                    record
+                    for record in self._registry.list_devices()
+                    if record.state == "active"
+                    and record.device_id in self._connections
+                    and any(cap.name == capability for cap in record.capabilities)
+                ),
+                key=lambda record: record.device_id,
+            )
+            if not candidates:
+                return _ResolutionFailure(
+                    _invoke_failure(
+                        "",
+                        ErrorCode.NO_MATCHING_DEVICE,
+                        "no online device advertises this capability",
+                    )
+                )
+            if len(candidates) > 1:
+                configured_default = (
+                    policy_table.default_device_for(capability)
+                    if policy_table is not None
+                    else None
+                )
+                selected_record = next(
+                    (
+                        candidate
+                        for candidate in candidates
+                        if candidate.device_id == configured_default
+                    ),
+                    None,
+                )
+                if selected_record is None:
+                    return _ResolutionFailure(
+                        _invoke_failure(
+                            "",
+                            ErrorCode.AMBIGUOUS_DEVICE,
+                            "multiple online devices advertise this capability",
+                            extras={
+                                "candidates": [
+                                    {
+                                        "device_id": candidate.device_id,
+                                        "friendly_name": candidate.friendly_name,
+                                    }
+                                    for candidate in candidates
+                                ]
+                            },
+                        )
+                    )
+            else:
+                selected_record = candidates[0]
+            connection = self._connections[selected_record.device_id]
+            capabilities = [cap for cap in selected_record.capabilities if cap.name == capability]
+
+        node_supports = sorted({cap.version for cap in capabilities})
+        mutually_supported = set(node_supports).intersection(acceptable_versions)
+        if not mutually_supported:
+            return _ResolutionFailure(
+                _invoke_failure(
+                    "",
+                    ErrorCode.VERSION_INCOMPATIBLE,
+                    "device and plugin have no mutually supported capability version",
+                    extras={
+                        "node_supports": node_supports,
+                        "plugin_supports": acceptable_versions,
+                    },
+                ),
+                selected_record.device_id,
+            )
+        version = max(mutually_supported)
+        selected_capability = next(cap for cap in capabilities if cap.version == version)
+        descriptor = CapabilityDescriptor(
+            name=selected_capability.name,
+            version=selected_capability.version,
+            input_schema=selected_capability.input_schema,
+            output_schema=selected_capability.output_schema,
+        )
+        return _ResolvedTarget(selected_record.device_id, connection, version, descriptor)
 
     def _to_invoke_reply(
-        self, invocation_id: str, device_id: str, capability: str, result_payload: dict[str, Any]
+        self, invocation_id: str, entry: PendingInvocation, result_payload: dict[str, Any]
     ) -> Envelope:
         if not result_payload.get("ok"):
             error = result_payload.get("error")
@@ -479,7 +1094,7 @@ class ControlServer:
             )
 
         data = result_payload.get("data") or {}
-        descriptor = self._descriptors.get(device_id, {}).get(capability)
+        descriptor = entry.descriptor
         if descriptor is not None:
             try:
                 validate_output(descriptor, data)
@@ -488,7 +1103,10 @@ class ControlServer:
                 # log-only record (hdp-spec/errors.md's `schema_drift` entry) — mirrors
                 # `embedded.py`'s `_to_invoke_result`.
                 logger.warning(
-                    "schema_drift capability=%s device_id=%s detail=%s", capability, device_id, exc
+                    "schema_drift capability=%s device_id=%s detail=%s",
+                    entry.capability,
+                    entry.device_id,
+                    exc,
                 )
                 return _invoke_failure(invocation_id, ErrorCode.MALFORMED_RESULT, str(exc))
         return Envelope.new(
@@ -503,17 +1121,26 @@ class ControlServer:
         reason = envelope.payload.get("reason", "")
         entry = self._invocations.expire(invocation_id) if invocation_id else None
         if entry is not None:
-            connection = self._connections.get(entry.device_id)
-            if connection is not None:
-                await connection.send_cancel(invocation_id, reason)
             cancelled_result = {
                 "ok": False,
                 "error": err(ErrorCode.BRIDGE_UNAVAILABLE, reason)["error"],
             }
-            if not entry.ack_future.done():
-                entry.ack_future.set_result(None)
-            if not entry.result_future.done():
-                entry.result_future.set_result(cancelled_result)
+            connection = cast("NodeConnection | None", entry.connection)
+            try:
+                if connection is not None:
+                    await connection.send_cancel(invocation_id, reason)
+            except Exception as exc:
+                logger.info(
+                    "best-effort cancel failed invocation_id=%s device_id=%s detail=%s",
+                    invocation_id,
+                    entry.device_id,
+                    exc,
+                )
+            finally:
+                if not entry.ack_future.done():
+                    entry.ack_future.set_result(None)
+                if not entry.result_future.done():
+                    entry.result_future.set_result(cancelled_result)
         return Envelope.new("ctl_cancel_reply", {"ok": True})
 
     async def _ctl_status(self, envelope: Envelope) -> Envelope:
@@ -539,6 +1166,92 @@ class ControlServer:
         under a different profile's permissions."""
         lines = self._audit.read_today() if self._audit is not None else []
         return Envelope.new("ctl_audit_tail_reply", {"lines": lines})
+
+    async def _ctl_list_approvals(self, envelope: Envelope) -> Envelope:
+        """Return daemon-memory approvals; none are durable while pending."""
+        approvals = self._approvals.list_pending() if self._approvals is not None else []
+        return Envelope.new(
+            "ctl_list_approvals_reply",
+            {
+                "approvals": [
+                    {
+                        "invocation_id": approval.invocation_id,
+                        "device_id": approval.device_id,
+                        "capability": approval.capability,
+                        "version": approval.version,
+                        "args_summary": approval.args_summary,
+                        "requesting_session": approval.requesting_session,
+                        "risk_class": approval.risk_class,
+                        "created_at": approval.created_at,
+                        "expires_at": approval.expires_at,
+                    }
+                    for approval in approvals
+                ]
+            },
+        )
+
+    async def _ctl_resolve_approval(self, envelope: Envelope) -> Envelope:
+        if self._approvals is None:
+            return Envelope.new(
+                "error", err(ErrorCode.NOT_IMPLEMENTED, "approvals unavailable")["error"]
+            )
+        payload = envelope.payload
+        invocation_id = payload.get("invocation_id")
+        decision = payload.get("decision")
+        scope = payload.get("scope", "one_time")
+        if not isinstance(invocation_id, str) or decision not in {"approve", "deny"}:
+            return Envelope.new(
+                "error", err(ErrorCode.APPROVAL_DENIED, "invalid approval decision")["error"]
+            )
+        try:
+            resolution = self._approvals.resolve(
+                invocation_id,
+                approved=decision == "approve",
+                scope=ApprovalScope(scope),
+                decided_by="control_plane",
+            )
+        except (UnknownApprovalError, ValueError):
+            return Envelope.new(
+                "error", err(ErrorCode.APPROVAL_DENIED, "approval is no longer pending")["error"]
+            )
+        return Envelope.new(
+            "ctl_resolve_approval_reply",
+            {
+                "ok": True,
+                "state": resolution.state.value,
+                "scope": resolution.scope.value if resolution.scope is not None else None,
+            },
+        )
+
+    async def _ctl_policy_show(self, envelope: Envelope) -> Envelope:
+        if self._policy is None:
+            return Envelope.new(
+                "error", err(ErrorCode.NOT_IMPLEMENTED, "policy unavailable")["error"]
+            )
+        table = self._policy.table
+        return Envelope.new(
+            "ctl_policy_show_reply",
+            {
+                "policy_seq": table.policy_seq,
+                "defaults": {capability: mode.value for capability, mode in table.defaults},
+                "devices": {
+                    device_id: {capability: mode.value for capability, mode in modes}
+                    for device_id, modes in table.devices
+                },
+                "default_device": dict(table.default_devices),
+            },
+        )
+
+    async def _ctl_policy_reload(self, envelope: Envelope) -> Envelope:
+        if self._policy is None:
+            return Envelope.new(
+                "error", err(ErrorCode.NOT_IMPLEMENTED, "policy unavailable")["error"]
+            )
+        reloaded = self._policy.reload(force=True)
+        return Envelope.new(
+            "ctl_policy_reload_reply",
+            {"ok": reloaded, "policy_seq": self._policy.table.policy_seq},
+        )
 
     async def _ctl_devices_revoke(self, envelope: Envelope) -> Envelope:
         """Operator-only verb (FR-15, §4.4) — the CLI's `hdp-bridge devices revoke` reaches this

@@ -19,6 +19,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from hdp_proto import ids
+from hdp_proto.capabilities import CapabilityDescriptor
 
 
 class DeviceDisconnected(Exception):
@@ -42,7 +43,11 @@ class PendingInvocation:
     device_id: str
     ack_future: asyncio.Future[None]
     result_future: asyncio.Future[dict[str, Any]]
+    connection: object | None = None
     capability: str = ""
+    version: int = 0
+    descriptor: CapabilityDescriptor | None = None
+    disconnect_future: asyncio.Future[str] | None = None
 
 
 @dataclass
@@ -52,7 +57,15 @@ class InvocationsMem:
 
     _pending: dict[str, PendingInvocation] = field(default_factory=dict)
 
-    def mint_for(self, device_id: str, *, capability: str = "") -> tuple[str, PendingInvocation]:
+    def mint_for(
+        self,
+        device_id: str,
+        *,
+        capability: str = "",
+        version: int = 0,
+        descriptor: CapabilityDescriptor | None = None,
+        connection: object | None = None,
+    ) -> tuple[str, PendingInvocation]:
         """Mint a fresh, bridge-side invocation id (FR-28) and register it as pending."""
         loop = asyncio.get_running_loop()
         invocation_id = ids.new()
@@ -60,26 +73,41 @@ class InvocationsMem:
             device_id=device_id,
             ack_future=loop.create_future(),
             result_future=loop.create_future(),
+            connection=connection,
             capability=capability,
+            version=version,
+            descriptor=descriptor,
+            disconnect_future=loop.create_future(),
         )
         self._pending[invocation_id] = entry
         return invocation_id, entry
 
-    def mark_acked(self, invocation_id: str) -> bool:
+    def mark_acked(self, invocation_id: str, *, connection: object | None = None) -> bool:
         """Called when an `ack` frame arrives. Returns `False` (a silent no-op) for an unknown or
         already-terminal id — a late ack is not an error, just information nobody needs anymore."""
         entry = self._pending.get(invocation_id)
-        if entry is None or entry.ack_future.done():
+        if (
+            entry is None
+            or entry.ack_future.done()
+            or (connection is not None and entry.connection is not connection)
+        ):
             return False
         entry.ack_future.set_result(None)
         return True
 
-    def resolve(self, invocation_id: str, result: dict[str, Any]) -> bool:
+    def resolve(
+        self,
+        invocation_id: str,
+        result: dict[str, Any],
+        *,
+        connection: object | None = None,
+    ) -> bool:
         """Called when a `result` frame arrives. Returns `False` for an unknown id — the
         late-result path (HDP-0.md §7): dropped silently here, logged by the caller."""
-        entry = self._pending.pop(invocation_id, None)
-        if entry is None:
+        entry = self._pending.get(invocation_id)
+        if entry is None or (connection is not None and entry.connection is not connection):
             return False
+        del self._pending[invocation_id]
         # Deliberately does NOT also resolve `ack_future` here: HDP-0.md §7's ack-timeout rule is
         # strict ("a node that never acks fails early"), so a result arriving without a prior
         # explicit `ack` must not retroactively count as one — that would let a node skip acking
@@ -122,8 +150,19 @@ class InvocationsMem:
         not just through `ctl_invoke`'s sequential await)."""
         return self._fail(device_id=device_id, reason=reason, fail_both=fail_both)
 
+    def fail_all_for_connection(
+        self, connection: object, *, reason: str = "device_offline"
+    ) -> list[str]:
+        """Fail only calls dispatched through one concrete connection generation."""
+        return self._fail(device_id=None, connection=connection, reason=reason)
+
     def _fail(
-        self, *, device_id: str | None, reason: str = "device_offline", fail_both: bool = False
+        self,
+        *,
+        device_id: str | None,
+        connection: object | None = None,
+        reason: str = "device_offline",
+        fail_both: bool = False,
     ) -> list[str]:
         """Remove and fail every pending entry (all of them when `device_id` is `None`). By
         default the exception goes on exactly one future — `elif`, not a second `if`: setting it
@@ -137,7 +176,11 @@ class InvocationsMem:
         for invocation_id, entry in list(self._pending.items()):
             if device_id is not None and entry.device_id != device_id:
                 continue
+            if connection is not None and entry.connection is not connection:
+                continue
             del self._pending[invocation_id]
+            if entry.disconnect_future is not None and not entry.disconnect_future.done():
+                entry.disconnect_future.set_result(reason)
             if not entry.ack_future.done():
                 entry.ack_future.set_exception(DeviceDisconnected(reason))
                 if fail_both and not entry.result_future.done():

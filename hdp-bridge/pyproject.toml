@@ -6,6 +6,7 @@ requires-python = ">=3.11,<3.13"
 dependencies = [
   "aiohttp",
   "hdp-proto",
+  "pyyaml",
 ]
 
 [project.scripts]
@@ -20,4 +21,3 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["hdp_bridge"]
-

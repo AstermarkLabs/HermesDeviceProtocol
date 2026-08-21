@@ -51,6 +51,9 @@ files = ["hdp-spec/hdp_proto"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 timeout = 30
+markers = [
+  "acceptance: requires the prepared real-Hermes runner and a live model provider",
+]
 testpaths = [
   "tests",
   "hdp-spec/tests",
@@ -58,4 +61,3 @@ testpaths = [
   "hdp-bridge/tests",
   "hdp-reference-node/tests",
 ]
-

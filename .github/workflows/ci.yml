@@ -16,10 +16,10 @@ jobs:
       matrix:
         python-version: ["3.11"]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v3
+        uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57 # v8.0.0
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -28,3 +28,50 @@ jobs:
 
       - name: make check (ruff check, ruff format --check, mypy, pytest)
         run: make check
+
+  acceptance:
+    # The persistent credentialed runner executes protected main only. Pull requests, including
+    # same-repository PRs, receive the uncredentialed hosted `check` job and never this job.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: check
+    runs-on: [self-hosted, linux, x64, hermes-m4]
+    # The acceptance test owns a 19-minute deadline; retain one minute for runner cleanup and
+    # GitHub Actions reporting if pytest exhausts that budget.
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Install uv with the workspace Python
+        uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57 # v8.0.0
+        with:
+          python-version: "3.11.15"
+
+      - name: Sync workspace
+        run: uv sync --python 3.11.15
+
+      - name: Install the stdlib-only protocol package into Hermes
+        run: >-
+          uv pip install
+          --python "$HOME/.hermes/hermes-agent/venv/bin/python"
+          --no-deps
+          -e ./hdp-spec
+
+      - name: Seed success criterion through real Hermes
+        run: make acceptance
+        env:
+          HDP_ACCEPTANCE_PROVIDER: ${{ vars.HDP_ACCEPTANCE_PROVIDER }}
+          HDP_ACCEPTANCE_MODEL: ${{ vars.HDP_ACCEPTANCE_MODEL }}
+          OPENROUTER_API_KEY: >-
+            ${{ vars.HDP_ACCEPTANCE_PROVIDER == 'openrouter' &&
+                secrets.HDP_ACCEPTANCE_PROVIDER_API_KEY || '' }}
+          OPENAI_API_KEY: >-
+            ${{ vars.HDP_ACCEPTANCE_PROVIDER == 'openai' &&
+                secrets.HDP_ACCEPTANCE_PROVIDER_API_KEY || '' }}
+          ANTHROPIC_API_KEY: >-
+            ${{ vars.HDP_ACCEPTANCE_PROVIDER == 'anthropic' &&
+                secrets.HDP_ACCEPTANCE_PROVIDER_API_KEY || '' }}
+          NOUS_API_KEY: >-
+            ${{ vars.HDP_ACCEPTANCE_PROVIDER == 'nous' &&
+                secrets.HDP_ACCEPTANCE_PROVIDER_API_KEY || '' }}

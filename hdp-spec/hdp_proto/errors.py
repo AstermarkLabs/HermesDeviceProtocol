@@ -14,6 +14,7 @@ become reachable as their owning milestone lands its wire, registry, or policy e
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any
@@ -98,7 +99,13 @@ def ok(data: dict[str, Any]) -> dict[str, Any]:
     return {"ok": True, "data": data}
 
 
-def err(code: ErrorCode, detail: BaseException | str, *, hint: str | None = None) -> dict[str, Any]:
+def err(
+    code: ErrorCode,
+    detail: BaseException | str,
+    *,
+    hint: str | None = None,
+    extras: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
     """Build the failure half of the model-facing result envelope.
 
     `detail` becomes `message` (for a human reading a log); `hint` defaults to the code's
@@ -106,4 +113,11 @@ def err(code: ErrorCode, detail: BaseException | str, *, hint: str | None = None
     """
     message = str(detail)
     resolved_hint = hint if hint is not None else HINTS.get(code, "")
-    return {"ok": False, "error": Error(code=code, message=message, hint=resolved_hint).to_dict()}
+    error = Error(code=code, message=message, hint=resolved_hint).to_dict()
+    if extras:
+        reserved = set(error).intersection(extras)
+        if reserved:
+            names = ", ".join(sorted(reserved))
+            raise ValueError(f"extras contain reserved error field(s): {names}")
+        error.update(extras)
+    return {"ok": False, "error": error}

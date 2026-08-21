@@ -19,6 +19,7 @@ half of that fix is `hdp_bridge/control.py`'s `_handle`/`_correlate` (finding I3
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import logging
 import random
@@ -42,6 +43,7 @@ logger = logging.getLogger(__name__)
 _BACKOFF_INITIAL_S = 1.0
 _BACKOFF_MAX_S = 30.0
 _BACKOFF_JITTER_FRACTION = 0.25
+_CONTROL_CANCEL_TIMEOUT_S = 0.5
 
 _DEAD_CONNECTION_ERRORS = (
     ConnectionResetError,
@@ -212,14 +214,32 @@ class SocketTransport:
         request_env = Envelope.new(
             "ctl_invoke",
             {
-                "device_id": req.device_id,
                 "capability": req.capability,
-                "version": req.version,
+                "acceptable_versions": list(req.acceptable_versions),
+                "requested_device_id": req.requested_device_id,
                 "args": req.args,
                 "deadline_ms": req.deadline_ms,
+                "meta": req.meta,
             },
         )
-        reply = await self._roundtrip(request_env)
+        try:
+            reply = await self._roundtrip(request_env)
+        except asyncio.CancelledError:
+            # The daemon keys its off-loop invoke task by this original control request id.
+            # Cancel it over the same multiplexed connection without closing or disturbing
+            # unrelated calls that may still be using that socket.
+            cancel = Envelope.new(
+                "ctl_cancel",
+                {
+                    "control_request_id": request_env.id,
+                    "reason": "plugin invocation cancelled",
+                },
+            )
+            with contextlib.suppress(Exception):
+                await asyncio.shield(
+                    asyncio.wait_for(self._roundtrip(cancel), timeout=_CONTROL_CANCEL_TIMEOUT_S)
+                )
+            raise
         if reply.type == "error":
             return InvokeResult(invocation_id="", ok=False, error=reply.payload)
         payload = reply.payload
@@ -266,10 +286,33 @@ class SocketTransport:
         )
 
     async def list_approvals(self) -> list[PendingApproval]:
-        raise NotImplementedError("approvals are not implemented until M3")
+        reply = await self._roundtrip(Envelope.new("ctl_list_approvals", {}))
+        if reply.type == "error":
+            return []
+        return [
+            PendingApproval(
+                invocation_id=approval["invocation_id"],
+                device_id=approval["device_id"],
+                capability=approval["capability"],
+                version=approval["version"],
+                args_summary=approval["args_summary"],
+                requesting_session=approval.get("requesting_session", ""),
+                risk_class=approval.get("risk_class", ""),
+                created_at=approval["created_at"],
+                expires_at=approval["expires_at"],
+            )
+            for approval in reply.payload.get("approvals", [])
+        ]
 
     async def resolve_approval(self, invocation_id: str, decision: str, scope: str) -> None:
-        raise NotImplementedError("resolve_approval is not implemented until M3")
+        reply = await self._roundtrip(
+            Envelope.new(
+                "ctl_resolve_approval",
+                {"invocation_id": invocation_id, "decision": decision, "scope": scope},
+            )
+        )
+        if reply.type == "error":
+            raise RuntimeError(reply.payload.get("message", "approval resolution failed"))
 
     async def ctl_audit_tail(self) -> list[dict]:
         """Operator-only verb, deliberately **not** on `BridgeTransport` — never reachable by the
@@ -280,3 +323,11 @@ class SocketTransport:
         if reply.type == "error":
             return []
         return reply.payload.get("lines", [])
+
+    async def ctl_policy_show(self) -> dict:
+        reply = await self._roundtrip(Envelope.new("ctl_policy_show", {}))
+        return {} if reply.type == "error" else reply.payload
+
+    async def ctl_policy_reload(self) -> dict:
+        reply = await self._roundtrip(Envelope.new("ctl_policy_reload", {}))
+        return {} if reply.type == "error" else reply.payload

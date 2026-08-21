@@ -79,7 +79,7 @@ class NodeConnection:
         registry: Registry,
         invocations: InvocationsMem,
         connections: dict[str, NodeConnection],
-        descriptors: dict[str, dict[str, CapabilityDescriptor]],
+        descriptors: dict[str, dict[tuple[str, int], CapabilityDescriptor]],
         dead_peer_timeout_s: float = _DEAD_PEER_TIMEOUT_S,
         audit: AuditWriter | None = None,
     ) -> None:
@@ -322,7 +322,7 @@ class NodeConnection:
                 capabilities=capability_infos,
             )
         )
-        self._descriptors[device_id] = {c.name: c for c in hello.capabilities}
+        self._descriptors[device_id] = {(c.name, c.version): c for c in hello.capabilities}
         self._connections[device_id] = self
         self.device_id = device_id
 
@@ -338,6 +338,9 @@ class NodeConnection:
         device_id = self.device_id
         if device_id is None:  # pragma: no cover — guaranteed by _handle_frame's dispatch gate
             raise RuntimeError("_handle_capabilities reached before device_id was assigned")
+        if self._connections.get(device_id) is not self:
+            logger.info("ignored stale capabilities device_id=%s", device_id)
+            return
         existing = self._registry.get(device_id)
         friendly_name = existing.friendly_name if existing else device_id
         platform = existing.platform if existing else "unknown"
@@ -360,13 +363,13 @@ class NodeConnection:
                 capabilities=capability_infos,
             )
         )
-        self._descriptors[device_id] = {c.name: c for c in msg.capabilities}
+        self._descriptors[device_id] = {(c.name, c.version): c for c in msg.capabilities}
 
     async def _handle_ack(self, envelope: Envelope) -> None:
         if envelope.corr is None:
             await self._reject_malformed("ack missing corr")
             return
-        self._invocations.mark_acked(envelope.corr)
+        self._invocations.mark_acked(envelope.corr, connection=self)
 
     async def _handle_result(self, envelope: Envelope) -> None:
         if envelope.corr is None:
@@ -377,7 +380,7 @@ class NodeConnection:
         except ValueError as exc:
             await self._reject_malformed(f"malformed result: {exc}")
             return
-        resolved = self._invocations.resolve(envelope.corr, result_msg.to_wire())
+        resolved = self._invocations.resolve(envelope.corr, result_msg.to_wire(), connection=self)
         if not resolved:
             # HDP-0.md §7: dropped silently on the model-facing side, logged here.
             logger.info("late_result invocation_id=%s device_id=%s", envelope.corr, self.device_id)
@@ -387,7 +390,7 @@ class NodeConnection:
 
     async def _handle_heartbeat(self, envelope: Envelope) -> None:
         self._last_heartbeat = time.monotonic()
-        if self.device_id is not None:
+        if self.device_id is not None and self._connections.get(self.device_id) is self:
             with self._conn:
                 self._conn.execute(
                     "UPDATE devices SET last_seen_at = ? WHERE device_id = ?",
@@ -433,12 +436,16 @@ class NodeConnection:
     async def _on_disconnect(self) -> None:
         if self.device_id is None:
             return
-        self._registry.mark_offline(self.device_id)
-        failed = self._invocations.fail_all_for_device(
-            self.device_id, reason=self._disconnect_reason
-        )
+        # A reconnect with the same credential replaces this mapping. The old connection may
+        # unwind later, but it no longer owns presence and must not remove or fail the replacement.
+        owns_presence = self._connections.get(self.device_id) is self
+        if owns_presence:
+            self._connections.pop(self.device_id)
+        failed = self._invocations.fail_all_for_connection(self, reason=self._disconnect_reason)
         if failed:
             logger.info(
                 "device_offline mid-call device_id=%s invocation_ids=%s", self.device_id, failed
             )
-        self._connections.pop(self.device_id, None)
+        # Memory-visible presence and pending state change before the SQLite timestamp write.
+        if owns_presence:
+            self._registry.mark_offline(self.device_id)

@@ -41,8 +41,8 @@ def test_register_registers_exactly_three_async_device_tools():
     # FR-2 / ADR-0003: explicit None, not an omission — device_status_get must stay
     # model-visible when nothing else works, so it carries no health-based check_fn.
     assert by_name["device_status_get"]["check_fn"] is None
-    assert by_name["device_notifications_send"]["check_fn"] is tools.runtime_healthy
-    assert by_name["hdp_echo"]["check_fn"] is tools.runtime_healthy
+    assert by_name["device_notifications_send"]["check_fn"] is tools.notifications_available
+    assert by_name["hdp_echo"]["check_fn"] is tools.echo_available
 
 
 def test_register_also_registers_the_hdp_cli_command_and_slash_command():

@@ -13,8 +13,9 @@ import json
 import threading
 
 import pytest
-from hermes_device_plugin import tools
+from hermes_device_plugin import runtime, tools
 from hermes_device_plugin.runtime import get_runtime
+from hermes_device_plugin.transport.base import BridgeStatus, CapabilityInfo, DeviceInfo
 
 _HDP_THREAD_NAME = "hdp-runtime"
 
@@ -27,6 +28,7 @@ def _clean_runtime_singleton():
     with contextlib.suppress(Exception):
         get_runtime().close()
     get_runtime.reset()
+    runtime._reset_availability_for_tests()
 
 
 def _thread_names() -> set[str]:
@@ -82,7 +84,135 @@ def test_get_runtime_is_race_free_under_concurrent_first_calls():
     assert sum(1 for t in threading.enumerate() if t.name == _HDP_THREAD_NAME) == 1
 
 
-def test_runtime_healthy_does_not_force_construction():
-    """D6: `check_fn` must never build the runtime as a side effect of a health read."""
-    assert tools.runtime_healthy() is True
+def test_capability_check_fns_default_visible_without_forcing_runtime_construction():
+    """Unknown startup state is visible and a synchronous check never builds the runtime."""
+    assert tools.notifications_available() is True
+    assert tools.echo_available() is True
     assert _HDP_THREAD_NAME not in _thread_names()
+
+
+def test_capability_availability_snapshot_is_thread_safe_and_capability_specific():
+    notifications = DeviceInfo(
+        device_id="dev-notify",
+        friendly_name="phone",
+        platform="android",
+        online=True,
+        capabilities=[CapabilityInfo(name="notifications.send", version=1)],
+    )
+    runtime._update_availability(BridgeStatus(healthy=True), [notifications])
+
+    assert tools.notifications_available() is True
+    assert tools.echo_available() is False
+
+    barrier = threading.Barrier(9)
+
+    def _read_snapshot() -> tuple[bool, bool]:
+        barrier.wait()
+        return tools.notifications_available(), tools.echo_available()
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
+        futures = [pool.submit(_read_snapshot) for _ in range(8)]
+        barrier.wait()
+        assert all(future.result(timeout=2) == (True, False) for future in futures)
+
+
+def test_unhealthy_bridge_hides_both_capability_tools() -> None:
+    runtime._update_availability(BridgeStatus(healthy=False), [])
+
+    assert tools.notifications_available() is False
+    assert tools.echo_available() is False
+
+
+def test_runtime_refreshes_availability_after_transport_start(monkeypatch) -> None:
+    class _Transport:
+        def __init__(self) -> None:
+            self.listed = threading.Event()
+
+        async def start(self) -> None:
+            return None
+
+        async def close(self) -> None:
+            return None
+
+        async def status(self) -> BridgeStatus:
+            return BridgeStatus(healthy=True)
+
+        async def list_devices(self) -> list[DeviceInfo]:
+            self.listed.set()
+            return [
+                DeviceInfo(
+                    device_id="dev-echo",
+                    friendly_name="echo-node",
+                    platform="linux",
+                    online=True,
+                    capabilities=[CapabilityInfo(name="diagnostics.echo", version=1)],
+                )
+            ]
+
+    transport = _Transport()
+    monkeypatch.setattr(runtime, "SocketTransport", lambda: transport)
+
+    instance = runtime.HDPRuntime()
+    try:
+        assert transport.listed.wait(timeout=2)
+        assert tools.notifications_available() is False
+        assert tools.echo_available() is True
+    finally:
+        instance.close()
+
+
+def test_hung_availability_refresh_cannot_keep_runtime_thread_alive(monkeypatch) -> None:
+    class _HungTransport:
+        def __init__(self) -> None:
+            self.status_started = threading.Event()
+
+        async def start(self) -> None:
+            return None
+
+        async def close(self) -> None:
+            return None
+
+        async def status(self) -> BridgeStatus:
+            self.status_started.set()
+            await asyncio.Event().wait()
+            raise AssertionError("unreachable")
+
+        async def list_devices(self) -> list[DeviceInfo]:
+            raise AssertionError("status must time out before device listing")
+
+    transport = _HungTransport()
+    monkeypatch.setattr(runtime, "SocketTransport", lambda: transport)
+
+    instance = runtime.HDPRuntime()
+    assert transport.status_started.wait(timeout=2)
+
+    instance.close(timeout=2)
+
+    assert not instance._thread.is_alive()
+    assert tools.notifications_available() is True
+    assert tools.echo_available() is True
+
+
+async def test_failed_availability_refresh_retains_last_snapshot() -> None:
+    class _FailingTransport:
+        async def status(self) -> BridgeStatus:
+            raise OSError("bridge sample failed")
+
+        async def list_devices(self) -> list[DeviceInfo]:
+            raise AssertionError("list must not run after status failed")
+
+    notification = DeviceInfo(
+        device_id="dev-notify",
+        friendly_name="phone",
+        platform="android",
+        online=True,
+        capabilities=[CapabilityInfo(name="notifications.send", version=1)],
+    )
+    runtime._update_availability(BridgeStatus(healthy=True), [notification])
+    instance = object.__new__(runtime.HDPRuntime)
+    instance.transport = _FailingTransport()
+
+    await instance._refresh_availability()
+
+    assert tools.notifications_available() is True
+    assert tools.echo_available() is False

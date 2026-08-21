@@ -12,8 +12,14 @@ from unittest.mock import patch
 
 import pytest
 from hdp_proto.errors import ErrorCode
-from hermes_device_plugin import engine, tools
+from hermes_device_plugin import engine, runtime, tools
 from hermes_device_plugin.runtime import get_runtime
+from hermes_device_plugin.transport.base import (
+    BridgeStatus,
+    CapabilityInfo,
+    DeviceInfo,
+    InvokeResult,
+)
 
 _KNOWN_CODES = {c.value for c in ErrorCode}
 
@@ -77,3 +83,90 @@ async def test_device_status_get_succeeds_with_zero_nodes():
     tool that must stay visible when nothing else works."""
     result = json.loads(await tools.device_status_get({}))
     assert result == {"ok": True, "data": {"devices": []}}
+
+
+async def test_device_status_get_retains_device_and_capability_details(monkeypatch):
+    class _Transport:
+        async def list_devices(self):
+            return [
+                DeviceInfo(
+                    device_id="dev_1",
+                    friendly_name="workshop-node",
+                    platform="linux",
+                    online=True,
+                    capabilities=[
+                        CapabilityInfo(name="notifications.send", version=1),
+                        CapabilityInfo(name="diagnostics.echo", version=2),
+                    ],
+                    state="active",
+                    client_version="0.4.0",
+                    first_paired_at=100,
+                    last_seen_at=200,
+                )
+            ]
+
+    class _Runtime:
+        transport = _Transport()
+
+    monkeypatch.setattr(tools, "get_runtime", lambda: _Runtime())
+
+    result = await tools._status_get_body()
+
+    assert result == {
+        "ok": True,
+        "data": {
+            "devices": [
+                {
+                    "device_id": "dev_1",
+                    "friendly_name": "workshop-node",
+                    "platform": "linux",
+                    "online": True,
+                    "state": "active",
+                    "client_version": "0.4.0",
+                    "first_paired_at": 100,
+                    "last_seen_at": 200,
+                    "capabilities": [
+                        {"name": "notifications.send", "version": 1},
+                        {"name": "diagnostics.echo", "version": 2},
+                    ],
+                }
+            ]
+        },
+    }
+
+
+async def test_check_fn_is_not_a_gate() -> None:
+    """ADR-0003: hidden-but-live still invokes; visibility is not a correctness input."""
+
+    class _Transport:
+        async def invoke(self, request):
+            return InvokeResult(
+                invocation_id="inv-live",
+                ok=True,
+                data={"delivered": True, "device_id": request.requested_device_id},
+            )
+
+    class _Runtime:
+        transport = _Transport()
+
+    runtime._update_availability(BridgeStatus(healthy=False), [])
+    try:
+        assert tools.notifications_available() is False
+
+        with patch.object(engine, "get_runtime", return_value=_Runtime()):
+            result = json.loads(
+                await engine.invoke(
+                    "notifications.send",
+                    [1],
+                    {"title": "still routes", "body": "live state wins"},
+                    {},
+                    device_id="dev-live",
+                )
+            )
+    finally:
+        runtime._reset_availability_for_tests()
+
+    assert result == {
+        "ok": True,
+        "data": {"delivered": True, "device_id": "dev-live"},
+    }

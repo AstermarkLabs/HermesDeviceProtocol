@@ -19,14 +19,25 @@ from hermes_device_plugin.transport.base import DeviceInfo
 from hermes_device_plugin.transport.socket import SocketTransport
 
 
+def _console_script(name: str) -> list[str]:
+    """Use the active environment's installed entry point without rebuilding the workspace.
+
+    The fallback keeps the harness usable from a source checkout where the console script has
+    not been installed yet.  Using the active script directly also makes protocol tests runnable
+    from an already-provisioned Hermes/uv environment with no network access.
+    """
+    script = Path(sys.executable).with_name(name)
+    if script.exists():
+        return [str(script)]
+    return ["uv", "run", name]
+
+
 async def start_bridge(hermes_home: Path) -> asyncio.subprocess.Process:
     """Launch the real `hdp-bridge serve` daemon as a subprocess, pointed at `hermes_home`. The
     caller is responsible for calling `stop_bridge` on the result."""
     env = {**os.environ, "HERMES_HOME": str(hermes_home), "HDP_BIND_PORT": "0"}
     proc = await asyncio.create_subprocess_exec(
-        "uv",
-        "run",
-        "hdp-bridge",
+        *_console_script("hdp-bridge"),
         "serve",
         env=env,
         stdout=asyncio.subprocess.PIPE,
@@ -59,9 +70,7 @@ async def mint_pairing_code() -> str:
     safe) and return the minted pairing code. M2: every node connection now needs one of these
     before it can complete a `hello` handshake — see `start_node`'s docstring."""
     proc = await asyncio.create_subprocess_exec(
-        "uv",
-        "run",
-        "hdp-bridge",
+        *_console_script("hdp-bridge"),
         "pair",
         "new",
         stdout=asyncio.subprocess.PIPE,
@@ -98,9 +107,7 @@ async def start_node(
         credential_file = hermes_home / f".hdp-node-credential.{uuid.uuid4().hex}"
     pair_code = await mint_pairing_code()
     cmd = [
-        sys.executable,
-        "-m",
-        "hdp_reference_node",
+        *_console_script("hdp-node"),
         "connect",
         "--name",
         name,

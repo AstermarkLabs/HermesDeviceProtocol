@@ -36,6 +36,8 @@ async def test_android_profile_pair_invoke_reconnect_and_local_policy(
         welcome = await node.connect(bridge_url, pair_code=pair_code)
         device = await wait_for_device(bridge)
         assert welcome.device_id == device.device_id
+        # Amendments v0.3 — what `device_status_get` surfaces for an Android node.
+        assert device.platform == "android"
         assert {capability.name for capability in device.capabilities} == {
             capability.name for capability in ANDROID_CAPABILITIES
         }

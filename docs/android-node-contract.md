@@ -34,6 +34,11 @@ current capability descriptor list, and either the stored credential or the expl
 credential for first pairing. Unsupported protocol versions are rejected; the node must not
 downgrade silently.
 
+The Android node also sends `platform: "android"` (HDP-0.md Amendments v0.3). This is advisory
+metadata that makes the node distinguishable in `device_status_get` and `hermes hdp devices`; it is
+never an authorization input, and omitting it degrades to a `"unknown"` listing rather than failing
+the handshake.
+
 On success, the bridge sends `welcome` with the negotiated `hdp_version` and `device_id`. The
 first pairing welcome contains the credential exactly once. The node writes it immediately to
 platform-protected storage and never logs it, includes it in diagnostics, or stores it in an

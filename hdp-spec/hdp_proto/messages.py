@@ -56,12 +56,18 @@ def _capabilities_from_wire(raw: Any) -> tuple[CapabilityDescriptor, ...]:
 @dataclass(frozen=True)
 class Hello:
     """Node → Bridge, first frame on a new connection. `hello` doubles as the node's initial
-    `capabilities` message (HDP-0.md §3) — a node need not send both."""
+    `capabilities` message (HDP-0.md §3) — a node need not send both.
+
+    `platform` (Amendments v0.3) is an optional self-reported platform identifier, e.g.
+    `"android"` or `"linux"`. It is advisory metadata for operator-facing device listings, never
+    an authorization input. Absent means the bridge records `"unknown"`, which is what every
+    pre-v0.3 node produces — defaulted here so this stays an addition, not a wire break."""
 
     hdp_versions: tuple[int, ...]
     device_name: str
     capabilities: tuple[CapabilityDescriptor, ...]
     credential: str | None = None
+    platform: str | None = None
 
     @classmethod
     def from_wire(cls, d: dict[str, Any]) -> Hello:
@@ -73,6 +79,7 @@ class Hello:
             device_name=_require_str(d, "device_name"),
             capabilities=_capabilities_from_wire(d.get("capabilities", [])),
             credential=_require_str_or_none(d, "credential"),
+            platform=_require_str_or_none(d, "platform"),
         )
 
     def to_wire(self) -> dict[str, Any]:
@@ -81,6 +88,7 @@ class Hello:
             "device_name": self.device_name,
             "capabilities": [c.to_wire() for c in self.capabilities],
             "credential": self.credential,
+            "platform": self.platform,
         }
 
 

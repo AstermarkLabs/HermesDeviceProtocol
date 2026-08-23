@@ -317,7 +317,9 @@ class NodeConnection:
             DeviceRecord(
                 device_id=device_id,
                 friendly_name=hello.device_name,
-                platform="unknown",
+                # Self-reported and advisory (HDP-0.md Amendments v0.3). Pre-v0.3 nodes omit it
+                # and stay "unknown"; it is never consulted for an authorization decision.
+                platform=hello.platform or "unknown",
                 online=True,
                 capabilities=capability_infos,
             )

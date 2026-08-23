@@ -233,3 +233,90 @@ async def test_hello_with_a_revoked_credential_is_auth_failed(tmp_path):
     await connection._handle_frame(json.dumps(Envelope.new("hello", hello.to_wire()).to_wire()))
     assert ws.closed_with is not None
     assert connection.device_id is None
+
+
+async def test_pairing_hello_records_the_self_reported_platform(tmp_path):
+    """HDP-0.md Amendments v0.3. Without this the registry hardcodes "unknown" and
+    `device_status_get` cannot distinguish an Android node from a Linux one."""
+    db_path = tmp_path / "registry.db"
+    conn = db.connect(db_path)
+    code = pairing.mint_pairing_code(conn)
+    registry = Registry(db_path)
+    ws = _FakeWS()
+    connection = NodeConnection(
+        ws,
+        conn=conn,
+        registry=registry,
+        invocations=InvocationsMem(),
+        connections={},
+        descriptors={},
+    )
+
+    hello = Hello(
+        hdp_versions=(0,),
+        device_name="pixel",
+        capabilities=(),
+        credential=f"pair:{code}",
+        platform="android",
+    )
+    await connection._handle_frame(json.dumps(Envelope.new("hello", hello.to_wire()).to_wire()))
+
+    assert connection.device_id is not None
+    assert registry.get(connection.device_id).platform == "android"
+
+
+async def test_pairing_hello_without_a_platform_stays_unknown(tmp_path):
+    """Every pre-v0.3 node omits the field; it must keep pairing, not fail closed."""
+    db_path = tmp_path / "registry.db"
+    conn = db.connect(db_path)
+    code = pairing.mint_pairing_code(conn)
+    registry = Registry(db_path)
+    ws = _FakeWS()
+    connection = NodeConnection(
+        ws,
+        conn=conn,
+        registry=registry,
+        invocations=InvocationsMem(),
+        connections={},
+        descriptors={},
+    )
+
+    hello = Hello(hdp_versions=(0,), device_name="n", capabilities=(), credential=f"pair:{code}")
+    await connection._handle_frame(json.dumps(Envelope.new("hello", hello.to_wire()).to_wire()))
+
+    assert connection.device_id is not None
+    assert registry.get(connection.device_id).platform == "unknown"
+
+
+async def test_returning_hello_refreshes_the_recorded_platform(tmp_path):
+    """Both handshake paths run through `_register_device`, so a node that starts reporting a
+    platform picks it up on its next reconnect rather than being stuck at its paired-at value."""
+    db_path = tmp_path / "registry.db"
+    conn = db.connect(db_path)
+    conn.execute(
+        "INSERT INTO devices (device_id, friendly_name, platform, client_version, "
+        "first_paired_at, last_seen_at, state) VALUES ('dev_1', 'n', 'unknown', '', 0, 0, 'active')"
+    )
+    credential = credentials.issue_credential(conn, "dev_1")
+    registry = Registry(db_path)
+    ws = _FakeWS()
+    connection = NodeConnection(
+        ws,
+        conn=conn,
+        registry=registry,
+        invocations=InvocationsMem(),
+        connections={},
+        descriptors={},
+    )
+
+    hello = Hello(
+        hdp_versions=(0,),
+        device_name="n",
+        capabilities=(),
+        credential=credential,
+        platform="android",
+    )
+    await connection._handle_frame(json.dumps(Envelope.new("hello", hello.to_wire()).to_wire()))
+
+    assert connection.device_id == "dev_1"
+    assert registry.get("dev_1").platform == "android"

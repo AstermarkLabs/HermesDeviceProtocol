@@ -84,6 +84,9 @@ class AndroidNodeFixture:
             device_name=self.name,
             capabilities=self.capabilities,
             credential=credential,
+            # Amendments v0.3. The reference node deliberately omits this, so the suite keeps
+            # live coverage of both the reporting and the omitting branch.
+            platform="android",
         )
         await self._send(Envelope.new("hello", hello.to_wire()))
         message = await self._ws.receive(timeout=5)

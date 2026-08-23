@@ -66,10 +66,11 @@ their eventual use additive rather than a wire break.
    ```json
    {"hdp": "0", "type": "hello", "id": "...", "ts": ..., "corr": null,
     "payload": {"hdp_versions": [0], "device_name": "workshop-node",
-                "capabilities": [...], "credential": null}}
+                "capabilities": [...], "credential": null, "platform": "linux"}}
    ```
    - `hdp_versions`: protocol versions the node speaks, in preference order.
    - `device_name`: a human-readable label, not an identifier.
+   - `platform`: optional, self-reported (see Amendments (v0.3)).
    - `capabilities`: the node's initial full-set capability list (see §2's full-replacement rule
      and §6 for the descriptor shape) — `hello` doubles as the first `capabilities` message so a
      node need not send both.
@@ -219,3 +220,23 @@ is a document revision, not a new protocol version.
   round trip before the WebSocket upgrade would need its own auth story for no benefit, since the
   pairing code itself is already the one-time secret. Recorded here as the resolution of that
   ambiguity, not a silent drop.)
+
+## Amendments (v0.3)
+
+Landed at M6. Additive under §1's "unknown fields tolerated" rule, exactly as v0.2 was. The `hdp`
+envelope field's value is unchanged (`"0"`); this is a document revision, not a new protocol version.
+
+- **`hello.platform`** (new, optional field): a node's self-reported platform identifier, e.g.
+  `"android"` or `"linux"`. The bridge persists it on the device record so operator-facing listings
+  (`device_status_get`, `hermes hdp devices`) can distinguish an Android node from a Linux one.
+
+  It is **advisory metadata, never an authorization input.** The value is attacker-controlled in
+  exactly the same sense `device_name` is — it is whatever the peer typed — so no policy decision,
+  capability resolution, or routing choice may consult it. Recorded and displayed only.
+
+  Absent (or explicitly `null`) → the bridge records `"unknown"`, which is what every pre-v0.3 node
+  produces. Present but not a string → the `hello` is malformed and handled per §5, the same way a
+  non-string `credential` already is; the field is optional, not untyped.
+
+  Both the pairing and returning-connection handshakes read it, so a node that changes its reported
+  platform refreshes the stored value on its next reconnect.

@@ -28,6 +28,16 @@ _CASES = [
         "extra",
     ),
     (Hello(hdp_versions=(0,), device_name="n", capabilities=(), credential="secret"), "extra"),
+    (
+        Hello(
+            hdp_versions=(0,),
+            device_name="n",
+            capabilities=(),
+            credential="secret",
+            platform="android",
+        ),
+        "extra",
+    ),
     (Welcome(hdp_version=0, device_id="01JB0000000000000000000000"), "extra"),
     (
         Welcome(hdp_version=0, device_id="01JB0000000000000000000000", credential="new-credential"),
@@ -80,6 +90,32 @@ def test_welcome_credential_defaults_to_none_and_round_trips_present_as_null():
     assert "credential" in wire
     assert wire["credential"] is None
     assert Welcome.from_wire(wire).credential is None
+
+
+def test_hello_platform_defaults_to_none_and_round_trips_present_as_null():
+    """Amendments v0.3. Emitting the key as an explicit null (rather than omitting it) keeps
+    `to_wire` output shape-stable across nodes that do and don't report a platform."""
+    hello = Hello(hdp_versions=(0,), device_name="n", capabilities=(), credential=None)
+    assert hello.platform is None
+    wire = hello.to_wire()
+    assert "platform" in wire
+    assert wire["platform"] is None
+    assert Hello.from_wire(wire).platform is None
+
+
+def test_hello_without_platform_key_parses_as_none():
+    """A pre-v0.3 node omits the key entirely; that must stay a valid `hello`, not a wire break."""
+    wire = Hello(hdp_versions=(0,), device_name="n", capabilities=(), credential="c").to_wire()
+    del wire["platform"]
+    assert Hello.from_wire(wire).platform is None
+
+
+def test_hello_rejects_non_string_platform():
+    """Optional, not untyped — same posture as a non-string `credential`."""
+    wire = Hello(hdp_versions=(0,), device_name="n", capabilities=(), credential="c").to_wire()
+    wire["platform"] = 17
+    with pytest.raises(ValueError):
+        Hello.from_wire(wire)
 
 
 def test_hello_rejects_malformed_hdp_versions():

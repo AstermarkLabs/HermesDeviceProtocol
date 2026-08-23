@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import os
 
 import pytest
 from harness import start_bridge, stop_bridge
@@ -19,8 +20,25 @@ from hermes_device_plugin import config
 from hermes_device_plugin.transport.socket import SocketTransport
 
 
+def external_node_mode() -> bool:
+    """Is the suite being pointed at a real, externally-connected node (M6)?
+
+    In that mode the peer is a physical or emulated device pairing against the operator's own
+    running bridge, so the suite must not commandeer `$HERMES_HOME` or start a daemon of its own —
+    it attaches to what is already there. Every assertion downstream is unchanged; only the
+    fixture wiring differs, which is the point of M5's "runnable against an Android endpoint
+    without changing its assertions" gate.
+    """
+    return os.environ.get("HDP_EXTERNAL_NODE") == "1"
+
+
 @pytest.fixture(autouse=True)
 def _hermes_home(tmp_path, monkeypatch):
+    if external_node_mode():
+        # Use the operator's real profile — the device is paired against that bridge, not a
+        # throwaway one this process would own.
+        yield None
+        return
     monkeypatch.setenv("HERMES_HOME", str(tmp_path))
     monkeypatch.setenv("HDP_BIND_PORT", "0")
     yield tmp_path
@@ -28,6 +46,16 @@ def _hermes_home(tmp_path, monkeypatch):
 
 @pytest.fixture
 async def _bridge_proc(_hermes_home):
+    if external_node_mode():
+        # The operator's bridge is already serving; adopt it rather than starting a second one,
+        # which would fail the PID claim anyway.
+        yield None, []
+        return
+    async for value in _managed_bridge_proc(_hermes_home):
+        yield value
+
+
+async def _managed_bridge_proc(_hermes_home):
     """Starts the real `hdp-bridge serve` subprocess and continuously drains its stdout (stderr
     is redirected into it, per `start_bridge`) into `lines` as it's produced. `hdp-bridge serve`
     runs with `logging.basicConfig(level=INFO, ...)` (`daemon.main`), so bridge-side log records

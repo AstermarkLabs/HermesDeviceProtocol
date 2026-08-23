@@ -83,8 +83,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_init",
-      "community": 40,
-      "community_name": "daemon.py",
+      "community": 11,
+      "community_name": "hdp_bridge/__init__.py",
       "norm_label": "hdp_bridge/__init__.py"
     },
     {
@@ -94,8 +94,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_init_rationale_1",
-      "community": 40,
-      "community_name": "daemon.py",
+      "community": 11,
+      "community_name": "hdp_bridge/__init__.py",
       "norm_label": "hdp bridge daemon package."
     },
     {
@@ -654,7 +654,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_cli",
       "community": 11,
-      "community_name": "test_cli.py",
+      "community_name": "hdp_bridge/__init__.py",
       "norm_label": "hdp_bridge/cli.py"
     },
     {
@@ -666,7 +666,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_cli_main",
       "community": 11,
-      "community_name": "test_cli.py",
+      "community_name": "hdp_bridge/__init__.py",
       "norm_label": "main()"
     },
     {
@@ -678,7 +678,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_cli_run_pair_new",
       "community": 11,
-      "community_name": "test_cli.py",
+      "community_name": "hdp_bridge/__init__.py",
       "norm_label": "_run_pair_new()"
     },
     {
@@ -690,7 +690,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_cli_run_audit_tail",
       "community": 11,
-      "community_name": "test_cli.py",
+      "community_name": "hdp_bridge/__init__.py",
       "norm_label": "_run_audit_tail()"
     },
     {
@@ -702,7 +702,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_cli_run_devices_revoke",
       "community": 11,
-      "community_name": "test_cli.py",
+      "community_name": "hdp_bridge/__init__.py",
       "norm_label": "_run_devices_revoke()"
     },
     {
@@ -714,7 +714,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_cli_run_approvals_list",
       "community": 11,
-      "community_name": "test_cli.py",
+      "community_name": "hdp_bridge/__init__.py",
       "norm_label": "_run_approvals_list()"
     },
     {
@@ -726,7 +726,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_cli_run_approval_resolve",
       "community": 11,
-      "community_name": "test_cli.py",
+      "community_name": "hdp_bridge/__init__.py",
       "norm_label": "_run_approval_resolve()"
     },
     {
@@ -738,7 +738,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_cli_run_policy_control",
       "community": 11,
-      "community_name": "test_cli.py",
+      "community_name": "hdp_bridge/__init__.py",
       "norm_label": "_run_policy_control()"
     },
     {
@@ -750,7 +750,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_cli_run_policy_validate",
       "community": 11,
-      "community_name": "test_cli.py",
+      "community_name": "hdp_bridge/__init__.py",
       "norm_label": "_run_policy_validate()"
     },
     {
@@ -761,7 +761,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_cli_py_path",
       "community": 11,
-      "community_name": "test_cli.py",
+      "community_name": "hdp_bridge/__init__.py",
       "norm_label": "path"
     },
     {
@@ -773,7 +773,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_cli_control_request",
       "community": 11,
-      "community_name": "test_cli.py",
+      "community_name": "hdp_bridge/__init__.py",
       "norm_label": "_control_request()"
     },
     {
@@ -784,7 +784,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_cli_rationale_96",
       "community": 11,
-      "community_name": "test_cli.py",
+      "community_name": "hdp_bridge/__init__.py",
       "norm_label": "thin renderer over `operations.revoke` \u2014 the daemon-reachable/offline-fallback..."
     },
     {
@@ -795,7 +795,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_config",
       "community": 30,
-      "community_name": "hdp_bridge/config.py",
+      "community_name": "_serve_claimed",
       "norm_label": "hdp_bridge/config.py"
     },
     {
@@ -807,7 +807,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_config_hermes_home",
       "community": 30,
-      "community_name": "hdp_bridge/config.py",
+      "community_name": "_serve_claimed",
       "norm_label": "hermes_home()"
     },
     {
@@ -818,7 +818,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_config_py_path",
       "community": 30,
-      "community_name": "hdp_bridge/config.py",
+      "community_name": "_serve_claimed",
       "norm_label": "path"
     },
     {
@@ -830,7 +830,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_config_hdp_home",
       "community": 30,
-      "community_name": "hdp_bridge/config.py",
+      "community_name": "_serve_claimed",
       "norm_label": "hdp_home()"
     },
     {
@@ -841,7 +841,7 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_config_hdp_bind_host",
-      "community": 76,
+      "community": 30,
       "community_name": "_serve_claimed",
       "norm_label": "hdp_bind_host()"
     },
@@ -853,7 +853,7 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_config_hdp_bind_port",
-      "community": 76,
+      "community": 30,
       "community_name": "_serve_claimed",
       "norm_label": "hdp_bind_port()"
     },
@@ -865,7 +865,7 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_config_hdp_allow_remote",
-      "community": 76,
+      "community": 30,
       "community_name": "_serve_claimed",
       "norm_label": "hdp_allow_remote()"
     },
@@ -878,7 +878,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_config_bridge_addr_path",
       "community": 30,
-      "community_name": "hdp_bridge/config.py",
+      "community_name": "_serve_claimed",
       "norm_label": "bridge_addr_path()"
     },
     {
@@ -890,7 +890,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_config_control_socket_path",
       "community": 30,
-      "community_name": "hdp_bridge/config.py",
+      "community_name": "_serve_claimed",
       "norm_label": "control_socket_path()"
     },
     {
@@ -902,7 +902,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_config_pid_path",
       "community": 30,
-      "community_name": "hdp_bridge/config.py",
+      "community_name": "_serve_claimed",
       "norm_label": "pid_path()"
     },
     {
@@ -926,7 +926,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_config_policy_path",
       "community": 30,
-      "community_name": "hdp_bridge/config.py",
+      "community_name": "_serve_claimed",
       "norm_label": "policy_path()"
     },
     {
@@ -937,7 +937,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_config_rationale_1",
       "community": 30,
-      "community_name": "hdp_bridge/config.py",
+      "community_name": "_serve_claimed",
       "norm_label": "profile-scoped paths, timeouts, and defaults for the standalone `hdp-bridge`..."
     },
     {
@@ -948,7 +948,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_config_rationale_31",
       "community": 30,
-      "community_name": "hdp_bridge/config.py",
+      "community_name": "_serve_claimed",
       "norm_label": "the active hermes profile's state root. read fresh on every call \u2014 never cache..."
     },
     {
@@ -959,7 +959,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_config_rationale_36",
       "community": 30,
-      "community_name": "hdp_bridge/config.py",
+      "community_name": "_serve_claimed",
       "norm_label": "`$hermes_home/hdp/` \u2014 where all hdp state lives, profile-scoped (fr-17,..."
     },
     {
@@ -969,7 +969,7 @@
       "source_location": "L41",
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_config_rationale_41",
-      "community": 76,
+      "community": 30,
       "community_name": "_serve_claimed",
       "norm_label": "the host the aiohttp node-facing server binds to. read fresh on every call..."
     },
@@ -980,7 +980,7 @@
       "source_location": "L49",
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_config_rationale_49",
-      "community": 76,
+      "community": 30,
       "community_name": "_serve_claimed",
       "norm_label": "the port the aiohttp node-facing server binds to. `0` (test convention)..."
     },
@@ -991,7 +991,7 @@
       "source_location": "L55",
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_config_rationale_55",
-      "community": 76,
+      "community": 30,
       "community_name": "_serve_claimed",
       "norm_label": "nfr-4's guard: binding to a non-loopback host is refused unless this is set."
     },
@@ -1003,7 +1003,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_config_rationale_60",
       "community": 30,
-      "community_name": "hdp_bridge/config.py",
+      "community_name": "_serve_claimed",
       "norm_label": "`$hermes_home/hdp/bridge.addr` \u2014 a plaintext `host:port` file the running..."
     },
     {
@@ -1014,7 +1014,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_config_rationale_67",
       "community": 30,
-      "community_name": "hdp_bridge/config.py",
+      "community_name": "_serve_claimed",
       "norm_label": "`$hermes_home/hdp/bridge.sock` \u2014 the plugin\u2194bridge unix control socket, mode..."
     },
     {
@@ -1025,7 +1025,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_config_rationale_73",
       "community": 30,
-      "community_name": "hdp_bridge/config.py",
+      "community_name": "_serve_claimed",
       "norm_label": "`$hermes_home/hdp/bridge.pid`, written by `daemon.py` after the control socket..."
     },
     {
@@ -1036,7 +1036,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_config_rationale_82",
       "community": 30,
-      "community_name": "hdp_bridge/config.py",
+      "community_name": "_serve_claimed",
       "norm_label": "`$hermes_home/hdp/policy.yaml`, read only by the bridge daemon."
     },
     {
@@ -1059,8 +1059,8 @@
       "_callable_class": true,
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_connection_pendinghandshake",
-      "community": 58,
-      "community_name": "CapabilityDescriptor",
+      "community": 4,
+      "community_name": "Registry",
       "norm_label": "_pendinghandshake"
     },
     {
@@ -1072,8 +1072,8 @@
       "_callable_class": true,
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_connection_invokerequestlike",
-      "community": 58,
-      "community_name": "CapabilityDescriptor",
+      "community": 4,
+      "community_name": "Registry",
       "norm_label": "_invokerequestlike"
     },
     {
@@ -1083,8 +1083,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_connection_py_protocol",
-      "community": 58,
-      "community_name": "CapabilityDescriptor",
+      "community": 4,
+      "community_name": "Registry",
       "norm_label": "protocol"
     },
     {
@@ -1108,8 +1108,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_connection_nodeconnection_init",
-      "community": 13,
-      "community_name": "InvocationsMem",
+      "community": 9,
+      "community_name": ".__init__",
       "norm_label": ".__init__()"
     },
     {
@@ -1119,8 +1119,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_connection_py_websocketresponse",
-      "community": 13,
-      "community_name": "InvocationsMem",
+      "community": 9,
+      "community_name": ".__init__",
       "norm_label": "websocketresponse"
     },
     {
@@ -1130,8 +1130,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_connection_py_connection",
-      "community": 13,
-      "community_name": "InvocationsMem",
+      "community": 9,
+      "community_name": ".__init__",
       "norm_label": "connection"
     },
     {
@@ -1166,7 +1166,7 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_connection_nodeconnection_send_invoke",
-      "community": 58,
+      "community": 31,
       "community_name": "CapabilityDescriptor",
       "norm_label": ".send_invoke()"
     },
@@ -1452,8 +1452,8 @@
       "source_location": "L64",
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_connection_rationale_64",
-      "community": 58,
-      "community_name": "CapabilityDescriptor",
+      "community": 4,
+      "community_name": "Registry",
       "norm_label": "a challenge awaiting its proof (hdp-0.md amendments v0.4). `pair_code` is set..."
     },
     {
@@ -2516,8 +2516,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_daemon_ensure_policy_file",
-      "community": 76,
-      "community_name": "_serve_claimed",
+      "community": 40,
+      "community_name": "daemon.py",
       "norm_label": "_ensure_policy_file()"
     },
     {
@@ -2527,8 +2527,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_daemon_py_path",
-      "community": 76,
-      "community_name": "_serve_claimed",
+      "community": 40,
+      "community_name": "daemon.py",
       "norm_label": "path"
     },
     {
@@ -2586,7 +2586,7 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_daemon_serve_claimed",
-      "community": 76,
+      "community": 30,
       "community_name": "_serve_claimed",
       "norm_label": "_serve_claimed()"
     },
@@ -2631,8 +2631,8 @@
       "source_location": "L45",
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_daemon_rationale_45",
-      "community": 76,
-      "community_name": "_serve_claimed",
+      "community": 40,
+      "community_name": "daemon.py",
       "norm_label": "create the conservative daemon-owned policy once, without overwriting operator..."
     },
     {
@@ -3150,8 +3150,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_operations_pair_new",
-      "community": 20,
-      "community_name": "connect",
+      "community": 30,
+      "community_name": "_serve_claimed",
       "norm_label": "pair_new()"
     },
     {
@@ -3175,7 +3175,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_operations_revoke_failed",
       "community": 11,
-      "community_name": "test_cli.py",
+      "community_name": "hdp_bridge/__init__.py",
       "norm_label": "revoke_failed()"
     },
     {
@@ -3232,8 +3232,8 @@
       "source_location": "L36",
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_operations_rationale_36",
-      "community": 20,
-      "community_name": "connect",
+      "community": 30,
+      "community_name": "_serve_claimed",
       "norm_label": "mint a pairing code and return it in plaintext. there is no control-plane verb..."
     },
     {
@@ -3255,7 +3255,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_operations_rationale_66",
       "community": 11,
-      "community_name": "test_cli.py",
+      "community_name": "hdp_bridge/__init__.py",
       "norm_label": "true when `revoke()`'s return value describes a failure rather than a completed..."
     },
     {
@@ -3324,8 +3324,8 @@
       "_callable_class": true,
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_pairing_nopairingcodeavailableerror",
-      "community": 82,
-      "community_name": "NoPairingCodeAvailableError",
+      "community": 38,
+      "community_name": "mint_pairing_code",
       "norm_label": "nopairingcodeavailableerror"
     },
     {
@@ -3335,8 +3335,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_pairing_py_runtimeerror",
-      "community": 82,
-      "community_name": "NoPairingCodeAvailableError",
+      "community": 38,
+      "community_name": "mint_pairing_code",
       "norm_label": "runtimeerror"
     },
     {
@@ -3427,8 +3427,8 @@
       "source_location": "L47",
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_pairing_rationale_47",
-      "community": 82,
-      "community_name": "NoPairingCodeAvailableError",
+      "community": 38,
+      "community_name": "mint_pairing_code",
       "norm_label": "every sampled code collided with a code that is still live. only reachable with..."
     },
     {
@@ -3987,8 +3987,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_registry_registry_known_active_device_ids",
-      "community": 4,
-      "community_name": "Registry",
+      "community": 18,
+      "community_name": ".known_active_device_ids",
       "norm_label": ".known_active_device_ids()"
     },
     {
@@ -4055,8 +4055,8 @@
       "source_location": "L119",
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_registry_rationale_119",
-      "community": 4,
-      "community_name": "Registry",
+      "community": 18,
+      "community_name": ".known_active_device_ids",
       "norm_label": "return active device ids valid for policy references."
     },
     {
@@ -4066,8 +4066,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_revocation",
-      "community": 17,
-      "community_name": "AuditWriter",
+      "community": 75,
+      "community_name": "test_revocation.py",
       "norm_label": "revocation.py"
     },
     {
@@ -4100,8 +4100,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_revocation_rationale_1",
-      "community": 17,
-      "community_name": "AuditWriter",
+      "community": 75,
+      "community_name": "test_revocation.py",
       "norm_label": "operator-initiated revocation (fr-15, \u00a74.4) \u2014 immediate and total, four steps..."
     },
     {
@@ -4122,7 +4122,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_server",
-      "community": 63,
+      "community": 6,
       "community_name": "server.py",
       "norm_label": "server.py"
     },
@@ -4135,7 +4135,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_server_build_app",
       "community": 63,
-      "community_name": "server.py",
+      "community_name": "build_app",
       "norm_label": "build_app()"
     },
     {
@@ -4146,7 +4146,7 @@
       "_origin": "ast",
       "id": "connectionfactory",
       "community": 63,
-      "community_name": "server.py",
+      "community_name": "build_app",
       "norm_label": "connectionfactory"
     },
     {
@@ -4157,7 +4157,7 @@
       "_origin": "ast",
       "id": "application",
       "community": 63,
-      "community_name": "server.py",
+      "community_name": "build_app",
       "norm_label": "application"
     },
     {
@@ -4169,7 +4169,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_server_health",
       "community": 63,
-      "community_name": "server.py",
+      "community_name": "build_app",
       "norm_label": "_health()"
     },
     {
@@ -4180,7 +4180,7 @@
       "_origin": "ast",
       "id": "request",
       "community": 63,
-      "community_name": "server.py",
+      "community_name": "build_app",
       "norm_label": "request"
     },
     {
@@ -4191,7 +4191,7 @@
       "_origin": "ast",
       "id": "response",
       "community": 63,
-      "community_name": "server.py",
+      "community_name": "build_app",
       "norm_label": "response"
     },
     {
@@ -4203,7 +4203,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_server_blobs_reserved",
       "community": 63,
-      "community_name": "server.py",
+      "community_name": "build_app",
       "norm_label": "_blobs_reserved()"
     },
     {
@@ -4215,7 +4215,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_server_make_socket_handler",
       "community": 63,
-      "community_name": "server.py",
+      "community_name": "build_app",
       "norm_label": "_make_socket_handler()"
     },
     {
@@ -4226,7 +4226,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_server_py_any",
       "community": 63,
-      "community_name": "server.py",
+      "community_name": "build_app",
       "norm_label": "any"
     },
     {
@@ -4237,7 +4237,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_server_py_websocketresponse",
       "community": 63,
-      "community_name": "server.py",
+      "community_name": "build_app",
       "norm_label": "websocketresponse"
     },
     {
@@ -4250,7 +4250,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_server_hdpserver",
       "community": 6,
-      "community_name": "HdpServer",
+      "community_name": "server.py",
       "norm_label": "hdpserver"
     },
     {
@@ -4262,7 +4262,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_server_hdpserver_init",
       "community": 63,
-      "community_name": "server.py",
+      "community_name": "build_app",
       "norm_label": ".__init__()"
     },
     {
@@ -4272,8 +4272,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_server_py_path",
-      "community": 6,
-      "community_name": "HdpServer",
+      "community": 63,
+      "community_name": "build_app",
       "norm_label": "path"
     },
     {
@@ -4285,7 +4285,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_server_hdpserver_start",
       "community": 6,
-      "community_name": "HdpServer",
+      "community_name": "server.py",
       "norm_label": ".start()"
     },
     {
@@ -4297,7 +4297,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_server_hdpserver_close",
       "community": 6,
-      "community_name": "HdpServer",
+      "community_name": "server.py",
       "norm_label": ".close()"
     },
     {
@@ -4309,7 +4309,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_server_bound_port",
       "community": 6,
-      "community_name": "HdpServer",
+      "community_name": "server.py",
       "norm_label": "_bound_port()"
     },
     {
@@ -4320,7 +4320,7 @@
       "_origin": "ast",
       "id": "tcpsite",
       "community": 6,
-      "community_name": "HdpServer",
+      "community_name": "server.py",
       "norm_label": "tcpsite"
     },
     {
@@ -4332,7 +4332,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_server_write_bridge_addr",
       "community": 6,
-      "community_name": "HdpServer",
+      "community_name": "server.py",
       "norm_label": "_write_bridge_addr()"
     },
     {
@@ -4342,7 +4342,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_server_rationale_1",
-      "community": 63,
+      "community": 6,
       "community_name": "server.py",
       "norm_label": "the standalone `hdp-bridge` daemon's aiohttp app (adr-0004, design \u00a73) \u2014 the m2..."
     },
@@ -4354,7 +4354,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_server_rationale_33",
       "community": 63,
-      "community_name": "server.py",
+      "community_name": "build_app",
       "norm_label": "`connection_factory` builds one `nodeconnection` per accepted websocket,..."
     },
     {
@@ -4365,7 +4365,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_server_rationale_70",
       "community": 6,
-      "community_name": "HdpServer",
+      "community_name": "server.py",
       "norm_label": "owns the `apprunner`/`tcpsite` pair and the `bridge.addr` discovery file."
     },
     {
@@ -4376,7 +4376,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_server_rationale_89",
       "community": 6,
-      "community_name": "HdpServer",
+      "community_name": "server.py",
       "norm_label": "bind and start serving. returns the actually-bound port. refuses to bind a non-..."
     },
     {
@@ -4387,7 +4387,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_server_rationale_125",
       "community": 6,
-      "community_name": "HdpServer",
+      "community_name": "server.py",
       "norm_label": "`tcpsite` doesn't expose the bound port directly when the requested port was..."
     },
     {
@@ -4669,8 +4669,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_types_capabilityrecord_to_wire",
-      "community": 83,
-      "community_name": ".to_wire",
+      "community": 4,
+      "community_name": "Registry",
       "norm_label": ".to_wire()"
     },
     {
@@ -4680,8 +4680,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_types_py_any",
-      "community": 83,
-      "community_name": ".to_wire",
+      "community": 4,
+      "community_name": "Registry",
       "norm_label": "any"
     },
     {
@@ -4705,8 +4705,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_bridge_hdp_bridge_types_devicerecord_to_wire",
-      "community": 83,
-      "community_name": ".to_wire",
+      "community": 4,
+      "community_name": "Registry",
       "norm_label": ".to_wire()"
     },
     {
@@ -4950,7 +4950,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_tests_test_bridge_config",
       "community": 30,
-      "community_name": "hdp_bridge/config.py",
+      "community_name": "_serve_claimed",
       "norm_label": "test_bridge_config.py"
     },
     {
@@ -4962,7 +4962,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_tests_test_bridge_config_test_paths_are_profile_scoped",
       "community": 30,
-      "community_name": "hdp_bridge/config.py",
+      "community_name": "_serve_claimed",
       "norm_label": "test_paths_are_profile_scoped()"
     },
     {
@@ -4974,7 +4974,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_tests_test_bridge_config_test_paths_read_home_fresh_every_call",
       "community": 30,
-      "community_name": "hdp_bridge/config.py",
+      "community_name": "_serve_claimed",
       "norm_label": "test_paths_read_home_fresh_every_call()"
     },
     {
@@ -4985,7 +4985,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_tests_test_cli",
       "community": 11,
-      "community_name": "test_cli.py",
+      "community_name": "hdp_bridge/__init__.py",
       "norm_label": "test_cli.py"
     },
     {
@@ -4997,7 +4997,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_tests_test_cli_test_approvals_list_renders_daemon_held_pending_records",
       "community": 11,
-      "community_name": "test_cli.py",
+      "community_name": "hdp_bridge/__init__.py",
       "norm_label": "test_approvals_list_renders_daemon_held_pending_records()"
     },
     {
@@ -5008,7 +5008,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_tests_test_cli_py_parametrize",
       "community": 11,
-      "community_name": "test_cli.py",
+      "community_name": "hdp_bridge/__init__.py",
       "norm_label": "parametrize"
     },
     {
@@ -5020,7 +5020,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_tests_test_cli_test_approval_decisions_use_the_control_plane",
       "community": 11,
-      "community_name": "test_cli.py",
+      "community_name": "hdp_bridge/__init__.py",
       "norm_label": "test_approval_decisions_use_the_control_plane()"
     },
     {
@@ -5032,7 +5032,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_tests_test_cli_test_policy_show_and_reload_are_read_only_control_plane_clients",
       "community": 11,
-      "community_name": "test_cli.py",
+      "community_name": "hdp_bridge/__init__.py",
       "norm_label": "test_policy_show_and_reload_are_read_only_control_plane_clients()"
     },
     {
@@ -5044,7 +5044,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_tests_test_cli_test_policy_validate_checks_a_file_without_replacing_daemon_policy",
       "community": 11,
-      "community_name": "test_cli.py",
+      "community_name": "hdp_bridge/__init__.py",
       "norm_label": "test_policy_validate_checks_a_file_without_replacing_daemon_policy()"
     },
     {
@@ -5056,7 +5056,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_tests_test_cli_test_pair_new_records_pairing_code_minted_with_no_code_or_hash",
       "community": 11,
-      "community_name": "test_cli.py",
+      "community_name": "hdp_bridge/__init__.py",
       "norm_label": "test_pair_new_records_pairing_code_minted_with_no_code_or_hash()"
     },
     {
@@ -5068,7 +5068,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_tests_test_cli_test_audit_tail_prints_todays_audit_file",
       "community": 11,
-      "community_name": "test_cli.py",
+      "community_name": "hdp_bridge/__init__.py",
       "norm_label": "test_audit_tail_prints_todays_audit_file()"
     },
     {
@@ -5080,7 +5080,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_tests_test_cli_test_audit_tail_prints_nothing_when_no_audit_file_exists",
       "community": 11,
-      "community_name": "test_cli.py",
+      "community_name": "hdp_bridge/__init__.py",
       "norm_label": "test_audit_tail_prints_nothing_when_no_audit_file_exists()"
     },
     {
@@ -5092,7 +5092,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_tests_test_cli_test_devices_revoke_offline_fallback_records_a_revoked_audit_entry",
       "community": 11,
-      "community_name": "test_cli.py",
+      "community_name": "hdp_bridge/__init__.py",
       "norm_label": "test_devices_revoke_offline_fallback_records_a_revoked_audit_entry()"
     },
     {
@@ -5104,7 +5104,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_tests_test_cli_insert_device_with_credential",
       "community": 11,
-      "community_name": "test_cli.py",
+      "community_name": "hdp_bridge/__init__.py",
       "norm_label": "_insert_device_with_credential()"
     },
     {
@@ -5116,7 +5116,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_tests_test_cli_test_devices_revoke_of_an_unknown_device_reports_no_such_device_and_audits_nothing",
       "community": 11,
-      "community_name": "test_cli.py",
+      "community_name": "hdp_bridge/__init__.py",
       "norm_label": "test_devices_revoke_of_an_unknown_device_reports_no_such_device_and_audits_nothing()"
     },
     {
@@ -5128,7 +5128,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_tests_test_cli_test_devices_revoke_twice_reports_no_such_device_the_second_time",
       "community": 11,
-      "community_name": "test_cli.py",
+      "community_name": "hdp_bridge/__init__.py",
       "norm_label": "test_devices_revoke_twice_reports_no_such_device_the_second_time()"
     },
     {
@@ -5139,7 +5139,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_tests_test_cli_rationale_1",
       "community": 11,
-      "community_name": "test_cli.py",
+      "community_name": "hdp_bridge/__init__.py",
       "norm_label": "`hdp-bridge` cli \u2014 `pair new`'s audit call site (task 16) and `audit tail`. no..."
     },
     {
@@ -5150,7 +5150,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_tests_test_cli_rationale_146",
       "community": 11,
-      "community_name": "test_cli.py",
+      "community_name": "hdp_bridge/__init__.py",
       "norm_label": "task 17's gap-fix for the review finding carried forward from task 16: with no..."
     },
     {
@@ -5161,7 +5161,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_tests_test_cli_rationale_172",
       "community": 11,
-      "community_name": "test_cli.py",
+      "community_name": "hdp_bridge/__init__.py",
       "norm_label": "a minimal `devices` row plus one live `credentials` row \u2014 the smallest state in..."
     },
     {
@@ -5172,7 +5172,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_tests_test_cli_rationale_188",
       "community": 11,
-      "community_name": "test_cli.py",
+      "community_name": "hdp_bridge/__init__.py",
       "norm_label": "finding i4: the offline fallback used to print \"revoked <id>\" unconditionally,..."
     },
     {
@@ -5183,7 +5183,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_tests_test_cli_rationale_204",
       "community": 11,
-      "community_name": "test_cli.py",
+      "community_name": "hdp_bridge/__init__.py",
       "norm_label": "already-revoked is the same zero-rows case as never-existed \u2014 both are \"nothing..."
     },
     {
@@ -5338,8 +5338,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_bridge_tests_test_connection_auth_test_hello_with_a_previously_consumed_pairing_code_is_auth_failed",
-      "community": 38,
-      "community_name": "mint_pairing_code",
+      "community": 71,
+      "community_name": "test_connection_auth.py",
       "norm_label": "test_hello_with_a_previously_consumed_pairing_code_is_auth_failed()"
     },
     {
@@ -5374,8 +5374,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_bridge_tests_test_connection_auth_test_pairing_hello_records_the_self_reported_platform",
-      "community": 20,
-      "community_name": "connect",
+      "community": 71,
+      "community_name": "test_connection_auth.py",
       "norm_label": "test_pairing_hello_records_the_self_reported_platform()"
     },
     {
@@ -5386,8 +5386,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_bridge_tests_test_connection_auth_test_pairing_hello_without_a_platform_stays_unknown",
-      "community": 20,
-      "community_name": "connect",
+      "community": 71,
+      "community_name": "test_connection_auth.py",
       "norm_label": "test_pairing_hello_without_a_platform_stays_unknown()"
     },
     {
@@ -5420,8 +5420,8 @@
       "source_location": "L239",
       "_origin": "ast",
       "id": "hdp_bridge_tests_test_connection_auth_rationale_239",
-      "community": 20,
-      "community_name": "connect",
+      "community": 71,
+      "community_name": "test_connection_auth.py",
       "norm_label": "hdp-0.md amendments v0.3. without this the registry hardcodes \"unknown\" and..."
     },
     {
@@ -5431,8 +5431,8 @@
       "source_location": "L269",
       "_origin": "ast",
       "id": "hdp_bridge_tests_test_connection_auth_rationale_269",
-      "community": 20,
-      "community_name": "connect",
+      "community": 71,
+      "community_name": "test_connection_auth.py",
       "norm_label": "every pre-v0.3 node omits the field; it must keep pairing, not fail closed."
     },
     {
@@ -5453,8 +5453,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "hdp_bridge_tests_test_control",
-      "community": 52,
-      "community_name": "test_control.py",
+      "community": 3,
+      "community_name": ".new",
       "norm_label": "test_control.py"
     },
     {
@@ -5464,8 +5464,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "hdp_bridge_tests_test_control_py_fixture",
-      "community": 52,
-      "community_name": "test_control.py",
+      "community": 3,
+      "community_name": ".new",
       "norm_label": "fixture"
     },
     {
@@ -5585,8 +5585,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_bridge_tests_test_control_node_client",
-      "community": 52,
-      "community_name": "test_control.py",
+      "community": 3,
+      "community_name": ".new",
       "norm_label": "node_client()"
     },
     {
@@ -5597,8 +5597,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_bridge_tests_test_control_ctl_conn",
-      "community": 52,
-      "community_name": "test_control.py",
+      "community": 3,
+      "community_name": ".new",
       "norm_label": "ctl_conn()"
     },
     {
@@ -5609,8 +5609,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_bridge_tests_test_control_connect_and_hello",
-      "community": 52,
-      "community_name": "test_control.py",
+      "community": 3,
+      "community_name": ".new",
       "norm_label": "_connect_and_hello()"
     },
     {
@@ -5621,8 +5621,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_bridge_tests_test_control_ctl_invoke",
-      "community": 52,
-      "community_name": "test_control.py",
+      "community": 3,
+      "community_name": ".new",
       "norm_label": "_ctl_invoke()"
     },
     {
@@ -5681,8 +5681,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_bridge_tests_test_control_test_ctl_invoke_against_unknown_device_is_device_offline",
-      "community": 52,
-      "community_name": "test_control.py",
+      "community": 3,
+      "community_name": ".new",
       "norm_label": "test_ctl_invoke_against_unknown_device_is_device_offline()"
     },
     {
@@ -5693,8 +5693,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_bridge_tests_test_control_test_ctl_invoke_round_trips_and_validates_output",
-      "community": 52,
-      "community_name": "test_control.py",
+      "community": 3,
+      "community_name": ".new",
       "norm_label": "test_ctl_invoke_round_trips_and_validates_output()"
     },
     {
@@ -5705,8 +5705,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_bridge_tests_test_control_test_ctl_invoke_never_ack_yields_device_offline",
-      "community": 52,
-      "community_name": "test_control.py",
+      "community": 3,
+      "community_name": ".new",
       "norm_label": "test_ctl_invoke_never_ack_yields_device_offline()"
     },
     {
@@ -5717,8 +5717,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_bridge_tests_test_control_test_ctl_invoke_slow_result_yields_invocation_timeout",
-      "community": 52,
-      "community_name": "test_control.py",
+      "community": 3,
+      "community_name": ".new",
       "norm_label": "test_ctl_invoke_slow_result_yields_invocation_timeout()"
     },
     {
@@ -5729,8 +5729,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_bridge_tests_test_control_test_ctl_invoke_disconnect_mid_call_is_immediate",
-      "community": 52,
-      "community_name": "test_control.py",
+      "community": 3,
+      "community_name": ".new",
       "norm_label": "test_ctl_invoke_disconnect_mid_call_is_immediate()"
     },
     {
@@ -5741,8 +5741,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_bridge_tests_test_control_test_ctl_invoke_malformed_result_is_rejected",
-      "community": 52,
-      "community_name": "test_control.py",
+      "community": 3,
+      "community_name": ".new",
       "norm_label": "test_ctl_invoke_malformed_result_is_rejected()"
     },
     {
@@ -5753,8 +5753,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_bridge_tests_test_control_test_ctl_invoke_node_reported_failure_passes_through",
-      "community": 52,
-      "community_name": "test_control.py",
+      "community": 3,
+      "community_name": ".new",
       "norm_label": "test_ctl_invoke_node_reported_failure_passes_through()"
     },
     {
@@ -5765,8 +5765,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_bridge_tests_test_control_test_ctl_invoke_expired_invocation_leaves_nothing_pending",
-      "community": 52,
-      "community_name": "test_control.py",
+      "community": 3,
+      "community_name": ".new",
       "norm_label": "test_ctl_invoke_expired_invocation_leaves_nothing_pending()"
     },
     {
@@ -5777,8 +5777,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_bridge_tests_test_control_test_ctl_cancel_on_pending_invocation_resolves_it_negatively",
-      "community": 52,
-      "community_name": "test_control.py",
+      "community": 3,
+      "community_name": ".new",
       "norm_label": "test_ctl_cancel_on_pending_invocation_resolves_it_negatively()"
     },
     {
@@ -5801,8 +5801,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_bridge_tests_test_control_test_ctl_status_reports_connected_device_count",
-      "community": 52,
-      "community_name": "test_control.py",
+      "community": 3,
+      "community_name": ".new",
       "norm_label": "test_ctl_status_reports_connected_device_count()"
     },
     {
@@ -5813,8 +5813,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_bridge_tests_test_control_test_ctl_list_approvals_returns_an_empty_pending_set",
-      "community": 52,
-      "community_name": "test_control.py",
+      "community": 3,
+      "community_name": ".new",
       "norm_label": "test_ctl_list_approvals_returns_an_empty_pending_set()"
     },
     {
@@ -5849,8 +5849,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_bridge_tests_test_control_test_ctl_devices_revoke_disconnects_live_node_and_fails_in_flight_invoke",
-      "community": 52,
-      "community_name": "test_control.py",
+      "community": 3,
+      "community_name": ".new",
       "norm_label": "test_ctl_devices_revoke_disconnects_live_node_and_fails_in_flight_invoke()"
     },
     {
@@ -5908,8 +5908,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "hdp_bridge_tests_test_control_rationale_1",
-      "community": 52,
-      "community_name": "test_control.py",
+      "community": 3,
+      "community_name": ".new",
       "norm_label": "`hdp_bridge.control` \u2014 the plugin\u2194bridge unix-socket control plane...."
     },
     {
@@ -5974,8 +5974,8 @@
       "source_location": "L507",
       "_origin": "ast",
       "id": "hdp_bridge_tests_test_control_rationale_507",
-      "community": 52,
-      "community_name": "test_control.py",
+      "community": 3,
+      "community_name": ".new",
       "norm_label": "nothing-leaks invariant (hdp-spec/hdp-0.md \u00a77): after a terminal outcome \u2014..."
     },
     {
@@ -5985,8 +5985,8 @@
       "source_location": "L583",
       "_origin": "ast",
       "id": "hdp_bridge_tests_test_control_rationale_583",
-      "community": 52,
-      "community_name": "test_control.py",
+      "community": 3,
+      "community_name": ".new",
       "norm_label": "m3 exposes daemon-held pending approvals over the existing control verb."
     },
     {
@@ -6018,8 +6018,8 @@
       "source_location": "L676",
       "_origin": "ast",
       "id": "hdp_bridge_tests_test_control_rationale_676",
-      "community": 52,
-      "community_name": "test_control.py",
+      "community": 3,
+      "community_name": ".new",
       "norm_label": "end-to-end (task 13, fr-15): a live node connection receives a `revoke` frame..."
     },
     {
@@ -8481,8 +8481,8 @@
       "_callable_class": true,
       "_origin": "ast",
       "id": "hdp_bridge_tests_test_server_harness",
-      "community": 78,
-      "community_name": "_Harness",
+      "community": 28,
+      "community_name": "test_server.py",
       "norm_label": "_harness"
     },
     {
@@ -8493,8 +8493,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_bridge_tests_test_server_harness_init",
-      "community": 78,
-      "community_name": "_Harness",
+      "community": 28,
+      "community_name": "test_server.py",
       "norm_label": ".__init__()"
     },
     {
@@ -8505,8 +8505,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_bridge_tests_test_server_harness_make_connection",
-      "community": 78,
-      "community_name": "_Harness",
+      "community": 28,
+      "community_name": "test_server.py",
       "norm_label": ".make_connection()"
     },
     {
@@ -8516,8 +8516,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "hdp_bridge_tests_test_server_py_fixture",
-      "community": 63,
-      "community_name": "server.py",
+      "community": 28,
+      "community_name": "test_server.py",
       "norm_label": "fixture"
     },
     {
@@ -8528,8 +8528,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_bridge_tests_test_server_client",
-      "community": 63,
-      "community_name": "server.py",
+      "community": 28,
+      "community_name": "test_server.py",
       "norm_label": "client()"
     },
     {
@@ -8634,8 +8634,8 @@
       "source_location": "L49",
       "_origin": "ast",
       "id": "hdp_bridge_tests_test_server_rationale_49",
-      "community": 78,
-      "community_name": "_Harness",
+      "community": 28,
+      "community_name": "test_server.py",
       "norm_label": "the same shared-state wiring `embeddedtransport` used to own at m1: one..."
     },
     {
@@ -8646,7 +8646,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_tests_test_server_bind_lifecycle",
       "community": 6,
-      "community_name": "HdpServer",
+      "community_name": "server.py",
       "norm_label": "test_server_bind_lifecycle.py"
     },
     {
@@ -8658,7 +8658,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_tests_test_server_bind_lifecycle_noop_connection_factory",
       "community": 6,
-      "community_name": "HdpServer",
+      "community_name": "server.py",
       "norm_label": "_noop_connection_factory()"
     },
     {
@@ -8670,7 +8670,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_tests_test_server_bind_lifecycle_test_write_bridge_addr_retries_past_transient_failure",
       "community": 6,
-      "community_name": "HdpServer",
+      "community_name": "server.py",
       "norm_label": "test_write_bridge_addr_retries_past_transient_failure()"
     },
     {
@@ -8682,7 +8682,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_tests_test_server_bind_lifecycle_test_write_bridge_addr_reraises_after_exhausting_attempts",
       "community": 6,
-      "community_name": "HdpServer",
+      "community_name": "server.py",
       "norm_label": "test_write_bridge_addr_reraises_after_exhausting_attempts()"
     },
     {
@@ -8694,7 +8694,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_tests_test_server_bind_lifecycle_test_close_swallows_oserror_from_a_missing_parent",
       "community": 6,
-      "community_name": "HdpServer",
+      "community_name": "server.py",
       "norm_label": "test_close_swallows_oserror_from_a_missing_parent()"
     },
     {
@@ -8706,7 +8706,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_tests_test_server_bind_lifecycle_test_close_swallows_oserror_from_torn_down_filesystem",
       "community": 6,
-      "community_name": "HdpServer",
+      "community_name": "server.py",
       "norm_label": "test_close_swallows_oserror_from_torn_down_filesystem()"
     },
     {
@@ -8718,7 +8718,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_tests_test_server_bind_lifecycle_test_server_module_has_no_config_import",
       "community": 6,
-      "community_name": "HdpServer",
+      "community_name": "server.py",
       "norm_label": "test_server_module_has_no_config_import()"
     },
     {
@@ -8729,7 +8729,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_tests_test_server_bind_lifecycle_rationale_1",
       "community": 6,
-      "community_name": "HdpServer",
+      "community_name": "server.py",
       "norm_label": "`hdpserver.start()`/`close()` bind-lifecycle edge cases \u2014 specifically the two..."
     },
     {
@@ -8740,7 +8740,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_tests_test_server_bind_lifecycle_rationale_29",
       "community": 6,
-      "community_name": "HdpServer",
+      "community_name": "server.py",
       "norm_label": "an `oserror` on the first two attempts (simulating a transient filesystem..."
     },
     {
@@ -8751,7 +8751,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_tests_test_server_bind_lifecycle_rationale_50",
       "community": 6,
-      "community_name": "HdpServer",
+      "community_name": "server.py",
       "norm_label": "if the failure is genuinely persistent (not just a transient race), the caller..."
     },
     {
@@ -8762,7 +8762,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_tests_test_server_bind_lifecycle_rationale_65",
       "community": 6,
-      "community_name": "HdpServer",
+      "community_name": "server.py",
       "norm_label": "`hdpserver.close()` runs on the daemon thread during possibly-uncoordinated..."
     },
     {
@@ -8773,7 +8773,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_tests_test_server_bind_lifecycle_rationale_86",
       "community": 6,
-      "community_name": "HdpServer",
+      "community_name": "server.py",
       "norm_label": "same as above but for an `oserror` raised by `unlink()` itself rather than a..."
     },
     {
@@ -8784,7 +8784,7 @@
       "_origin": "ast",
       "id": "hdp_bridge_tests_test_server_bind_lifecycle_rationale_107",
       "community": 6,
-      "community_name": "HdpServer",
+      "community_name": "server.py",
       "norm_label": "global constraint: `hdp_bridge` must never import from `hermes_device_plugin` \u2014..."
     },
     {
@@ -8953,8 +8953,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "hdp_reference_node_hdp_reference_node_capabilities_device_status",
-      "community": 67,
-      "community_name": "device_status.py",
+      "community": 21,
+      "community_name": "capabilities.py",
       "norm_label": "device_status.py"
     },
     {
@@ -8965,8 +8965,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_reference_node_hdp_reference_node_capabilities_device_status_handle",
-      "community": 67,
-      "community_name": "device_status.py",
+      "community": 21,
+      "community_name": "capabilities.py",
       "norm_label": "handle()"
     },
     {
@@ -8976,8 +8976,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "hdp_reference_node_hdp_reference_node_capabilities_device_status_py_any",
-      "community": 67,
-      "community_name": "device_status.py",
+      "community": 21,
+      "community_name": "capabilities.py",
       "norm_label": "any"
     },
     {
@@ -8987,8 +8987,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "hdp_reference_node_hdp_reference_node_capabilities_device_status_rationale_1",
-      "community": 67,
-      "community_name": "device_status.py",
+      "community": 21,
+      "community_name": "capabilities.py",
       "norm_label": "`device.status@1` (hdp-spec/capabilities/device.status@1.md). deliberately..."
     },
     {
@@ -8998,8 +8998,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "hdp_reference_node_hdp_reference_node_capabilities_diagnostics",
-      "community": 64,
-      "community_name": "diagnostics.py",
+      "community": 21,
+      "community_name": "capabilities.py",
       "norm_label": "diagnostics.py"
     },
     {
@@ -9010,8 +9010,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_reference_node_hdp_reference_node_capabilities_diagnostics_handle",
-      "community": 64,
-      "community_name": "diagnostics.py",
+      "community": 21,
+      "community_name": "capabilities.py",
       "norm_label": "handle()"
     },
     {
@@ -9021,8 +9021,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "hdp_reference_node_hdp_reference_node_capabilities_diagnostics_py_any",
-      "community": 64,
-      "community_name": "diagnostics.py",
+      "community": 21,
+      "community_name": "capabilities.py",
       "norm_label": "any"
     },
     {
@@ -9032,8 +9032,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "hdp_reference_node_hdp_reference_node_capabilities_diagnostics_rationale_1",
-      "community": 64,
-      "community_name": "diagnostics.py",
+      "community": 21,
+      "community_name": "capabilities.py",
       "norm_label": "`diagnostics.echo@1` (hdp-spec/capabilities/diagnostics.echo@1.md) \u2014 a pure..."
     },
     {
@@ -9043,8 +9043,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "hdp_reference_node_hdp_reference_node_capabilities_notifications",
-      "community": 69,
-      "community_name": "notifications.py",
+      "community": 21,
+      "community_name": "capabilities.py",
       "norm_label": "notifications.py"
     },
     {
@@ -9055,8 +9055,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_reference_node_hdp_reference_node_capabilities_notifications_handle",
-      "community": 69,
-      "community_name": "notifications.py",
+      "community": 21,
+      "community_name": "capabilities.py",
       "norm_label": "handle()"
     },
     {
@@ -9066,8 +9066,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "hdp_reference_node_hdp_reference_node_capabilities_notifications_py_any",
-      "community": 69,
-      "community_name": "notifications.py",
+      "community": 21,
+      "community_name": "capabilities.py",
       "norm_label": "any"
     },
     {
@@ -9077,8 +9077,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "hdp_reference_node_hdp_reference_node_capabilities_notifications_rationale_1",
-      "community": 69,
-      "community_name": "notifications.py",
+      "community": 21,
+      "community_name": "capabilities.py",
       "norm_label": "`notifications.send@1` (hdp-spec/capabilities/notifications.send@1.md). prints..."
     },
     {
@@ -9741,8 +9741,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_reference_node_tests_test_node_auth_capture_explicit_credential_handler",
-      "community": 0,
-      "community_name": ".from_wire",
+      "community": 3,
+      "community_name": ".new",
       "norm_label": "_capture_explicit_credential_handler()"
     },
     {
@@ -9902,8 +9902,8 @@
       "source_location": "L157",
       "_origin": "ast",
       "id": "hdp_reference_node_tests_test_node_auth_rationale_157",
-      "community": 0,
-      "community_name": ".from_wire",
+      "community": 3,
+      "community_name": ".new",
       "norm_label": "capture the hello so the explicit, non-persistent credential contract is..."
     },
     {
@@ -10178,8 +10178,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_init",
-      "community": 0,
-      "community_name": ".from_wire",
+      "community": 3,
+      "community_name": ".new",
       "norm_label": "hdp_proto/__init__.py"
     },
     {
@@ -10189,8 +10189,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_init_rationale_1",
-      "community": 0,
-      "community_name": ".from_wire",
+      "community": 3,
+      "community_name": ".new",
       "norm_label": "stdlib-only hdp protocol codec package."
     },
     {
@@ -10200,7 +10200,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_capabilities",
-      "community": 18,
+      "community": 21,
       "community_name": "capabilities.py",
       "norm_label": "capabilities.py"
     },
@@ -10224,8 +10224,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_capabilities_py_valueerror",
-      "community": 21,
-      "community_name": "validate_output",
+      "community": 31,
+      "community_name": "CapabilityDescriptor",
       "norm_label": "valueerror"
     },
     {
@@ -10237,7 +10237,7 @@
       "_callable_class": true,
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_capabilities_capabilitydescriptor",
-      "community": 58,
+      "community": 31,
       "community_name": "CapabilityDescriptor",
       "norm_label": "capabilitydescriptor"
     },
@@ -10249,8 +10249,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_capabilities_capabilitydescriptor_from_wire",
-      "community": 21,
-      "community_name": "validate_output",
+      "community": 31,
+      "community_name": "CapabilityDescriptor",
       "norm_label": ".from_wire()"
     },
     {
@@ -10261,7 +10261,7 @@
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_capabilities_py_any",
       "community": 21,
-      "community_name": "validate_output",
+      "community_name": "capabilities.py",
       "norm_label": "any"
     },
     {
@@ -10273,7 +10273,7 @@
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_capabilities_capabilitydescriptor_to_wire",
       "community": 21,
-      "community_name": "validate_output",
+      "community_name": "capabilities.py",
       "norm_label": ".to_wire()"
     },
     {
@@ -10285,7 +10285,7 @@
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_capabilities_validate_output",
       "community": 21,
-      "community_name": "validate_output",
+      "community_name": "capabilities.py",
       "norm_label": "validate_output()"
     },
     {
@@ -10297,7 +10297,7 @@
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_capabilities_validate",
       "community": 21,
-      "community_name": "validate_output",
+      "community_name": "capabilities.py",
       "norm_label": "_validate()"
     },
     {
@@ -10307,7 +10307,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_capabilities_rationale_1",
-      "community": 18,
+      "community": 21,
       "community_name": "capabilities.py",
       "norm_label": "capability descriptors and output-schema validation. `capabilitydescriptor` is..."
     },
@@ -10329,7 +10329,7 @@
       "source_location": "L29",
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_capabilities_rationale_29",
-      "community": 58,
+      "community": 31,
       "community_name": "CapabilityDescriptor",
       "norm_label": "one entry in a `capabilities` message's full-replacement list (hdp-0.md \u00a72, \u00a76)."
     },
@@ -10340,8 +10340,8 @@
       "source_location": "L38",
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_capabilities_rationale_38",
-      "community": 21,
-      "community_name": "validate_output",
+      "community": 31,
+      "community_name": "CapabilityDescriptor",
       "norm_label": "never `cls(**d)` \u2014 read fields by name, tolerate unknown fields, matching the..."
     },
     {
@@ -10352,7 +10352,7 @@
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_capabilities_rationale_73",
       "community": 21,
-      "community_name": "validate_output",
+      "community_name": "capabilities.py",
       "norm_label": "validate `data` against `descriptor.output_schema`. raises..."
     },
     {
@@ -10362,8 +10362,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_envelope",
-      "community": 0,
-      "community_name": ".from_wire",
+      "community": 43,
+      "community_name": "asyncio",
       "norm_label": "envelope.py"
     },
     {
@@ -10375,8 +10375,8 @@
       "_callable_class": true,
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_envelope_envelopeerror",
-      "community": 0,
-      "community_name": ".from_wire",
+      "community": 10,
+      "community_name": "control.py",
       "norm_label": "envelopeerror"
     },
     {
@@ -10386,8 +10386,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_envelope_py_valueerror",
-      "community": 0,
-      "community_name": ".from_wire",
+      "community": 10,
+      "community_name": "control.py",
       "norm_label": "valueerror"
     },
     {
@@ -10399,8 +10399,8 @@
       "_callable_class": true,
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_envelope_unsupportedversionerror",
-      "community": 0,
-      "community_name": ".from_wire",
+      "community": 3,
+      "community_name": ".new",
       "norm_label": "unsupportedversionerror"
     },
     {
@@ -10412,8 +10412,8 @@
       "_callable_class": true,
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_envelope_unknowntypeerror",
-      "community": 0,
-      "community_name": ".from_wire",
+      "community": 3,
+      "community_name": ".new",
       "norm_label": "unknowntypeerror"
     },
     {
@@ -10448,8 +10448,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_envelope_py_any",
-      "community": 0,
-      "community_name": ".from_wire",
+      "community": 3,
+      "community_name": ".new",
       "norm_label": "any"
     },
     {
@@ -10460,8 +10460,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_envelope_envelope_from_wire",
-      "community": 0,
-      "community_name": ".from_wire",
+      "community": 3,
+      "community_name": ".new",
       "norm_label": ".from_wire()"
     },
     {
@@ -10472,8 +10472,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_envelope_envelope_to_wire",
-      "community": 0,
-      "community_name": ".from_wire",
+      "community": 3,
+      "community_name": ".new",
       "norm_label": ".to_wire()"
     },
     {
@@ -10483,8 +10483,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_envelope_rationale_1",
-      "community": 0,
-      "community_name": ".from_wire",
+      "community": 43,
+      "community_name": "asyncio",
       "norm_label": "the hdp/0 envelope: `{\"hdp\", \"type\", \"id\", \"ts\", \"corr\", \"payload\"}` \u2014 see..."
     },
     {
@@ -10494,8 +10494,8 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_envelope_rationale_20",
-      "community": 0,
-      "community_name": ".from_wire",
+      "community": 10,
+      "community_name": "control.py",
       "norm_label": "raised by `envelope.from_wire` on any structurally or semantically invalid..."
     },
     {
@@ -10505,8 +10505,8 @@
       "source_location": "L34",
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_envelope_rationale_34",
-      "community": 0,
-      "community_name": ".from_wire",
+      "community": 3,
+      "community_name": ".new",
       "norm_label": "the frame's `hdp` field names a version we do not speak. per hdp-0.md \u00a73, this..."
     },
     {
@@ -10516,8 +10516,8 @@
       "source_location": "L40",
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_envelope_rationale_40",
-      "community": 0,
-      "community_name": ".from_wire",
+      "community": 3,
+      "community_name": ".new",
       "norm_label": "the frame's `type` field is missing or not in `known_types`. per hdp-0.md \u00a75,..."
     },
     {
@@ -10549,8 +10549,8 @@
       "source_location": "L65",
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_envelope_rationale_65",
-      "community": 0,
-      "community_name": ".from_wire",
+      "community": 3,
+      "community_name": ".new",
       "norm_label": "validate and construct. never `cls(**d)` \u2014 an unknown top-level key must not..."
     },
     {
@@ -10560,8 +10560,8 @@
       "source_location": "L105",
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_envelope_rationale_105",
-      "community": 0,
-      "community_name": ".from_wire",
+      "community": 3,
+      "community_name": ".new",
       "norm_label": "return a plain `dict`, never a string \u2014 serialization belongs to the transport..."
     },
     {
@@ -10572,7 +10572,7 @@
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_errors",
       "community": 15,
-      "community_name": "err",
+      "community_name": "ErrorCode",
       "norm_label": "errors.py"
     },
     {
@@ -10585,7 +10585,7 @@
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_errors_errorcode",
       "community": 15,
-      "community_name": "err",
+      "community_name": "ErrorCode",
       "norm_label": "errorcode"
     },
     {
@@ -10596,7 +10596,7 @@
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_errors_py_strenum",
       "community": 15,
-      "community_name": "err",
+      "community_name": "ErrorCode",
       "norm_label": "strenum"
     },
     {
@@ -10609,7 +10609,7 @@
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_errors_error",
       "community": 15,
-      "community_name": "err",
+      "community_name": "ErrorCode",
       "norm_label": "error"
     },
     {
@@ -10621,7 +10621,7 @@
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_errors_error_to_dict",
       "community": 15,
-      "community_name": "err",
+      "community_name": "ErrorCode",
       "norm_label": ".to_dict()"
     },
     {
@@ -10632,8 +10632,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_errors_ok",
-      "community": 15,
-      "community_name": "err",
+      "community": 57,
+      "community_name": "Envelope",
       "norm_label": "ok()"
     },
     {
@@ -10643,8 +10643,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_errors_py_any",
-      "community": 15,
-      "community_name": "err",
+      "community": 57,
+      "community_name": "Envelope",
       "norm_label": "any"
     },
     {
@@ -10655,8 +10655,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_errors_err",
-      "community": 15,
-      "community_name": "err",
+      "community": 57,
+      "community_name": "Envelope",
       "norm_label": "err()"
     },
     {
@@ -10666,8 +10666,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "baseexception",
-      "community": 15,
-      "community_name": "err",
+      "community": 57,
+      "community_name": "Envelope",
       "norm_label": "baseexception"
     },
     {
@@ -10678,7 +10678,7 @@
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_errors_rationale_1",
       "community": 15,
-      "community_name": "err",
+      "community_name": "ErrorCode",
       "norm_label": "the closed hdp error-code taxonomy and the model-facing result envelope...."
     },
     {
@@ -10689,7 +10689,7 @@
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_errors_rationale_24",
       "community": 15,
-      "community_name": "err",
+      "community_name": "ErrorCode",
       "norm_label": "stable declaration order \u2014 this is the order the m1 conformance test diffs..."
     },
     {
@@ -10700,7 +10700,7 @@
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_errors_rationale_87",
       "community": 15,
-      "community_name": "err",
+      "community_name": "ErrorCode",
       "norm_label": "the `error` half of the model-facing result envelope."
     },
     {
@@ -10710,8 +10710,8 @@
       "source_location": "L98",
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_errors_rationale_98",
-      "community": 15,
-      "community_name": "err",
+      "community": 57,
+      "community_name": "Envelope",
       "norm_label": "build the success half of the model-facing result envelope: `{\"ok\": true,..."
     },
     {
@@ -10721,8 +10721,8 @@
       "source_location": "L109",
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_errors_rationale_109",
-      "community": 15,
-      "community_name": "err",
+      "community": 57,
+      "community_name": "Envelope",
       "norm_label": "build the failure half of the model-facing result envelope. `detail` becomes..."
     },
     {
@@ -10732,8 +10732,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_ids",
-      "community": 9,
-      "community_name": "ids.py",
+      "community": 3,
+      "community_name": ".new",
       "norm_label": "ids.py"
     },
     {
@@ -10745,8 +10745,8 @@
       "_callable_class": true,
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_ids_invaliduliderror",
-      "community": 9,
-      "community_name": "ids.py",
+      "community": 3,
+      "community_name": ".new",
       "norm_label": "invaliduliderror"
     },
     {
@@ -10756,8 +10756,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_ids_py_valueerror",
-      "community": 9,
-      "community_name": "ids.py",
+      "community": 3,
+      "community_name": ".new",
       "norm_label": "valueerror"
     },
     {
@@ -10768,8 +10768,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_ids_encode_crockford",
-      "community": 9,
-      "community_name": "ids.py",
+      "community": 3,
+      "community_name": ".new",
       "norm_label": "_encode_crockford()"
     },
     {
@@ -10780,8 +10780,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_ids_decode_crockford",
-      "community": 9,
-      "community_name": "ids.py",
+      "community": 3,
+      "community_name": ".new",
       "norm_label": "_decode_crockford()"
     },
     {
@@ -10792,8 +10792,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_ids_new",
-      "community": 9,
-      "community_name": "ids.py",
+      "community": 3,
+      "community_name": ".new",
       "norm_label": "new()"
     },
     {
@@ -10804,8 +10804,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_ids_parse",
-      "community": 9,
-      "community_name": "ids.py",
+      "community": 3,
+      "community_name": ".new",
       "norm_label": "parse()"
     },
     {
@@ -10816,8 +10816,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_ids_is_valid",
-      "community": 9,
-      "community_name": "ids.py",
+      "community": 3,
+      "community_name": ".new",
       "norm_label": "is_valid()"
     },
     {
@@ -10827,8 +10827,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_ids_rationale_1",
-      "community": 9,
-      "community_name": "ids.py",
+      "community": 3,
+      "community_name": ".new",
       "norm_label": "hand-rolled ulid mint/parse \u2014 stdlib only, no `ulid` dependency (sdr-3). a ulid..."
     },
     {
@@ -10838,8 +10838,8 @@
       "source_location": "L27",
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_ids_rationale_27",
-      "community": 9,
-      "community_name": "ids.py",
+      "community": 3,
+      "community_name": ".new",
       "norm_label": "raised by `parse` on a string that is not a well-formed 26-character ulid."
     },
     {
@@ -10849,8 +10849,8 @@
       "source_location": "L50",
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_ids_rationale_50",
-      "community": 9,
-      "community_name": "ids.py",
+      "community": 3,
+      "community_name": ".new",
       "norm_label": "mint a new ulid, monotonic within this process for same-millisecond calls."
     },
     {
@@ -10860,8 +10860,8 @@
       "source_location": "L69",
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_ids_rationale_69",
-      "community": 9,
-      "community_name": "ids.py",
+      "community": 3,
+      "community_name": ".new",
       "norm_label": "parse a ulid string into (timestamp_ms, random_component). raises..."
     },
     {
@@ -10872,7 +10872,7 @@
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_messages",
       "community": 31,
-      "community_name": "messages.py",
+      "community_name": "CapabilityDescriptor",
       "norm_label": "messages.py"
     },
     {
@@ -10884,7 +10884,7 @@
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_messages_require_str",
       "community": 31,
-      "community_name": "messages.py",
+      "community_name": "CapabilityDescriptor",
       "norm_label": "_require_str()"
     },
     {
@@ -10895,7 +10895,7 @@
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_messages_py_any",
       "community": 31,
-      "community_name": "messages.py",
+      "community_name": "CapabilityDescriptor",
       "norm_label": "any"
     },
     {
@@ -10906,8 +10906,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_messages_require_str_or_none",
-      "community": 31,
-      "community_name": "messages.py",
+      "community": 37,
+      "community_name": "AndroidNodeFixture",
       "norm_label": "_require_str_or_none()"
     },
     {
@@ -10919,7 +10919,7 @@
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_messages_require_dict",
       "community": 31,
-      "community_name": "messages.py",
+      "community_name": "CapabilityDescriptor",
       "norm_label": "_require_dict()"
     },
     {
@@ -10931,7 +10931,7 @@
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_messages_require_int",
       "community": 31,
-      "community_name": "messages.py",
+      "community_name": "CapabilityDescriptor",
       "norm_label": "_require_int()"
     },
     {
@@ -10942,7 +10942,7 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_messages_capabilities_from_wire",
-      "community": 58,
+      "community": 31,
       "community_name": "CapabilityDescriptor",
       "norm_label": "_capabilities_from_wire()"
     },
@@ -10980,7 +10980,7 @@
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_messages_hello_to_wire",
       "community": 31,
-      "community_name": "messages.py",
+      "community_name": "CapabilityDescriptor",
       "norm_label": ".to_wire()"
     },
     {
@@ -11016,8 +11016,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_messages_welcome_to_wire",
-      "community": 31,
-      "community_name": "messages.py",
+      "community": 37,
+      "community_name": "AndroidNodeFixture",
       "norm_label": ".to_wire()"
     },
     {
@@ -11029,8 +11029,8 @@
       "_callable_class": true,
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_messages_capabilitiesmsg",
-      "community": 58,
-      "community_name": "CapabilityDescriptor",
+      "community": 36,
+      "community_name": "test_presence.py",
       "norm_label": "capabilitiesmsg"
     },
     {
@@ -11041,7 +11041,7 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_messages_capabilitiesmsg_from_wire",
-      "community": 58,
+      "community": 31,
       "community_name": "CapabilityDescriptor",
       "norm_label": ".from_wire()"
     },
@@ -11054,7 +11054,7 @@
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_messages_capabilitiesmsg_to_wire",
       "community": 31,
-      "community_name": "messages.py",
+      "community_name": "CapabilityDescriptor",
       "norm_label": ".to_wire()"
     },
     {
@@ -11066,7 +11066,7 @@
       "_callable_class": true,
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_messages_invokemsg",
-      "community": 58,
+      "community": 31,
       "community_name": "CapabilityDescriptor",
       "norm_label": "invokemsg"
     },
@@ -11079,7 +11079,7 @@
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_messages_invokemsg_from_wire",
       "community": 31,
-      "community_name": "messages.py",
+      "community_name": "CapabilityDescriptor",
       "norm_label": ".from_wire()"
     },
     {
@@ -11090,7 +11090,7 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_messages_invokemsg_to_wire",
-      "community": 58,
+      "community": 31,
       "community_name": "CapabilityDescriptor",
       "norm_label": ".to_wire()"
     },
@@ -11104,7 +11104,7 @@
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_messages_ack",
       "community": 31,
-      "community_name": "messages.py",
+      "community_name": "CapabilityDescriptor",
       "norm_label": "ack"
     },
     {
@@ -11116,7 +11116,7 @@
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_messages_ack_from_wire",
       "community": 31,
-      "community_name": "messages.py",
+      "community_name": "CapabilityDescriptor",
       "norm_label": ".from_wire()"
     },
     {
@@ -11128,7 +11128,7 @@
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_messages_ack_to_wire",
       "community": 31,
-      "community_name": "messages.py",
+      "community_name": "CapabilityDescriptor",
       "norm_label": ".to_wire()"
     },
     {
@@ -11140,8 +11140,8 @@
       "_callable_class": true,
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_messages_resultmsg",
-      "community": 66,
-      "community_name": "test_lifecycle.py",
+      "community": 2,
+      "community_name": "test_faults.py",
       "norm_label": "resultmsg"
     },
     {
@@ -11152,8 +11152,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_messages_resultmsg_from_wire",
-      "community": 66,
-      "community_name": "test_lifecycle.py",
+      "community": 51,
+      "community_name": "Hello",
       "norm_label": ".from_wire()"
     },
     {
@@ -11165,7 +11165,7 @@
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_messages_resultmsg_to_wire",
       "community": 31,
-      "community_name": "messages.py",
+      "community_name": "CapabilityDescriptor",
       "norm_label": ".to_wire()"
     },
     {
@@ -11178,7 +11178,7 @@
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_messages_cancelmsg",
       "community": 31,
-      "community_name": "messages.py",
+      "community_name": "CapabilityDescriptor",
       "norm_label": "cancelmsg"
     },
     {
@@ -11190,7 +11190,7 @@
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_messages_cancelmsg_from_wire",
       "community": 31,
-      "community_name": "messages.py",
+      "community_name": "CapabilityDescriptor",
       "norm_label": ".from_wire()"
     },
     {
@@ -11202,7 +11202,7 @@
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_messages_cancelmsg_to_wire",
       "community": 31,
-      "community_name": "messages.py",
+      "community_name": "CapabilityDescriptor",
       "norm_label": ".to_wire()"
     },
     {
@@ -11215,7 +11215,7 @@
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_messages_progressmsg",
       "community": 31,
-      "community_name": "messages.py",
+      "community_name": "CapabilityDescriptor",
       "norm_label": "progressmsg"
     },
     {
@@ -11227,7 +11227,7 @@
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_messages_progressmsg_from_wire",
       "community": 31,
-      "community_name": "messages.py",
+      "community_name": "CapabilityDescriptor",
       "norm_label": ".from_wire()"
     },
     {
@@ -11239,7 +11239,7 @@
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_messages_progressmsg_to_wire",
       "community": 31,
-      "community_name": "messages.py",
+      "community_name": "CapabilityDescriptor",
       "norm_label": ".to_wire()"
     },
     {
@@ -11252,7 +11252,7 @@
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_messages_heartbeat",
       "community": 31,
-      "community_name": "messages.py",
+      "community_name": "CapabilityDescriptor",
       "norm_label": "heartbeat"
     },
     {
@@ -11264,7 +11264,7 @@
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_messages_heartbeat_from_wire",
       "community": 31,
-      "community_name": "messages.py",
+      "community_name": "CapabilityDescriptor",
       "norm_label": ".from_wire()"
     },
     {
@@ -11276,7 +11276,7 @@
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_messages_heartbeat_to_wire",
       "community": 31,
-      "community_name": "messages.py",
+      "community_name": "CapabilityDescriptor",
       "norm_label": ".to_wire()"
     },
     {
@@ -11288,8 +11288,8 @@
       "_callable_class": true,
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_messages_challenge",
-      "community": 58,
-      "community_name": "CapabilityDescriptor",
+      "community": 77,
+      "community_name": "_FakeWS",
       "norm_label": "challenge"
     },
     {
@@ -11312,8 +11312,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_messages_challenge_to_wire",
-      "community": 58,
-      "community_name": "CapabilityDescriptor",
+      "community": 77,
+      "community_name": "_FakeWS",
       "norm_label": ".to_wire()"
     },
     {
@@ -11338,7 +11338,7 @@
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_messages_proof_from_wire",
       "community": 31,
-      "community_name": "messages.py",
+      "community_name": "CapabilityDescriptor",
       "norm_label": ".from_wire()"
     },
     {
@@ -11349,8 +11349,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_messages_proof_to_wire",
-      "community": 48,
-      "community_name": "test_device_bound_pairing.py",
+      "community": 31,
+      "community_name": "CapabilityDescriptor",
       "norm_label": ".to_wire()"
     },
     {
@@ -11363,7 +11363,7 @@
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_messages_errormsg",
       "community": 31,
-      "community_name": "messages.py",
+      "community_name": "CapabilityDescriptor",
       "norm_label": "errormsg"
     },
     {
@@ -11375,7 +11375,7 @@
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_messages_errormsg_from_wire",
       "community": 31,
-      "community_name": "messages.py",
+      "community_name": "CapabilityDescriptor",
       "norm_label": ".from_wire()"
     },
     {
@@ -11387,7 +11387,7 @@
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_messages_errormsg_to_wire",
       "community": 31,
-      "community_name": "messages.py",
+      "community_name": "CapabilityDescriptor",
       "norm_label": ".to_wire()"
     },
     {
@@ -11400,7 +11400,7 @@
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_messages_revokemsg",
       "community": 31,
-      "community_name": "messages.py",
+      "community_name": "CapabilityDescriptor",
       "norm_label": "revokemsg"
     },
     {
@@ -11412,7 +11412,7 @@
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_messages_revokemsg_from_wire",
       "community": 31,
-      "community_name": "messages.py",
+      "community_name": "CapabilityDescriptor",
       "norm_label": ".from_wire()"
     },
     {
@@ -11424,7 +11424,7 @@
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_messages_revokemsg_to_wire",
       "community": 31,
-      "community_name": "messages.py",
+      "community_name": "CapabilityDescriptor",
       "norm_label": ".to_wire()"
     },
     {
@@ -11435,7 +11435,7 @@
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_messages_rationale_1",
       "community": 31,
-      "community_name": "messages.py",
+      "community_name": "CapabilityDescriptor",
       "norm_label": "typed payload dataclasses for each hdp/0 message type (hdp-spec/hdp-0.md \u00a72)...."
     },
     {
@@ -11467,8 +11467,8 @@
       "source_location": "L133",
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_messages_rationale_133",
-      "community": 58,
-      "community_name": "CapabilityDescriptor",
+      "community": 36,
+      "community_name": "test_presence.py",
       "norm_label": "either direction's `capabilities` frame: a full-set replacement, never a delta..."
     },
     {
@@ -11478,7 +11478,7 @@
       "source_location": "L147",
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_messages_rationale_147",
-      "community": 58,
+      "community": 31,
       "community_name": "CapabilityDescriptor",
       "norm_label": "bridge \u2192 node. `corr` (on the envelope, not here) carries the bridge-minted..."
     },
@@ -11490,7 +11490,7 @@
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_messages_rationale_175",
       "community": 31,
-      "community_name": "messages.py",
+      "community_name": "CapabilityDescriptor",
       "norm_label": "either direction's `ack` frame. empty payload \u2014 the envelope's `corr` carries..."
     },
     {
@@ -11500,8 +11500,8 @@
       "source_location": "L188",
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_messages_rationale_188",
-      "community": 66,
-      "community_name": "test_lifecycle.py",
+      "community": 2,
+      "community_name": "test_faults.py",
       "norm_label": "node \u2192 bridge. `ok=true` carries `data`; `ok=false` carries `error` shaped like..."
     },
     {
@@ -11512,7 +11512,7 @@
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_messages_rationale_216",
       "community": 31,
-      "community_name": "messages.py",
+      "community_name": "CapabilityDescriptor",
       "norm_label": "bridge \u2192 node, sent best-effort on timeout or explicit cancellation."
     },
     {
@@ -11523,7 +11523,7 @@
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_messages_rationale_230",
       "community": 31,
-      "community_name": "messages.py",
+      "community_name": "CapabilityDescriptor",
       "norm_label": "node \u2192 bridge. declared per hdp-0.md \u00a72; no m1 producer or consumer."
     },
     {
@@ -11534,7 +11534,7 @@
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_messages_rationale_244",
       "community": 31,
-      "community_name": "messages.py",
+      "community_name": "CapabilityDescriptor",
       "norm_label": "either direction. application-level heartbeat, belt-and-suspenders on top of..."
     },
     {
@@ -11544,8 +11544,8 @@
       "source_location": "L257",
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_messages_rationale_257",
-      "community": 58,
-      "community_name": "CapabilityDescriptor",
+      "community": 77,
+      "community_name": "_FakeWS",
       "norm_label": "bridge \u2192 node (amendments v0.4). a fresh nonce the node must sign to prove it..."
     },
     {
@@ -11567,7 +11567,7 @@
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_messages_rationale_289",
       "community": 31,
-      "community_name": "messages.py",
+      "community_name": "CapabilityDescriptor",
       "norm_label": "either direction. same shape `hdp_proto.errors.err()` produces for the model-..."
     },
     {
@@ -11578,7 +11578,7 @@
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_messages_rationale_311",
       "community": 31,
-      "community_name": "messages.py",
+      "community_name": "CapabilityDescriptor",
       "norm_label": "bridge \u2192 node. declared per hdp-0.md \u00a73.3; unused until m2's credential-..."
     },
     {
@@ -11588,8 +11588,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_version",
-      "community": 0,
-      "community_name": ".from_wire",
+      "community": 43,
+      "community_name": "asyncio",
       "norm_label": "version.py"
     },
     {
@@ -11599,8 +11599,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "hdp_spec_hdp_proto_version_rationale_1",
-      "community": 0,
-      "community_name": ".from_wire",
+      "community": 43,
+      "community_name": "asyncio",
       "norm_label": "hdp wire version and the known-message-type boundary. the full hdp/0 type set,..."
     },
     {
@@ -11625,7 +11625,7 @@
       "_origin": "ast",
       "id": "hdp_spec_tests_test_capabilities",
       "community": 21,
-      "community_name": "validate_output",
+      "community_name": "capabilities.py",
       "norm_label": "test_capabilities.py"
     },
     {
@@ -11637,7 +11637,7 @@
       "_origin": "ast",
       "id": "hdp_spec_tests_test_capabilities_test_round_trip",
       "community": 21,
-      "community_name": "validate_output",
+      "community_name": "capabilities.py",
       "norm_label": "test_round_trip()"
     },
     {
@@ -11649,7 +11649,7 @@
       "_origin": "ast",
       "id": "hdp_spec_tests_test_capabilities_test_from_wire_tolerates_unknown_fields",
       "community": 21,
-      "community_name": "validate_output",
+      "community_name": "capabilities.py",
       "norm_label": "test_from_wire_tolerates_unknown_fields()"
     },
     {
@@ -11660,7 +11660,7 @@
       "_origin": "ast",
       "id": "hdp_spec_tests_test_capabilities_py_parametrize",
       "community": 21,
-      "community_name": "validate_output",
+      "community_name": "capabilities.py",
       "norm_label": "parametrize"
     },
     {
@@ -11672,7 +11672,7 @@
       "_origin": "ast",
       "id": "hdp_spec_tests_test_capabilities_test_from_wire_rejects_malformed_input",
       "community": 21,
-      "community_name": "validate_output",
+      "community_name": "capabilities.py",
       "norm_label": "test_from_wire_rejects_malformed_input()"
     },
     {
@@ -11684,7 +11684,7 @@
       "_origin": "ast",
       "id": "hdp_spec_tests_test_capabilities_test_validate_output_accepts_matching_data",
       "community": 21,
-      "community_name": "validate_output",
+      "community_name": "capabilities.py",
       "norm_label": "test_validate_output_accepts_matching_data()"
     },
     {
@@ -11696,7 +11696,7 @@
       "_origin": "ast",
       "id": "hdp_spec_tests_test_capabilities_test_validate_output_rejects_missing_required_field",
       "community": 21,
-      "community_name": "validate_output",
+      "community_name": "capabilities.py",
       "norm_label": "test_validate_output_rejects_missing_required_field()"
     },
     {
@@ -11708,7 +11708,7 @@
       "_origin": "ast",
       "id": "hdp_spec_tests_test_capabilities_test_validate_output_rejects_wrong_type",
       "community": 21,
-      "community_name": "validate_output",
+      "community_name": "capabilities.py",
       "norm_label": "test_validate_output_rejects_wrong_type()"
     },
     {
@@ -11720,7 +11720,7 @@
       "_origin": "ast",
       "id": "hdp_spec_tests_test_capabilities_test_validate_output_untyped_nested_field_accepts_anything",
       "community": 21,
-      "community_name": "validate_output",
+      "community_name": "capabilities.py",
       "norm_label": "test_validate_output_untyped_nested_field_accepts_anything()"
     },
     {
@@ -11732,7 +11732,7 @@
       "_origin": "ast",
       "id": "hdp_spec_tests_test_capabilities_test_validate_output_rejects_non_object_top_level",
       "community": 21,
-      "community_name": "validate_output",
+      "community_name": "capabilities.py",
       "norm_label": "test_validate_output_rejects_non_object_top_level()"
     },
     {
@@ -11743,7 +11743,7 @@
       "_origin": "ast",
       "id": "hdp_spec_tests_test_capabilities_rationale_81",
       "community": 21,
-      "community_name": "validate_output",
+      "community_name": "capabilities.py",
       "norm_label": "diagnostics.echo@1's `payload` field has no nested schema \u2014 any json value..."
     },
     {
@@ -11753,8 +11753,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "hdp_spec_tests_test_envelope",
-      "community": 0,
-      "community_name": ".from_wire",
+      "community": 3,
+      "community_name": ".new",
       "norm_label": "test_envelope.py"
     },
     {
@@ -11765,8 +11765,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_spec_tests_test_envelope_valid_wire",
-      "community": 0,
-      "community_name": ".from_wire",
+      "community": 3,
+      "community_name": ".new",
       "norm_label": "_valid_wire()"
     },
     {
@@ -11777,8 +11777,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_spec_tests_test_envelope_test_round_trip",
-      "community": 9,
-      "community_name": "ids.py",
+      "community": 3,
+      "community_name": ".new",
       "norm_label": "test_round_trip()"
     },
     {
@@ -11789,8 +11789,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_spec_tests_test_envelope_test_to_wire_is_a_dict_not_a_string",
-      "community": 0,
-      "community_name": ".from_wire",
+      "community": 3,
+      "community_name": ".new",
       "norm_label": "test_to_wire_is_a_dict_not_a_string()"
     },
     {
@@ -11801,8 +11801,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_spec_tests_test_envelope_test_new_mints_a_valid_ulid_id",
-      "community": 9,
-      "community_name": "ids.py",
+      "community": 3,
+      "community_name": ".new",
       "norm_label": "test_new_mints_a_valid_ulid_id()"
     },
     {
@@ -11813,8 +11813,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_spec_tests_test_envelope_test_from_wire_tolerates_unknown_fields",
-      "community": 0,
-      "community_name": ".from_wire",
+      "community": 3,
+      "community_name": ".new",
       "norm_label": "test_from_wire_tolerates_unknown_fields()"
     },
     {
@@ -11824,8 +11824,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "hdp_spec_tests_test_envelope_py_parametrize",
-      "community": 0,
-      "community_name": ".from_wire",
+      "community": 3,
+      "community_name": ".new",
       "norm_label": "parametrize"
     },
     {
@@ -11836,8 +11836,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_spec_tests_test_envelope_test_from_wire_rejects_malformed_input",
-      "community": 0,
-      "community_name": ".from_wire",
+      "community": 3,
+      "community_name": ".new",
       "norm_label": "test_from_wire_rejects_malformed_input()"
     },
     {
@@ -11848,8 +11848,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_spec_tests_test_envelope_test_from_wire_rejects_non_dict",
-      "community": 0,
-      "community_name": ".from_wire",
+      "community": 3,
+      "community_name": ".new",
       "norm_label": "test_from_wire_rejects_non_dict()"
     },
     {
@@ -11860,8 +11860,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_spec_tests_test_envelope_test_version_mismatch_raises_the_specific_subclass",
-      "community": 0,
-      "community_name": ".from_wire",
+      "community": 3,
+      "community_name": ".new",
       "norm_label": "test_version_mismatch_raises_the_specific_subclass()"
     },
     {
@@ -11872,8 +11872,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_spec_tests_test_envelope_test_unknown_type_raises_the_specific_subclass",
-      "community": 0,
-      "community_name": ".from_wire",
+      "community": 3,
+      "community_name": ".new",
       "norm_label": "test_unknown_type_raises_the_specific_subclass()"
     },
     {
@@ -11884,8 +11884,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_spec_tests_test_envelope_test_operator_policy_control_types_are_known",
-      "community": 0,
-      "community_name": ".from_wire",
+      "community": 3,
+      "community_name": ".new",
       "norm_label": "test_operator_policy_control_types_are_known()"
     },
     {
@@ -11896,8 +11896,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_spec_tests_test_envelope_test_both_subclasses_are_still_catchable_as_envelope_error",
-      "community": 0,
-      "community_name": ".from_wire",
+      "community": 3,
+      "community_name": ".new",
       "norm_label": "test_both_subclasses_are_still_catchable_as_envelope_error()"
     },
     {
@@ -11907,8 +11907,8 @@
       "source_location": "L74",
       "_origin": "ast",
       "id": "hdp_spec_tests_test_envelope_rationale_74",
-      "community": 0,
-      "community_name": ".from_wire",
+      "community": 3,
+      "community_name": ".new",
       "norm_label": "hdp-0.md \u00a73: a version mismatch must be distinguishable from an unknown type,..."
     },
     {
@@ -11918,8 +11918,8 @@
       "source_location": "L91",
       "_origin": "ast",
       "id": "hdp_spec_tests_test_envelope_rationale_91",
-      "community": 0,
-      "community_name": ".from_wire",
+      "community": 3,
+      "community_name": ".new",
       "norm_label": "m3 policy inspection stays on the daemon control plane, never a plugin file..."
     },
     {
@@ -11929,8 +11929,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "hdp_spec_tests_test_errors",
-      "community": 15,
-      "community_name": "err",
+      "community": 57,
+      "community_name": "Envelope",
       "norm_label": "test_errors.py"
     },
     {
@@ -11941,8 +11941,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_spec_tests_test_errors_test_ok_shape",
-      "community": 15,
-      "community_name": "err",
+      "community": 57,
+      "community_name": "Envelope",
       "norm_label": "test_ok_shape()"
     },
     {
@@ -11953,8 +11953,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_spec_tests_test_errors_test_err_shape_uses_canonical_hint_by_default",
-      "community": 15,
-      "community_name": "err",
+      "community": 57,
+      "community_name": "Envelope",
       "norm_label": "test_err_shape_uses_canonical_hint_by_default()"
     },
     {
@@ -11965,8 +11965,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_spec_tests_test_errors_test_err_accepts_an_exception_as_detail",
-      "community": 15,
-      "community_name": "err",
+      "community": 57,
+      "community_name": "Envelope",
       "norm_label": "test_err_accepts_an_exception_as_detail()"
     },
     {
@@ -11977,8 +11977,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_spec_tests_test_errors_test_err_hint_override",
-      "community": 15,
-      "community_name": "err",
+      "community": 57,
+      "community_name": "Envelope",
       "norm_label": "test_err_hint_override()"
     },
     {
@@ -11989,8 +11989,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_spec_tests_test_errors_test_err_carries_structured_context_without_overwriting_core_fields",
-      "community": 15,
-      "community_name": "err",
+      "community": 57,
+      "community_name": "Envelope",
       "norm_label": "test_err_carries_structured_context_without_overwriting_core_fields()"
     },
     {
@@ -12001,8 +12001,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_spec_tests_test_errors_test_error_codes_are_unique_string_values",
-      "community": 15,
-      "community_name": "err",
+      "community": 57,
+      "community_name": "Envelope",
       "norm_label": "test_error_codes_are_unique_string_values()"
     },
     {
@@ -12013,7 +12013,7 @@
       "_origin": "ast",
       "id": "hdp_spec_tests_test_errors_conformance",
       "community": 15,
-      "community_name": "err",
+      "community_name": "ErrorCode",
       "norm_label": "test_errors_conformance.py"
     },
     {
@@ -12025,7 +12025,7 @@
       "_origin": "ast",
       "id": "hdp_spec_tests_test_errors_conformance_parse_errors_md",
       "community": 15,
-      "community_name": "err",
+      "community_name": "ErrorCode",
       "norm_label": "_parse_errors_md()"
     },
     {
@@ -12037,7 +12037,7 @@
       "_origin": "ast",
       "id": "hdp_spec_tests_test_errors_conformance_test_errors_md_code_set_and_order_match_error_code",
       "community": 15,
-      "community_name": "err",
+      "community_name": "ErrorCode",
       "norm_label": "test_errors_md_code_set_and_order_match_error_code()"
     },
     {
@@ -12049,7 +12049,7 @@
       "_origin": "ast",
       "id": "hdp_spec_tests_test_errors_conformance_test_errors_md_hints_match_hints_dict",
       "community": 15,
-      "community_name": "err",
+      "community_name": "ErrorCode",
       "norm_label": "test_errors_md_hints_match_hints_dict()"
     },
     {
@@ -12061,7 +12061,7 @@
       "_origin": "ast",
       "id": "hdp_spec_tests_test_errors_conformance_test_errors_md_has_no_orphaned_entries",
       "community": 15,
-      "community_name": "err",
+      "community_name": "ErrorCode",
       "norm_label": "test_errors_md_has_no_orphaned_entries()"
     },
     {
@@ -12072,7 +12072,7 @@
       "_origin": "ast",
       "id": "hdp_spec_tests_test_errors_conformance_rationale_1",
       "community": 15,
-      "community_name": "err",
+      "community_name": "ErrorCode",
       "norm_label": "fr-32: `hdp-spec/errors.md` (the normative doc) must be identical to..."
     },
     {
@@ -12083,7 +12083,7 @@
       "_origin": "ast",
       "id": "hdp_spec_tests_test_errors_conformance_rationale_44",
       "community": 15,
-      "community_name": "err",
+      "community_name": "ErrorCode",
       "norm_label": "catches the inverse drift: a code declared in errors.md but removed from..."
     },
     {
@@ -12093,8 +12093,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "hdp_spec_tests_test_ids",
-      "community": 9,
-      "community_name": "ids.py",
+      "community": 3,
+      "community_name": ".new",
       "norm_label": "test_ids.py"
     },
     {
@@ -12105,8 +12105,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_spec_tests_test_ids_test_new_returns_26_char_string",
-      "community": 9,
-      "community_name": "ids.py",
+      "community": 3,
+      "community_name": ".new",
       "norm_label": "test_new_returns_26_char_string()"
     },
     {
@@ -12117,8 +12117,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_spec_tests_test_ids_test_new_is_valid",
-      "community": 9,
-      "community_name": "ids.py",
+      "community": 3,
+      "community_name": ".new",
       "norm_label": "test_new_is_valid()"
     },
     {
@@ -12129,8 +12129,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_spec_tests_test_ids_test_parse_round_trips",
-      "community": 9,
-      "community_name": "ids.py",
+      "community": 3,
+      "community_name": ".new",
       "norm_label": "test_parse_round_trips()"
     },
     {
@@ -12141,8 +12141,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_spec_tests_test_ids_test_same_millisecond_ids_are_monotonic",
-      "community": 9,
-      "community_name": "ids.py",
+      "community": 3,
+      "community_name": ".new",
       "norm_label": "test_same_millisecond_ids_are_monotonic()"
     },
     {
@@ -12153,8 +12153,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_spec_tests_test_ids_test_is_valid_rejects_garbage",
-      "community": 9,
-      "community_name": "ids.py",
+      "community": 3,
+      "community_name": ".new",
       "norm_label": "test_is_valid_rejects_garbage()"
     },
     {
@@ -12165,8 +12165,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_spec_tests_test_ids_test_parse_raises_invalid_ulid_error_on_garbage",
-      "community": 9,
-      "community_name": "ids.py",
+      "community": 3,
+      "community_name": ".new",
       "norm_label": "test_parse_raises_invalid_ulid_error_on_garbage()"
     },
     {
@@ -12284,7 +12284,7 @@
       "_origin": "ast",
       "id": "hdp_spec_tests_test_messages_test_invoke_msg_rejects_missing_deadline",
       "community": 31,
-      "community_name": "messages.py",
+      "community_name": "CapabilityDescriptor",
       "norm_label": "test_invoke_msg_rejects_missing_deadline()"
     },
     {
@@ -12295,8 +12295,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hdp_spec_tests_test_messages_test_result_msg_rejects_non_bool_ok",
-      "community": 66,
-      "community_name": "test_lifecycle.py",
+      "community": 51,
+      "community_name": "Hello",
       "norm_label": "test_result_msg_rejects_non_bool_ok()"
     },
     {
@@ -12339,8 +12339,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "hermes_device_plugin_hermes_device_plugin_init",
-      "community": 59,
-      "community_name": "hermes_device_plugin/__init__.py",
+      "community": 44,
+      "community_name": "runtime.py",
       "norm_label": "hermes_device_plugin/__init__.py"
     },
     {
@@ -12352,7 +12352,7 @@
       "_origin": "ast",
       "id": "hermes_device_plugin_hermes_device_plugin_init_register",
       "community": 59,
-      "community_name": "hermes_device_plugin/__init__.py",
+      "community_name": "register_cli_command",
       "norm_label": "register()"
     },
     {
@@ -12363,7 +12363,7 @@
       "_origin": "ast",
       "id": "hermes_device_plugin_hermes_device_plugin_init_py_any",
       "community": 59,
-      "community_name": "hermes_device_plugin/__init__.py",
+      "community_name": "register_cli_command",
       "norm_label": "any"
     },
     {
@@ -12373,8 +12373,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "hermes_device_plugin_hermes_device_plugin_init_rationale_1",
-      "community": 59,
-      "community_name": "hermes_device_plugin/__init__.py",
+      "community": 44,
+      "community_name": "runtime.py",
       "norm_label": "hermes device plugin package. `register(ctx)` below, plus `cli.py` and..."
     },
     {
@@ -12385,7 +12385,7 @@
       "_origin": "ast",
       "id": "hermes_device_plugin_hermes_device_plugin_init_rationale_18",
       "community": 59,
-      "community_name": "hermes_device_plugin/__init__.py",
+      "community_name": "register_cli_command",
       "norm_label": "register the three device tools in toolset `device`, all `is_async=true`..."
     },
     {
@@ -12452,8 +12452,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hermes_device_plugin_hermes_device_plugin_cli_render_status",
-      "community": 24,
-      "community_name": "hermes_device_plugin/cli.py",
+      "community": 0,
+      "community_name": "render_status",
       "norm_label": "render_status()"
     },
     {
@@ -12548,8 +12548,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hermes_device_plugin_hermes_device_plugin_cli_build_parser",
-      "community": 59,
-      "community_name": "hermes_device_plugin/__init__.py",
+      "community": 24,
+      "community_name": "hermes_device_plugin/cli.py",
       "norm_label": "_build_parser()"
     },
     {
@@ -12559,8 +12559,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "hermes_device_plugin_hermes_device_plugin_cli_py_argumentparser",
-      "community": 59,
-      "community_name": "hermes_device_plugin/__init__.py",
+      "community": 24,
+      "community_name": "hermes_device_plugin/cli.py",
       "norm_label": "argumentparser"
     },
     {
@@ -12594,8 +12594,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hermes_device_plugin_hermes_device_plugin_cli_main",
-      "community": 59,
-      "community_name": "hermes_device_plugin/__init__.py",
+      "community": 24,
+      "community_name": "hermes_device_plugin/cli.py",
       "norm_label": "main()"
     },
     {
@@ -12607,7 +12607,7 @@
       "_origin": "ast",
       "id": "hermes_device_plugin_hermes_device_plugin_cli_register_cli_command",
       "community": 59,
-      "community_name": "hermes_device_plugin/__init__.py",
+      "community_name": "register_cli_command",
       "norm_label": "register_cli_command()"
     },
     {
@@ -12618,7 +12618,7 @@
       "_origin": "ast",
       "id": "hermes_device_plugin_hermes_device_plugin_cli_py_any",
       "community": 59,
-      "community_name": "hermes_device_plugin/__init__.py",
+      "community_name": "register_cli_command",
       "norm_label": "any"
     },
     {
@@ -12672,8 +12672,8 @@
       "source_location": "L225",
       "_origin": "ast",
       "id": "hermes_device_plugin_hermes_device_plugin_cli_rationale_225",
-      "community": 59,
-      "community_name": "hermes_device_plugin/__init__.py",
+      "community": 24,
+      "community_name": "hermes_device_plugin/cli.py",
       "norm_label": "the `hermes hdp ...` operator entry point. `asyncio.run()` only appears here,..."
     },
     {
@@ -12684,7 +12684,7 @@
       "_origin": "ast",
       "id": "hermes_device_plugin_hermes_device_plugin_cli_rationale_248",
       "community": 59,
-      "community_name": "hermes_device_plugin/__init__.py",
+      "community_name": "register_cli_command",
       "norm_label": "registers `hermes hdp {status,devices,pair,audit}` (design \u00a72's confinement..."
     },
     {
@@ -12979,8 +12979,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "hermes_device_plugin_hermes_device_plugin_engine",
-      "community": 12,
-      "community_name": "InvokeRequest",
+      "community": 44,
+      "community_name": "runtime.py",
       "norm_label": "engine.py"
     },
     {
@@ -12992,7 +12992,7 @@
       "_origin": "ast",
       "id": "hermes_device_plugin_hermes_device_plugin_engine_invoke",
       "community": 25,
-      "community_name": "tools.py",
+      "community_name": "invoke",
       "norm_label": "invoke()"
     },
     {
@@ -13003,7 +13003,7 @@
       "_origin": "ast",
       "id": "hermes_device_plugin_hermes_device_plugin_engine_py_any",
       "community": 25,
-      "community_name": "tools.py",
+      "community_name": "invoke",
       "norm_label": "any"
     },
     {
@@ -13013,8 +13013,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "hermes_device_plugin_hermes_device_plugin_engine_rationale_1",
-      "community": 12,
-      "community_name": "InvokeRequest",
+      "community": 44,
+      "community_name": "runtime.py",
       "norm_label": "the plugin-side entry to daemon-owned invocation-time resolution."
     },
     {
@@ -13025,7 +13025,7 @@
       "_origin": "ast",
       "id": "hermes_device_plugin_hermes_device_plugin_engine_rationale_23",
       "community": 25,
-      "community_name": "tools.py",
+      "community_name": "invoke",
       "norm_label": "forward one unresolved request and return the daemon's model-facing result."
     },
     {
@@ -13157,8 +13157,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hermes_device_plugin_hermes_device_plugin_runtime_hdpruntime_init",
-      "community": 1,
-      "community_name": "SocketTransport",
+      "community": 33,
+      "community_name": "HDPRuntime",
       "norm_label": ".__init__()"
     },
     {
@@ -13406,8 +13406,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "hermes_device_plugin_hermes_device_plugin_schemas",
-      "community": 59,
-      "community_name": "hermes_device_plugin/__init__.py",
+      "community": 44,
+      "community_name": "runtime.py",
       "norm_label": "schemas.py"
     },
     {
@@ -13417,8 +13417,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "hermes_device_plugin_hermes_device_plugin_schemas_rationale_1",
-      "community": 59,
-      "community_name": "hermes_device_plugin/__init__.py",
+      "community": 44,
+      "community_name": "runtime.py",
       "norm_label": "llm-facing tool schemas \u2014 plain dicts, imported by nothing else in this..."
     },
     {
@@ -13428,8 +13428,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "hermes_device_plugin_hermes_device_plugin_tools",
-      "community": 25,
-      "community_name": "tools.py",
+      "community": 44,
+      "community_name": "runtime.py",
       "norm_label": "tools.py"
     },
     {
@@ -13465,7 +13465,7 @@
       "_origin": "ast",
       "id": "hermes_device_plugin_hermes_device_plugin_tools_handler",
       "community": 25,
-      "community_name": "tools.py",
+      "community_name": "invoke",
       "norm_label": "_handler()"
     },
     {
@@ -13476,7 +13476,7 @@
       "_origin": "ast",
       "id": "hermes_device_plugin_hermes_device_plugin_tools_py_any",
       "community": 25,
-      "community_name": "tools.py",
+      "community_name": "invoke",
       "norm_label": "any"
     },
     {
@@ -13488,7 +13488,7 @@
       "_origin": "ast",
       "id": "hermes_device_plugin_hermes_device_plugin_tools_run_on_hdp_loop",
       "community": 25,
-      "community_name": "tools.py",
+      "community_name": "invoke",
       "norm_label": "_run_on_hdp_loop()"
     },
     {
@@ -13499,7 +13499,7 @@
       "_origin": "ast",
       "id": "hermes_device_plugin_hermes_device_plugin_tools_py_t",
       "community": 25,
-      "community_name": "tools.py",
+      "community_name": "invoke",
       "norm_label": "t"
     },
     {
@@ -13511,7 +13511,7 @@
       "_origin": "ast",
       "id": "hermes_device_plugin_hermes_device_plugin_tools_notifications_send",
       "community": 25,
-      "community_name": "tools.py",
+      "community_name": "invoke",
       "norm_label": "_notifications_send()"
     },
     {
@@ -13523,7 +13523,7 @@
       "_origin": "ast",
       "id": "hermes_device_plugin_hermes_device_plugin_tools_status_get",
       "community": 25,
-      "community_name": "tools.py",
+      "community_name": "invoke",
       "norm_label": "_status_get()"
     },
     {
@@ -13535,7 +13535,7 @@
       "_origin": "ast",
       "id": "hermes_device_plugin_hermes_device_plugin_tools_status_get_body",
       "community": 25,
-      "community_name": "tools.py",
+      "community_name": "invoke",
       "norm_label": "_status_get_body()"
     },
     {
@@ -13547,7 +13547,7 @@
       "_origin": "ast",
       "id": "hermes_device_plugin_hermes_device_plugin_tools_echo",
       "community": 25,
-      "community_name": "tools.py",
+      "community_name": "invoke",
       "norm_label": "_echo()"
     },
     {
@@ -13557,8 +13557,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "hermes_device_plugin_hermes_device_plugin_tools_rationale_1",
-      "community": 25,
-      "community_name": "tools.py",
+      "community": 44,
+      "community_name": "runtime.py",
       "norm_label": "the three async tool handlers. every handler has the same shape (fr-1): `async..."
     },
     {
@@ -13591,7 +13591,7 @@
       "_origin": "ast",
       "id": "hermes_device_plugin_hermes_device_plugin_tools_rationale_51",
       "community": 25,
-      "community_name": "tools.py",
+      "community_name": "invoke",
       "norm_label": "wrap `fn` (which returns a *parsed* model-facing result dict, or raises) into a..."
     },
     {
@@ -13602,7 +13602,7 @@
       "_origin": "ast",
       "id": "hermes_device_plugin_hermes_device_plugin_tools_rationale_76",
       "community": 25,
-      "community_name": "tools.py",
+      "community_name": "invoke",
       "norm_label": "run `coro` on the hdp loop and await its answer on *the caller's* loop. the two..."
     },
     {
@@ -13613,7 +13613,7 @@
       "_origin": "ast",
       "id": "hermes_device_plugin_hermes_device_plugin_tools_rationale_98",
       "community": 25,
-      "community_name": "tools.py",
+      "community_name": "invoke",
       "norm_label": "runs on the hdp loop. `device_status_get` bypasses `engine.invoke` \u2014 it reports..."
     },
     {
@@ -13759,8 +13759,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hermes_device_plugin_hermes_device_plugin_transport_base_bridgetransport_invoke",
-      "community": 50,
-      "community_name": "BridgeTransport",
+      "community": 12,
+      "community_name": "InvokeRequest",
       "norm_label": ".invoke()"
     },
     {
@@ -14766,8 +14766,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "hermes_device_plugin_tests_test_operator_cli",
-      "community": 59,
-      "community_name": "hermes_device_plugin/__init__.py",
+      "community": 24,
+      "community_name": "hermes_device_plugin/cli.py",
       "norm_label": "test_operator_cli.py"
     },
     {
@@ -14778,8 +14778,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hermes_device_plugin_tests_test_operator_cli_test_approval_scope_is_constrained_by_parser",
-      "community": 59,
-      "community_name": "hermes_device_plugin/__init__.py",
+      "community": 24,
+      "community_name": "hermes_device_plugin/cli.py",
       "norm_label": "test_approval_scope_is_constrained_by_parser()"
     },
     {
@@ -14790,8 +14790,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hermes_device_plugin_tests_test_operator_cli_test_approval_error_is_not_rendered_as_success",
-      "community": 59,
-      "community_name": "hermes_device_plugin/__init__.py",
+      "community": 24,
+      "community_name": "hermes_device_plugin/cli.py",
       "norm_label": "test_approval_error_is_not_rendered_as_success()"
     },
     {
@@ -14848,8 +14848,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hermes_device_plugin_tests_test_plugin_cli_test_render_status_reports_unreachable_with_no_daemon",
-      "community": 24,
-      "community_name": "hermes_device_plugin/cli.py",
+      "community": 0,
+      "community_name": "render_status",
       "norm_label": "test_render_status_reports_unreachable_with_no_daemon()"
     },
     {
@@ -14872,8 +14872,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hermes_device_plugin_tests_test_plugin_cli_test_render_status_reports_healthy_against_a_real_daemon",
-      "community": 24,
-      "community_name": "hermes_device_plugin/cli.py",
+      "community": 0,
+      "community_name": "render_status",
       "norm_label": "test_render_status_reports_healthy_against_a_real_daemon()"
     },
     {
@@ -14993,7 +14993,7 @@
       "_origin": "ast",
       "id": "hermes_device_plugin_tests_test_plugin_cli_test_register_cli_command_registers_hdp",
       "community": 59,
-      "community_name": "hermes_device_plugin/__init__.py",
+      "community_name": "register_cli_command",
       "norm_label": "test_register_cli_command_registers_hdp()"
     },
     {
@@ -15082,8 +15082,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hermes_device_plugin_tests_test_plugin_commands_test_hdp_status_delegates_to_render_status",
-      "community": 19,
-      "community_name": "test_plugin_commands.py",
+      "community": 0,
+      "community_name": "render_status",
       "norm_label": "test_hdp_status_delegates_to_render_status()"
     },
     {
@@ -15690,8 +15690,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "hermes_device_plugin_tests_test_tools_test_device_status_get_retains_device_and_capability_details",
-      "community": 12,
-      "community_name": "InvokeRequest",
+      "community": 25,
+      "community_name": "invoke",
       "norm_label": "test_device_status_get_retains_device_and_capability_details()"
     },
     {
@@ -16641,8 +16641,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_conformance_android_node_fixture",
-      "community": 18,
-      "community_name": "capabilities.py",
+      "community": 43,
+      "community_name": "asyncio",
       "norm_label": "android_node_fixture.py"
     },
     {
@@ -16738,8 +16738,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "tests_conformance_android_node_fixture_androidnodefixture_replace_capabilities",
-      "community": 58,
-      "community_name": "CapabilityDescriptor",
+      "community": 37,
+      "community_name": "AndroidNodeFixture",
       "norm_label": ".replace_capabilities()"
     },
     {
@@ -16797,8 +16797,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_conformance_android_node_fixture_rationale_1",
-      "community": 18,
-      "community_name": "capabilities.py",
+      "community": 43,
+      "community_name": "asyncio",
       "norm_label": "protocol-only android-shaped node fixture for the m5 conformance target. this..."
     },
     {
@@ -16863,8 +16863,8 @@
       "source_location": "L164",
       "_origin": "ast",
       "id": "tests_conformance_android_node_fixture_rationale_164",
-      "community": 58,
-      "community_name": "CapabilityDescriptor",
+      "community": 37,
+      "community_name": "AndroidNodeFixture",
       "norm_label": "send a complete capability replacement, matching fr-8."
     },
     {
@@ -16890,6 +16890,18 @@
       "norm_label": "conformance/conftest.py"
     },
     {
+      "label": "external_node_mode()",
+      "file_type": "code",
+      "source_file": "tests/conformance/conftest.py",
+      "source_location": "L23",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "tests_conformance_conftest_external_node_mode",
+      "community": 2,
+      "community_name": "test_faults.py",
+      "norm_label": "external_node_mode()"
+    },
+    {
       "label": "fixture",
       "file_type": "code",
       "source_file": "",
@@ -16904,7 +16916,7 @@
       "label": "_hermes_home()",
       "file_type": "code",
       "source_file": "tests/conformance/conftest.py",
-      "source_location": "L23",
+      "source_location": "L36",
       "_callable": true,
       "_origin": "ast",
       "id": "tests_conformance_conftest_hermes_home",
@@ -16916,7 +16928,7 @@
       "label": "_bridge_proc()",
       "file_type": "code",
       "source_file": "tests/conformance/conftest.py",
-      "source_location": "L30",
+      "source_location": "L48",
       "_callable": true,
       "_origin": "ast",
       "id": "tests_conformance_conftest_bridge_proc",
@@ -16925,10 +16937,22 @@
       "norm_label": "_bridge_proc()"
     },
     {
+      "label": "_managed_bridge_proc()",
+      "file_type": "code",
+      "source_file": "tests/conformance/conftest.py",
+      "source_location": "L58",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "tests_conformance_conftest_managed_bridge_proc",
+      "community": 2,
+      "community_name": "test_faults.py",
+      "norm_label": "_managed_bridge_proc()"
+    },
+    {
       "label": "bridge()",
       "file_type": "code",
       "source_file": "tests/conformance/conftest.py",
-      "source_location": "L63",
+      "source_location": "L91",
       "_callable": true,
       "_origin": "ast",
       "id": "tests_conformance_conftest_bridge",
@@ -16940,7 +16964,7 @@
       "label": "bridge_log()",
       "file_type": "code",
       "source_file": "tests/conformance/conftest.py",
-      "source_location": "L77",
+      "source_location": "L105",
       "_callable": true,
       "_origin": "ast",
       "id": "tests_conformance_conftest_bridge_log",
@@ -16952,7 +16976,7 @@
       "label": "bridge_url()",
       "file_type": "code",
       "source_file": "tests/conformance/conftest.py",
-      "source_location": "L86",
+      "source_location": "L114",
       "_callable": true,
       "_origin": "ast",
       "id": "tests_conformance_conftest_bridge_url",
@@ -16972,12 +16996,23 @@
       "norm_label": "shared fixtures for the m2 conformance suite (m1-plan.md \u00a77, m2-plan.md). hdp..."
     },
     {
+      "label": "Is the suite being pointed at a real, externally-connected node (M6)? In that\u2026",
+      "file_type": "rationale",
+      "source_file": "tests/conformance/conftest.py",
+      "source_location": "L24",
+      "_origin": "ast",
+      "id": "tests_conformance_conftest_rationale_24",
+      "community": 2,
+      "community_name": "test_faults.py",
+      "norm_label": "is the suite being pointed at a real, externally-connected node (m6)? in that..."
+    },
+    {
       "label": "Starts the real `hdp-bridge serve` subprocess and continuously drains its\u2026",
       "file_type": "rationale",
       "source_file": "tests/conformance/conftest.py",
-      "source_location": "L31",
+      "source_location": "L59",
       "_origin": "ast",
-      "id": "tests_conformance_conftest_rationale_31",
+      "id": "tests_conformance_conftest_rationale_59",
       "community": 2,
       "community_name": "test_faults.py",
       "norm_label": "starts the real `hdp-bridge serve` subprocess and continuously drains its..."
@@ -16986,9 +17021,9 @@
       "label": "The bridge subprocess's captured stdout/stderr lines so far, live-updated as\u2026",
       "file_type": "rationale",
       "source_file": "tests/conformance/conftest.py",
-      "source_location": "L78",
+      "source_location": "L106",
       "_origin": "ast",
-      "id": "tests_conformance_conftest_rationale_78",
+      "id": "tests_conformance_conftest_rationale_106",
       "community": 2,
       "community_name": "test_faults.py",
       "norm_label": "the bridge subprocess's captured stdout/stderr lines so far, live-updated as..."
@@ -17070,8 +17105,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "tests_conformance_harness_mint_pairing_code",
-      "community": 66,
-      "community_name": "test_lifecycle.py",
+      "community": 2,
+      "community_name": "test_faults.py",
       "norm_label": "mint_pairing_code()"
     },
     {
@@ -17162,8 +17197,8 @@
       "source_location": "L67",
       "_origin": "ast",
       "id": "tests_conformance_harness_rationale_67",
-      "community": 66,
-      "community_name": "test_lifecycle.py",
+      "community": 2,
+      "community_name": "test_faults.py",
       "norm_label": "run `hdp-bridge pair new` as a subprocess against the already-running bridge..."
     },
     {
@@ -17290,6 +17325,167 @@
       "community": 2,
       "community_name": "test_faults.py",
       "norm_label": "the stolen-code case: presenting a valid pairing code alongside a public key..."
+    },
+    {
+      "label": "test_external_node.py",
+      "file_type": "code",
+      "source_file": "tests/conformance/test_external_node.py",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "tests_conformance_test_external_node",
+      "community": 2,
+      "community_name": "test_faults.py",
+      "norm_label": "test_external_node.py"
+    },
+    {
+      "label": "_await_paired_node()",
+      "file_type": "code",
+      "source_file": "tests/conformance/test_external_node.py",
+      "source_location": "L42",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "tests_conformance_test_external_node_await_paired_node",
+      "community": 2,
+      "community_name": "test_faults.py",
+      "norm_label": "_await_paired_node()"
+    },
+    {
+      "label": "_wait_for_capabilities()",
+      "file_type": "code",
+      "source_file": "tests/conformance/test_external_node.py",
+      "source_location": "L60",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "tests_conformance_test_external_node_wait_for_capabilities",
+      "community": 2,
+      "community_name": "test_faults.py",
+      "norm_label": "_wait_for_capabilities()"
+    },
+    {
+      "label": "_wait_for_online()",
+      "file_type": "code",
+      "source_file": "tests/conformance/test_external_node.py",
+      "source_location": "L72",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "tests_conformance_test_external_node_wait_for_online",
+      "community": 2,
+      "community_name": "test_faults.py",
+      "norm_label": "_wait_for_online()"
+    },
+    {
+      "label": "test_external_node_pairs_with_a_stable_android_identity()",
+      "file_type": "code",
+      "source_file": "tests/conformance/test_external_node.py",
+      "source_location": "L83",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "tests_conformance_test_external_node_test_external_node_pairs_with_a_stable_android_identity",
+      "community": 2,
+      "community_name": "test_faults.py",
+      "norm_label": "test_external_node_pairs_with_a_stable_android_identity()"
+    },
+    {
+      "label": "test_external_node_executes_the_minimal_capability_profile()",
+      "file_type": "code",
+      "source_file": "tests/conformance/test_external_node.py",
+      "source_location": "L93",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "tests_conformance_test_external_node_test_external_node_executes_the_minimal_capability_profile",
+      "community": 2,
+      "community_name": "test_faults.py",
+      "norm_label": "test_external_node_executes_the_minimal_capability_profile()"
+    },
+    {
+      "label": "test_external_node_denies_a_capability_it_does_not_advertise()",
+      "file_type": "code",
+      "source_file": "tests/conformance/test_external_node.py",
+      "source_location": "L116",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "tests_conformance_test_external_node_test_external_node_denies_a_capability_it_does_not_advertise",
+      "community": 2,
+      "community_name": "test_faults.py",
+      "norm_label": "test_external_node_denies_a_capability_it_does_not_advertise()"
+    },
+    {
+      "label": "test_external_node_keeps_its_identity_across_an_interruption()",
+      "file_type": "code",
+      "source_file": "tests/conformance/test_external_node.py",
+      "source_location": "L128",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "tests_conformance_test_external_node_test_external_node_keeps_its_identity_across_an_interruption",
+      "community": 2,
+      "community_name": "test_faults.py",
+      "norm_label": "test_external_node_keeps_its_identity_across_an_interruption()"
+    },
+    {
+      "label": "M6: the conformance rows run against a real, externally-connected node. Opt-in\u2026",
+      "file_type": "rationale",
+      "source_file": "tests/conformance/test_external_node.py",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "tests_conformance_test_external_node_rationale_1",
+      "community": 2,
+      "community_name": "test_faults.py",
+      "norm_label": "m6: the conformance rows run against a real, externally-connected node. opt-in..."
+    },
+    {
+      "label": "Return the connected node, pairing one first if none is present. Checks before\u2026",
+      "file_type": "rationale",
+      "source_file": "tests/conformance/test_external_node.py",
+      "source_location": "L43",
+      "_origin": "ast",
+      "id": "tests_conformance_test_external_node_rationale_43",
+      "community": 2,
+      "community_name": "test_faults.py",
+      "norm_label": "return the connected node, pairing one first if none is present. checks before..."
+    },
+    {
+      "label": "M6 exit gate 1 and 2.",
+      "file_type": "rationale",
+      "source_file": "tests/conformance/test_external_node.py",
+      "source_location": "L84",
+      "_origin": "ast",
+      "id": "tests_conformance_test_external_node_rationale_84",
+      "community": 2,
+      "community_name": "test_faults.py",
+      "norm_label": "m6 exit gate 1 and 2."
+    },
+    {
+      "label": "M6 exit gate 4's success path, plus the schema conformance FR-6 asks for: the\u2026",
+      "file_type": "rationale",
+      "source_file": "tests/conformance/test_external_node.py",
+      "source_location": "L94",
+      "_origin": "ast",
+      "id": "tests_conformance_test_external_node_rationale_94",
+      "community": 2,
+      "community_name": "test_faults.py",
+      "norm_label": "m6 exit gate 4's success path, plus the schema conformance fr-6 asks for: the..."
+    },
+    {
+      "label": "M6 exit gate 4's node-local layer. `diagnostics.echo@1` is deliberately outside\u2026",
+      "file_type": "rationale",
+      "source_file": "tests/conformance/test_external_node.py",
+      "source_location": "L117",
+      "_origin": "ast",
+      "id": "tests_conformance_test_external_node_rationale_117",
+      "community": 2,
+      "community_name": "test_faults.py",
+      "norm_label": "m6 exit gate 4's node-local layer. `diagnostics.echo@1` is deliberately outside..."
+    },
+    {
+      "label": "M6 exit gate 3. Driven by the operator: background/kill the app, then bring it\u2026",
+      "file_type": "rationale",
+      "source_file": "tests/conformance/test_external_node.py",
+      "source_location": "L129",
+      "_origin": "ast",
+      "id": "tests_conformance_test_external_node_rationale_129",
+      "community": 2,
+      "community_name": "test_faults.py",
+      "norm_label": "m6 exit gate 3. driven by the operator: background/kill the app, then bring it..."
     },
     {
       "label": "test_faults.py",
@@ -17485,8 +17681,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_conformance_test_lifecycle",
-      "community": 66,
-      "community_name": "test_lifecycle.py",
+      "community": 2,
+      "community_name": "test_faults.py",
       "norm_label": "test_lifecycle.py"
     },
     {
@@ -17497,8 +17693,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "tests_conformance_test_lifecycle_echo_request",
-      "community": 66,
-      "community_name": "test_lifecycle.py",
+      "community": 2,
+      "community_name": "test_faults.py",
       "norm_label": "_echo_request()"
     },
     {
@@ -17509,8 +17705,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "tests_conformance_test_lifecycle_wait_for_online_devices",
-      "community": 66,
-      "community_name": "test_lifecycle.py",
+      "community": 2,
+      "community_name": "test_faults.py",
       "norm_label": "_wait_for_online_devices()"
     },
     {
@@ -17521,8 +17717,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "tests_conformance_test_lifecycle_test_appear_then_disappear_changes_the_very_next_implicit_resolution",
-      "community": 66,
-      "community_name": "test_lifecycle.py",
+      "community": 2,
+      "community_name": "test_faults.py",
       "norm_label": "test_appear_then_disappear_changes_the_very_next_implicit_resolution()"
     },
     {
@@ -17533,8 +17729,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "tests_conformance_test_lifecycle_test_multiple_candidates_are_structured_then_one_policy_default_selects",
-      "community": 66,
-      "community_name": "test_lifecycle.py",
+      "community": 2,
+      "community_name": "test_faults.py",
       "norm_label": "test_multiple_candidates_are_structured_then_one_policy_default_selects()"
     },
     {
@@ -17545,8 +17741,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "tests_conformance_test_lifecycle_test_highest_mutual_version_is_dispatched_and_no_overlap_carries_both_lists",
-      "community": 66,
-      "community_name": "test_lifecycle.py",
+      "community": 2,
+      "community_name": "test_faults.py",
       "norm_label": "test_highest_mutual_version_is_dispatched_and_no_overlap_carries_both_lists()"
     },
     {
@@ -17557,8 +17753,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "tests_conformance_test_lifecycle_test_readvertisement_is_full_set_and_inflight_validation_uses_dispatch_schema",
-      "community": 66,
-      "community_name": "test_lifecycle.py",
+      "community": 2,
+      "community_name": "test_faults.py",
       "norm_label": "test_readvertisement_is_full_set_and_inflight_validation_uses_dispatch_schema()"
     },
     {
@@ -17569,8 +17765,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "tests_conformance_test_lifecycle_test_disconnect_midflight_fails_immediately",
-      "community": 66,
-      "community_name": "test_lifecycle.py",
+      "community": 2,
+      "community_name": "test_faults.py",
       "norm_label": "test_disconnect_midflight_fails_immediately()"
     },
     {
@@ -17581,8 +17777,8 @@
       "_callable": true,
       "_origin": "ast",
       "id": "tests_conformance_test_lifecycle_test_same_device_reconnect_replaces_connection_without_cross_failing_calls",
-      "community": 66,
-      "community_name": "test_lifecycle.py",
+      "community": 2,
+      "community_name": "test_faults.py",
       "norm_label": "test_same_device_reconnect_replaces_connection_without_cross_failing_calls()"
     },
     {
@@ -17604,8 +17800,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_conformance_test_lifecycle_rationale_1",
-      "community": 66,
-      "community_name": "test_lifecycle.py",
+      "community": 2,
+      "community_name": "test_faults.py",
       "norm_label": "m4 live lifecycle and version-resolution behavior over the public protocol."
     },
     {
@@ -48792,6 +48988,18 @@
       "relation": "imports",
       "context": "import",
       "confidence": "EXTRACTED",
+      "source_file": "tests/conformance/test_external_node.py",
+      "source_location": "L22",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "tests_conformance_test_external_node",
+      "target": "asyncio",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
       "source_file": "tests/conformance/test_faults.py",
       "source_location": "L15",
       "weight": 1.0,
@@ -54290,7 +54498,7 @@
       "context": "import",
       "confidence": "EXTRACTED",
       "source_file": "tests/conformance/conftest.py",
-      "source_location": "L18",
+      "source_location": "L19",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tests_conformance_conftest",
@@ -57541,6 +57749,18 @@
       "relation": "imports_from",
       "context": "import",
       "confidence": "EXTRACTED",
+      "source_file": "tests/conformance/test_external_node.py",
+      "source_location": "L28",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "tests_conformance_test_external_node",
+      "target": "hermes_device_plugin_hermes_device_plugin_transport_base",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
       "source_file": "tests/conformance/test_faults.py",
       "source_location": "L23",
       "weight": 1.0,
@@ -57793,6 +58013,30 @@
       "weight": 1.0,
       "_origin": "ast",
       "source": "tests_conformance_test_android_node_test_android_profile_pair_invoke_reconnect_and_local_policy",
+      "target": "hermes_device_plugin_hermes_device_plugin_transport_base_invokerequest"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "tests/conformance/test_external_node.py",
+      "source_location": "L122",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "tests_conformance_test_external_node_test_external_node_denies_a_capability_it_does_not_advertise",
+      "target": "hermes_device_plugin_hermes_device_plugin_transport_base_invokerequest"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "tests/conformance/test_external_node.py",
+      "source_location": "L98",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "tests_conformance_test_external_node_test_external_node_executes_the_minimal_capability_profile",
       "target": "hermes_device_plugin_hermes_device_plugin_transport_base_invokerequest"
     },
     {
@@ -59184,7 +59428,7 @@
       "context": "import",
       "confidence": "EXTRACTED",
       "source_file": "tests/conformance/conftest.py",
-      "source_location": "L19",
+      "source_location": "L20",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tests_conformance_conftest",
@@ -59671,7 +59915,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "tests/conformance/conftest.py",
-      "source_location": "L68",
+      "source_location": "L96",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tests_conformance_conftest_bridge",
@@ -63441,7 +63685,7 @@
       "context": "import",
       "confidence": "EXTRACTED",
       "source_file": "tests/conformance/conftest.py",
-      "source_location": "L17",
+      "source_location": "L18",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tests_conformance_conftest",
@@ -63452,7 +63696,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "tests/conformance/conftest.py",
-      "source_location": "L63",
+      "source_location": "L91",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tests_conformance_conftest",
@@ -63463,7 +63707,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "tests/conformance/conftest.py",
-      "source_location": "L77",
+      "source_location": "L105",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tests_conformance_conftest",
@@ -63474,7 +63718,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "tests/conformance/conftest.py",
-      "source_location": "L30",
+      "source_location": "L48",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tests_conformance_conftest",
@@ -63485,7 +63729,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "tests/conformance/conftest.py",
-      "source_location": "L86",
+      "source_location": "L114",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tests_conformance_conftest",
@@ -63500,7 +63744,29 @@
       "weight": 1.0,
       "_origin": "ast",
       "source": "tests_conformance_conftest",
+      "target": "tests_conformance_conftest_external_node_mode",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/conformance/conftest.py",
+      "source_location": "L36",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "tests_conformance_conftest",
       "target": "tests_conformance_conftest_hermes_home",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/conformance/conftest.py",
+      "source_location": "L58",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "tests_conformance_conftest",
+      "target": "tests_conformance_conftest_managed_bridge_proc",
       "confidence_score": 1.0
     },
     {
@@ -63508,7 +63774,7 @@
       "context": "import",
       "confidence": "EXTRACTED",
       "source_file": "tests/conformance/conftest.py",
-      "source_location": "L17",
+      "source_location": "L18",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tests_conformance_conftest",
@@ -63520,7 +63786,7 @@
       "context": "import",
       "confidence": "EXTRACTED",
       "source_file": "tests/conformance/conftest.py",
-      "source_location": "L17",
+      "source_location": "L18",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tests_conformance_conftest",
@@ -63539,10 +63805,57 @@
       "confidence_score": 1.0
     },
     {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/conformance/conftest.py",
+      "source_location": "L49",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "tests_conformance_conftest_bridge_proc",
+      "target": "tests_conformance_conftest_external_node_mode",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/conformance/conftest.py",
+      "source_location": "L37",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "tests_conformance_conftest_hermes_home",
+      "target": "tests_conformance_conftest_external_node_mode",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/conformance/conftest.py",
+      "source_location": "L24",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "tests_conformance_conftest_rationale_24",
+      "target": "tests_conformance_conftest_external_node_mode",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/conformance/test_external_node.py",
+      "source_location": "L26",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "tests_conformance_test_external_node",
+      "target": "tests_conformance_conftest_external_node_mode",
+      "confidence_score": 1.0
+    },
+    {
       "relation": "references",
       "confidence": "EXTRACTED",
       "source_file": "tests/conformance/conftest.py",
-      "source_location": "L62",
+      "source_location": "L90",
       "weight": 1.0,
       "context": "decorator",
       "_origin": "ast",
@@ -63554,7 +63867,7 @@
       "relation": "references",
       "confidence": "EXTRACTED",
       "source_file": "tests/conformance/conftest.py",
-      "source_location": "L76",
+      "source_location": "L104",
       "weight": 1.0,
       "context": "decorator",
       "_origin": "ast",
@@ -63566,7 +63879,7 @@
       "relation": "references",
       "confidence": "EXTRACTED",
       "source_file": "tests/conformance/conftest.py",
-      "source_location": "L29",
+      "source_location": "L47",
       "weight": 1.0,
       "context": "decorator",
       "_origin": "ast",
@@ -63578,7 +63891,7 @@
       "relation": "references",
       "confidence": "EXTRACTED",
       "source_file": "tests/conformance/conftest.py",
-      "source_location": "L85",
+      "source_location": "L113",
       "weight": 1.0,
       "context": "decorator",
       "_origin": "ast",
@@ -63590,7 +63903,7 @@
       "relation": "references",
       "confidence": "EXTRACTED",
       "source_file": "tests/conformance/conftest.py",
-      "source_location": "L22",
+      "source_location": "L35",
       "weight": 1.0,
       "context": "decorator",
       "_origin": "ast",
@@ -63602,45 +63915,57 @@
       "relation": "calls",
       "context": "call",
       "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
       "source_file": "tests/conformance/conftest.py",
-      "source_location": "L38",
+      "source_location": "L54",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tests_conformance_conftest_bridge_proc",
-      "target": "tests_conformance_harness_start_bridge"
+      "target": "tests_conformance_conftest_managed_bridge_proc",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
       "context": "call",
       "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
       "source_file": "tests/conformance/conftest.py",
-      "source_location": "L50",
+      "source_location": "L66",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "tests_conformance_conftest_bridge_proc",
-      "target": "tests_conformance_harness_stop_bridge"
+      "source": "tests_conformance_conftest_managed_bridge_proc",
+      "target": "tests_conformance_harness_start_bridge",
+      "confidence_score": 1.0
     },
     {
-      "relation": "rationale_for",
+      "relation": "calls",
+      "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "tests/conformance/conftest.py",
-      "source_location": "L31",
+      "source_location": "L78",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "tests_conformance_conftest_rationale_31",
-      "target": "tests_conformance_conftest_bridge_proc",
+      "source": "tests_conformance_conftest_managed_bridge_proc",
+      "target": "tests_conformance_harness_stop_bridge",
       "confidence_score": 1.0
     },
     {
       "relation": "rationale_for",
       "confidence": "EXTRACTED",
       "source_file": "tests/conformance/conftest.py",
-      "source_location": "L78",
+      "source_location": "L59",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "tests_conformance_conftest_rationale_78",
+      "source": "tests_conformance_conftest_rationale_59",
+      "target": "tests_conformance_conftest_managed_bridge_proc",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/conformance/conftest.py",
+      "source_location": "L106",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "tests_conformance_conftest_rationale_106",
       "target": "tests_conformance_conftest_bridge_log",
       "confidence_score": 1.0
     },
@@ -63752,6 +64077,18 @@
       "weight": 1.0,
       "_origin": "ast",
       "source": "tests_conformance_test_android_node",
+      "target": "tests_conformance_harness",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/conformance/test_external_node.py",
+      "source_location": "L27",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "tests_conformance_test_external_node",
       "target": "tests_conformance_harness",
       "confidence_score": 1.0
     },
@@ -63989,6 +64326,30 @@
       "weight": 1.0,
       "_origin": "ast",
       "source": "tests_conformance_test_android_node_test_android_profile_pair_invoke_reconnect_and_local_policy",
+      "target": "tests_conformance_harness_mint_pairing_code",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/conformance/test_external_node.py",
+      "source_location": "L27",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "tests_conformance_test_external_node",
+      "target": "tests_conformance_harness_mint_pairing_code",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/conformance/test_external_node.py",
+      "source_location": "L53",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "tests_conformance_test_external_node_await_paired_node",
       "target": "tests_conformance_harness_mint_pairing_code",
       "confidence_score": 1.0
     },
@@ -64438,6 +64799,30 @@
       "relation": "imports",
       "context": "import",
       "confidence": "EXTRACTED",
+      "source_file": "tests/conformance/test_external_node.py",
+      "source_location": "L27",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "tests_conformance_test_external_node",
+      "target": "tests_conformance_harness_wait_for_device",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/conformance/test_external_node.py",
+      "source_location": "L55",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "tests_conformance_test_external_node_await_paired_node",
+      "target": "tests_conformance_harness_wait_for_device",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
       "source_file": "tests/conformance/test_faults.py",
       "source_location": "L20",
       "weight": 1.0,
@@ -64664,6 +65049,221 @@
       "_origin": "ast",
       "source": "tests_conformance_test_android_node_rationale_116",
       "target": "tests_conformance_test_android_node_test_a_node_that_cannot_sign_the_challenge_never_pairs",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/conformance/test_external_node.py",
+      "source_location": "L42",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "tests_conformance_test_external_node",
+      "target": "tests_conformance_test_external_node_await_paired_node",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/conformance/test_external_node.py",
+      "source_location": "L116",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "tests_conformance_test_external_node",
+      "target": "tests_conformance_test_external_node_test_external_node_denies_a_capability_it_does_not_advertise",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/conformance/test_external_node.py",
+      "source_location": "L93",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "tests_conformance_test_external_node",
+      "target": "tests_conformance_test_external_node_test_external_node_executes_the_minimal_capability_profile",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/conformance/test_external_node.py",
+      "source_location": "L128",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "tests_conformance_test_external_node",
+      "target": "tests_conformance_test_external_node_test_external_node_keeps_its_identity_across_an_interruption",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/conformance/test_external_node.py",
+      "source_location": "L83",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "tests_conformance_test_external_node",
+      "target": "tests_conformance_test_external_node_test_external_node_pairs_with_a_stable_android_identity",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/conformance/test_external_node.py",
+      "source_location": "L60",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "tests_conformance_test_external_node",
+      "target": "tests_conformance_test_external_node_wait_for_capabilities",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/conformance/test_external_node.py",
+      "source_location": "L72",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "tests_conformance_test_external_node",
+      "target": "tests_conformance_test_external_node_wait_for_online",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/conformance/test_external_node.py",
+      "source_location": "L1",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "tests_conformance_test_external_node_rationale_1",
+      "target": "tests_conformance_test_external_node",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/conformance/test_external_node.py",
+      "source_location": "L43",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "tests_conformance_test_external_node_rationale_43",
+      "target": "tests_conformance_test_external_node_await_paired_node",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/conformance/test_external_node.py",
+      "source_location": "L119",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "tests_conformance_test_external_node_test_external_node_denies_a_capability_it_does_not_advertise",
+      "target": "tests_conformance_test_external_node_await_paired_node",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/conformance/test_external_node.py",
+      "source_location": "L96",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "tests_conformance_test_external_node_test_external_node_executes_the_minimal_capability_profile",
+      "target": "tests_conformance_test_external_node_await_paired_node",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/conformance/test_external_node.py",
+      "source_location": "L130",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "tests_conformance_test_external_node_test_external_node_keeps_its_identity_across_an_interruption",
+      "target": "tests_conformance_test_external_node_await_paired_node",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/conformance/test_external_node.py",
+      "source_location": "L85",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "tests_conformance_test_external_node_test_external_node_pairs_with_a_stable_android_identity",
+      "target": "tests_conformance_test_external_node_await_paired_node",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/conformance/test_external_node.py",
+      "source_location": "L141",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "tests_conformance_test_external_node_test_external_node_keeps_its_identity_across_an_interruption",
+      "target": "tests_conformance_test_external_node_wait_for_capabilities",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/conformance/test_external_node.py",
+      "source_location": "L134",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "tests_conformance_test_external_node_test_external_node_keeps_its_identity_across_an_interruption",
+      "target": "tests_conformance_test_external_node_wait_for_online",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/conformance/test_external_node.py",
+      "source_location": "L84",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "tests_conformance_test_external_node_rationale_84",
+      "target": "tests_conformance_test_external_node_test_external_node_pairs_with_a_stable_android_identity",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/conformance/test_external_node.py",
+      "source_location": "L94",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "tests_conformance_test_external_node_rationale_94",
+      "target": "tests_conformance_test_external_node_test_external_node_executes_the_minimal_capability_profile",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/conformance/test_external_node.py",
+      "source_location": "L117",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "tests_conformance_test_external_node_rationale_117",
+      "target": "tests_conformance_test_external_node_test_external_node_denies_a_capability_it_does_not_advertise",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/conformance/test_external_node.py",
+      "source_location": "L129",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "tests_conformance_test_external_node_rationale_129",
+      "target": "tests_conformance_test_external_node_test_external_node_keeps_its_identity_across_an_interruption",
       "confidence_score": 1.0
     },
     {
@@ -66028,5 +66628,5 @@
       "source_file": "hermes-device-plugin/hermes_device_plugin/plugin.yaml"
     }
   ],
-  "built_at_commit": "f58fbc8a74d4b51da6e8b138ebfb6e79b8a52be7"
+  "built_at_commit": "7b4e57902945c205879c9065513eb8e96f38a0ba"
 }

@@ -450,9 +450,9 @@
     "semantic_hash": "e14eeba80bc8d250da0c8ac01da421cd"
   },
   "tests/conformance/conftest.py": {
-    "mtime": 1787065946.9653513,
-    "ast_hash": "801a349b5ee9ac39da20181e3a36d0a3",
-    "semantic_hash": "801a349b5ee9ac39da20181e3a36d0a3"
+    "mtime": 1787448537.3564556,
+    "ast_hash": "104ff719a3a3a03331ce96a8e286502f",
+    "semantic_hash": ""
   },
   "tests/conformance/harness.py": {
     "mtime": 1787428144.2510276,
@@ -602,6 +602,11 @@
   "hdp-bridge/tests/test_device_bound_pairing.py": {
     "mtime": 1787448394.329247,
     "ast_hash": "97143f9d91c1e5428c865b7d4290eef7",
+    "semantic_hash": ""
+  },
+  "tests/conformance/test_external_node.py": {
+    "mtime": 1787448692.6755064,
+    "ast_hash": "5f1f48e1690ef803fc9a56ebd2cb27f8",
     "semantic_hash": ""
   }
 }

@@ -1,0 +1,27 @@
+[Unit]
+Description=HDP bridge daemon (profile: @HERMES_HOME@)
+After=network.target
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+Environment=HERMES_HOME=@HERMES_HOME@
+WorkingDirectory=@REPO_ROOT@
+ExecStart=@REPO_ROOT@/.venv/bin/hdp-bridge serve
+Restart=on-failure
+RestartSec=2
+TimeoutStopSec=10
+
+# Hardening — bridge only needs to read the repo venv and read/write its own
+# profile-scoped state under $HERMES_HOME/hdp/ (registry.db, bridge.sock,
+# bridge.pid, bridge.addr, policy.yaml, audit/).
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=@HERMES_HOME@
+UMask=0077
+
+[Install]
+WantedBy=default.target

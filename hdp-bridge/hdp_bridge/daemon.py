@@ -5,6 +5,7 @@ bind/serve/shutdown loop so every task after it has a real daemon to talk to."""
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 from pathlib import Path
 
@@ -18,6 +19,8 @@ from .policy import PolicyEngine
 from .registry import Registry
 from .server import HdpServer
 from .store import db as store_db
+
+logger = logging.getLogger(__name__)
 
 
 class AlreadyRunningError(RuntimeError):
@@ -71,12 +74,18 @@ def _check_and_claim_pid(pid_path: Path) -> None:
             raise AlreadyRunningError(
                 f"hdp-bridge is already running (pid {existing_pid}, {pid_path})"
             )
+        if existing_pid is not None:
+            logger.info(
+                "Clearing stale PID file %s (pid %d no longer running)", pid_path, existing_pid
+            )
     pid_path.parent.mkdir(parents=True, exist_ok=True)
     pid_path.write_text(str(os.getpid()))
+    logger.debug("Claimed PID file %s (pid %d)", pid_path, os.getpid())
 
 
 async def serve(*, stop_event: asyncio.Event | None = None) -> None:
     pid_path = config.pid_path()
+    logger.info("Starting hdp-bridge (profile home: %s)", config.hdp_home())
     _check_and_claim_pid(pid_path)
 
     try:
@@ -85,6 +94,7 @@ async def serve(*, stop_event: asyncio.Event | None = None) -> None:
         # Anything from here through a successful `control.start()` — Registry/connection
         # construction, HdpServer/ControlServer construction, either `.start()` call — must not
         # leave the PID claim taken above on disk. Unclaim it before propagating.
+        logger.exception("hdp-bridge failed to start; releasing PID claim %s", pid_path)
         pid_path.unlink(missing_ok=True)
         raise
 
@@ -157,6 +167,12 @@ async def _serve_claimed(pid_path: Path, stop_event: asyncio.Event | None) -> No
     )
 
     await hdp_server.start()
+    logger.info(
+        "Node-facing server listening on %s:%d (bridge.addr: %s)",
+        config.hdp_bind_host(),
+        config.hdp_bind_port(),
+        config.bridge_addr_path(),
+    )
     try:
         await control.start()
     except BaseException:
@@ -164,14 +180,21 @@ async def _serve_claimed(pid_path: Path, stop_event: asyncio.Event | None) -> No
         # already-bound node-facing TCP socket and the `bridge.addr` file it wrote must not
         # leak — tear down what already succeeded before propagating. The PID claim itself is
         # unclaimed by `serve()`'s outer wrapper, which covers every failure in this function.
+        logger.exception(
+            "Control socket failed to bind at %s; tearing down node-facing server",
+            config.control_socket_path(),
+        )
         await hdp_server.close()
         raise
 
+    logger.info("Control socket listening at %s", config.control_socket_path())
     audit.record("daemon_start")
+    logger.info("hdp-bridge ready (pid %d)", os.getpid())
     stop_event = stop_event or asyncio.Event()
     try:
         await stop_event.wait()
     finally:
+        logger.info("hdp-bridge shutting down")
         audit.record("daemon_stop")
         await control.close()
         await hdp_server.close()
@@ -181,10 +204,10 @@ async def _serve_claimed(pid_path: Path, stop_event: asyncio.Event | None) -> No
         # thread. Unclaiming synchronously is in fact what we want: it must have happened before
         # `serve()` returns, or a fast restart could see a claim its owner has already abandoned.
         pid_path.unlink(missing_ok=True)  # noqa: ASYNC240
+        logger.info("hdp-bridge stopped")
 
 
 def main() -> None:
-    import logging
     import signal
 
     logging.basicConfig(

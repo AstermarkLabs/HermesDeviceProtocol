@@ -40,8 +40,8 @@
     "semantic_hash": "cc67a52abc221a7db3d2eac2ba2dac5a"
   },
   "hdp-bridge/hdp_bridge/daemon.py": {
-    "mtime": 1787276856.5848436,
-    "ast_hash": "9a62a92c44f7b333e2d177e0ef3bc148",
+    "mtime": 1787428484.4947286,
+    "ast_hash": "220cf53bda3b041096d78534f826a2f4",
     "semantic_hash": ""
   },
   "hdp-bridge/hdp_bridge/invocations.py": {
@@ -455,7 +455,7 @@
     "semantic_hash": "801a349b5ee9ac39da20181e3a36d0a3"
   },
   "tests/conformance/harness.py": {
-    "mtime": 1787290848.4675612,
+    "mtime": 1787428144.2510276,
     "ast_hash": "b8141ccca3c120637996bfa9731080b0",
     "semantic_hash": ""
   },
@@ -490,8 +490,8 @@
     "semantic_hash": "9d328221e1c3c161f53631718bd0c336"
   },
   "README.md": {
-    "mtime": 1787290630.3758295,
-    "ast_hash": "2cb798709292745c27b32cb6a48a181f",
+    "mtime": 1787428144.236027,
+    "ast_hash": "1f58dde1d0a4e849b846fe098bbda6fb",
     "semantic_hash": ""
   },
   "hdp-spec/HDP-0.md": {
@@ -575,13 +575,18 @@
     "semantic_hash": "66711e708032029dc0ad1238c0f51710"
   },
   "tests/conformance/android_node_fixture.py": {
-    "mtime": 1787291113.4121842,
+    "mtime": 1787428144.2510276,
     "ast_hash": "f9e2faceffd81dbd463cb4acc759b8e9",
     "semantic_hash": ""
   },
   "tests/conformance/test_android_node.py": {
-    "mtime": 1787291113.425185,
+    "mtime": 1787428144.2510276,
     "ast_hash": "dce536cb412dacc200704922bb4359da",
+    "semantic_hash": ""
+  },
+  "docs/android-node-contract.md": {
+    "mtime": 1787428144.236027,
+    "ast_hash": "d9534eff27c64a33a8590e1ed2439981",
     "semantic_hash": ""
   }
 }

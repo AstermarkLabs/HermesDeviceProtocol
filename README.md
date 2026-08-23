@@ -36,11 +36,34 @@ uv run hdp-node --help
 This installs all workspace packages into the project environment. The protocol codec (`hdp-proto`)
 is stdlib-only; the bridge, plugin, and reference node use their declared runtime dependencies.
 
+## Run the bridge as a service (Linux, recommended)
+
+`uv run hdp-bridge serve` is fine for a quick check but ties the daemon to a terminal — close the
+window and it's gone. For anything long-lived, install it as a `systemd --user` unit instead:
+
+```bash
+uv sync                # populate .venv/ first
+make service-install   # installs, enables at boot (linger), and starts it now
+```
+
+This renders `deploy/systemd/hdp-bridge.service.in` into
+`~/.config/systemd/user/hdp-bridge.service` for the current user and `$HOME/.hermes` profile
+(override with `HERMES_HOME_DIR=...`), then starts it. Manage it with:
+
+```bash
+make service-status    # systemctl --user status
+make service-logs      # journalctl --user -u hdp-bridge.service -f
+make service-uninstall # stop, disable, remove the unit
+```
+
+Crashes restart automatically (`Restart=on-failure`); `loginctl enable-linger` means it also starts
+at boot and survives logout, without needing root.
+
 ## Run the bridge and connect a node
 
 Use the same `HERMES_HOME` for the bridge and node, or pass the bridge URL explicitly.
 
-Terminal 1 — start the bridge:
+Terminal 1 — start the bridge (skip this if it's already running as a service above):
 
 ```bash
 export HERMES_HOME="$HOME/.hermes"

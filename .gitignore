@@ -28,3 +28,4 @@ docs/*
 !docs/android-node-contract.md
 graphify-out/20*
 graphify-out/cache
+nohup.out

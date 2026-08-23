@@ -22,12 +22,23 @@ def test_minted_code_is_six_digits_and_not_the_stored_hash(tmp_path):
     assert code not in stored  # never the plaintext, hashed only (no-plaintext rule)
 
 
-def test_minting_can_produce_a_leading_zero_code(tmp_path):
-    """Leading zeros are legal codes; anything that renders one as an int would drop them and
-    make ~10% of codes unusable."""
+def test_a_leading_zero_code_survives_the_full_mint_and_consume_path(tmp_path, monkeypatch):
+    """Leading zeros are legal codes. Anything that round-trips one through an int would drop
+    them and make ~10% of the space silently unusable, so drive the real path rather than only
+    asserting on the minted string's length."""
+    conn = db.connect(tmp_path / "registry.db")
+    monkeypatch.setattr(pairing, "_random_code", lambda: "000042")
+
+    code = mint_pairing_code(conn)
+    assert code == "000042"
+    assert code_is_live(conn, code) is True
+    assert consume_pairing_code(conn, code, "dev_1") is True
+
+
+def test_minted_codes_stay_six_characters_across_many_mints(tmp_path):
     conn = db.connect(tmp_path / "registry.db")
     codes = {mint_pairing_code(conn) for _ in range(400)}
-    assert all(len(c) == 6 for c in codes)
+    assert all(len(c) == 6 and c.isdigit() for c in codes)
 
 
 def test_consume_succeeds_exactly_once(tmp_path):

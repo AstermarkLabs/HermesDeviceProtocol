@@ -77,14 +77,14 @@ export HERMES_HOME="$HOME/.hermes"
 uv run hdp-bridge pair new
 ```
 
-Terminal 3 — pair and run the reference node. Replace the placeholder with the code printed by
-the previous command:
+Terminal 3 — pair and run the reference node. Replace the placeholder with the six-digit code
+printed by the previous command:
 
 ```bash
 export HERMES_HOME="$HOME/.hermes"
 uv run hdp-node connect \
   --name workshop-node \
-  --pair-code XXXX-XXXX-XXXX \
+  --pair-code 482915 \
   --credential-file "$HOME/.config/hdp/workshop-node.credential"
 ```
 

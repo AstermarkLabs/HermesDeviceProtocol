@@ -6,10 +6,13 @@ handshake state machine is exercised without standing up a real aiohttp server.
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import json
+from types import SimpleNamespace
 
 import pytest
+from aiohttp import WSCloseCode, WSMsgType
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from hdp_bridge import credentials, device_keys, pairing
@@ -339,3 +342,68 @@ async def test_a_malformed_signature_is_refused(tmp_path, signature):
     await _send(connection, "proof", {"signature": signature})
     assert ws.closed_with is not None
     assert connection.device_id is None
+
+
+async def test_a_held_challenge_does_not_pin_a_connection_open(tmp_path):
+    """A peer can open a connection, take a challenge, and simply never answer. The dead-peer
+    monitor must reap it: the dispatch gate refuses heartbeats while a proof is outstanding, so
+    such a connection can never refresh its liveness and is bounded rather than held forever."""
+    db_path = tmp_path / "registry.db"
+    conn = db.connect(db_path)
+    code = pairing.mint_pairing_code(conn)
+    _, pubkey = _new_key()
+
+    hello_frame = json.dumps(
+        Envelope.new(
+            "hello",
+            Hello(
+                hdp_versions=(0,),
+                device_name="squatter",
+                capabilities=(),
+                credential=f"pair:{code}",
+                device_pubkey=pubkey,
+            ).to_wire(),
+        ).to_wire()
+    )
+
+    class _SilentAfterHello(_FakeWS):
+        """Delivers `hello`, then goes quiet forever — the half-open handshake."""
+
+        def __init__(self):
+            super().__init__()
+            self._frames = [hello_frame]
+            self._closed = asyncio.Event()
+
+        async def close(self, *, code, message=b""):
+            await super().close(code=code, message=message)
+            # A real aiohttp socket ends its iteration on close; the double must too, or
+            # `run()`'s read loop would hang past the monitor firing.
+            self._closed.set()
+
+        def __aiter__(self):
+            return self
+
+        async def __anext__(self):
+            if self._frames:
+                data = self._frames.pop(0)
+                return SimpleNamespace(type=WSMsgType.TEXT, data=data)
+            await self._closed.wait()
+            raise StopAsyncIteration
+
+    ws = _SilentAfterHello()
+    connection = NodeConnection(
+        ws,
+        conn=conn,
+        registry=Registry(db_path),
+        invocations=InvocationsMem(),
+        connections={},
+        descriptors={},
+        dead_peer_timeout_s=0.2,
+    )
+
+    await asyncio.wait_for(connection.run(), timeout=5)
+
+    assert ws.closed_with == WSCloseCode.GOING_AWAY
+    assert connection.device_id is None
+    # And the squatter never got a device out of it.
+    assert Registry(db_path).list_devices() == []

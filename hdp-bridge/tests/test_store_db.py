@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sqlite3
+from pathlib import Path
 
 import pytest
 from hdp_bridge.store import db
@@ -36,3 +37,56 @@ def test_connect_refuses_a_newer_schema_version_than_it_knows(tmp_path):
     conn.close()
     with pytest.raises(db.SchemaTooNewError):
         db.connect(db_path)
+
+
+def test_migrating_a_populated_v1_database_preserves_rows_and_defaults(tmp_path):
+    """The user's live registry is a populated v1 database — the first one migration 002 will
+    ever touch. A fresh-tmpdir migration proves nothing about that path."""
+    db_path = tmp_path / "registry.db"
+    raw = sqlite3.connect(db_path)
+    raw.executescript((Path(db.__file__).parent / "migrations" / "001_initial.sql").read_text())
+    raw.execute(
+        "INSERT INTO devices (device_id, friendly_name, platform, client_version, "
+        "first_paired_at, last_seen_at, state) VALUES "
+        "('dev_legacy', 'workshop', 'linux', '1.0', 10, 20, 'active')"
+    )
+    raw.execute(
+        "INSERT INTO pairing_codes (code_hash, created_at, expires_at, consumed_at, "
+        "issued_device_id) VALUES ('abc123', 1, 2, NULL, NULL)"
+    )
+    raw.commit()
+    raw.close()
+
+    conn = db.connect(db_path)
+
+    assert conn.execute("SELECT version FROM schema_version").fetchone()[0] == 2
+    device = conn.execute(
+        "SELECT friendly_name, platform, device_pubkey FROM devices WHERE device_id = 'dev_legacy'"
+    ).fetchone()
+    # Existing data survives, and the pre-v0.4 device lands on the legacy (unbound) auth path.
+    assert device == ("workshop", "linux", "")
+    code = conn.execute(
+        "SELECT attempts_remaining, invalidated_at FROM pairing_codes WHERE code_hash = 'abc123'"
+    ).fetchone()
+    assert code == (5, None)
+
+
+def test_migrating_an_already_current_database_is_a_no_op(tmp_path):
+    db_path = tmp_path / "registry.db"
+    conn = db.connect(db_path)
+    conn.execute(
+        "INSERT INTO devices (device_id, friendly_name, platform, client_version, "
+        "first_paired_at, last_seen_at, state, device_pubkey) VALUES "
+        "('dev_1', 'n', 'android', '', 0, 0, 'active', 'a-key')"
+    )
+    conn.commit()
+    conn.close()
+
+    reopened = db.connect(db_path)
+    assert reopened.execute("SELECT version FROM schema_version").fetchone()[0] == 2
+    assert (
+        reopened.execute("SELECT device_pubkey FROM devices WHERE device_id = 'dev_1'").fetchone()[
+            0
+        ]
+        == "a-key"
+    )

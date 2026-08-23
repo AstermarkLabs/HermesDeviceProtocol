@@ -8,12 +8,22 @@ runtime APIs out of this repository's Python test process.
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 
 import aiohttp
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import ec
 from hdp_proto.capabilities import CapabilityDescriptor
 from hdp_proto.envelope import Envelope, EnvelopeError
-from hdp_proto.messages import CapabilitiesMsg, Hello, ResultMsg, Welcome
+from hdp_proto.messages import CapabilitiesMsg, Challenge, Hello, Proof, ResultMsg, Welcome
+
+#: Mirrors `hdp_bridge.device_keys`' contexts. Deliberately re-stated rather than imported: this
+#: fixture models a *peer*, and a peer gets these from the spec (HDP-0.md Amendments v0.4), not
+#: from the bridge's own module. Importing them would let a rename on one side silently keep the
+#: test passing while every real node broke.
+_PAIR_CONTEXT = b"HDP/0 pair-challenge\x00"
+_AUTH_CONTEXT = b"HDP/0 auth-challenge\x00"
 
 ANDROID_CAPABILITIES = (
     CapabilityDescriptor(
@@ -53,8 +63,12 @@ _ECHO_DESCRIPTOR = CapabilityDescriptor(
 class AndroidNodeFixture:
     """A small HDP peer with Android M5 policy semantics.
 
-    The fixture stores the credential in memory only.  A real Android node must replace this
-    with protected storage as specified in ``docs/android-node-contract.md``.
+    The fixture stores the credential and private key in memory only.  A real Android node must
+    replace both with Keystore-protected storage as specified in
+    ``docs/android-node-contract.md``.
+
+    It implements the v0.4 device-bound handshake because that is what the Android profile
+    requires, which also gives challenge/proof its only coverage over a real socket.
     """
 
     def __init__(self, name: str = "android-fixture") -> None:
@@ -68,6 +82,24 @@ class AndroidNodeFixture:
         self._ws: aiohttp.ClientWebSocketResponse | None = None
         self._reader_task: asyncio.Task[None] | None = None
         self._cancelled: set[str] = set()
+        self._private_key = ec.generate_private_key(ec.SECP256R1())
+
+    @property
+    def public_key(self) -> str:
+        """Base64 DER SubjectPublicKeyInfo, the encoding `hello.device_pubkey` carries."""
+        return base64.b64encode(
+            self._private_key.public_key().public_bytes(
+                serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo
+            )
+        ).decode("ascii")
+
+    def _sign_challenge(self, context: bytes, nonce: str) -> str:
+        """Sign the context prefix followed by the *decoded* nonce bytes (HDP-0.md v0.4) — not
+        the base64 text, which would produce a well-formed signature that never verifies."""
+        signature = self._private_key.sign(
+            context + base64.b64decode(nonce), ec.ECDSA(hashes.SHA256())
+        )
+        return base64.b64encode(signature).decode("ascii")
 
     async def connect(self, url: str, *, pair_code: str | None = None) -> Welcome:
         """Connect and complete pairing or credential authentication."""
@@ -78,7 +110,8 @@ class AndroidNodeFixture:
 
         self._session = aiohttp.ClientSession()
         self._ws = await self._session.ws_connect(url, heartbeat=15.0)
-        credential = f"pair:{pair_code}" if pair_code is not None else self.credential
+        pairing = pair_code is not None
+        credential = f"pair:{pair_code}" if pairing else self.credential
         hello = Hello(
             hdp_versions=(0,),
             device_name=self.name,
@@ -87,17 +120,38 @@ class AndroidNodeFixture:
             # Amendments v0.3. The reference node deliberately omits this, so the suite keeps
             # live coverage of both the reporting and the omitting branch.
             platform="android",
+            # Amendments v0.4: only the enrolling `hello` carries the key; afterwards the bridge
+            # challenges against the key it already stored.
+            device_pubkey=self.public_key if pairing else None,
         )
         await self._send(Envelope.new("hello", hello.to_wire()))
-        message = await self._ws.receive(timeout=5)
-        if message.type != aiohttp.WSMsgType.TEXT:
-            raise RuntimeError(f"expected welcome, got {message.type!r}")
-        welcome = Welcome.from_wire(Envelope.from_wire(json.loads(message.data)).payload)
+
+        envelope = await self._receive()
+        if envelope.type == "challenge":
+            nonce = Challenge.from_wire(envelope.payload).nonce
+            context = _PAIR_CONTEXT if pairing else _AUTH_CONTEXT
+            await self._send(
+                Envelope.new(
+                    "proof", Proof(signature=self._sign_challenge(context, nonce)).to_wire()
+                )
+            )
+            envelope = await self._receive()
+
+        if envelope.type != "welcome":
+            raise RuntimeError(f"expected welcome, got {envelope.type!r}")
+        welcome = Welcome.from_wire(envelope.payload)
         self.device_id = welcome.device_id
         if welcome.credential is not None:
             self.credential = welcome.credential
         self._reader_task = asyncio.create_task(self._read_frames())
         return welcome
+
+    async def _receive(self) -> Envelope:
+        assert self._ws is not None
+        message = await self._ws.receive(timeout=5)
+        if message.type != aiohttp.WSMsgType.TEXT:
+            raise RuntimeError(f"expected a text frame, got {message.type!r}")
+        return Envelope.from_wire(json.loads(message.data))
 
     async def reconnect(self, url: str) -> Welcome:
         """Reconnect with the stored credential and preserve the bridge-issued identity."""

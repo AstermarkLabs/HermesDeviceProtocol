@@ -280,6 +280,14 @@ letting dead rows permanently consume the space.
 - **`proof`** (Node → Bridge): `{"signature": "<base64 DER ECDSA-P256-SHA256>"}` over
   `context || nonce`.
 
+**The signed input is the context prefix followed by the *decoded* nonce bytes** — the 32 raw bytes
+the base64 in `challenge` represents, never that base64 text itself. Both are byte strings a signer
+will accept without complaint, and choosing the wrong one produces a valid-looking signature that
+simply fails verification, so it is pinned here rather than left to the reader. Concretely, the
+signer's input is `context + base64_decode(nonce)`, and the signature is DER-encoded ECDSA
+(the format Java's `Signature.getInstance("SHA256withECDSA")` and OpenSSL both emit by default,
+not the fixed-width r||s concatenation some libraries use).
+
 Both handshakes become `hello → challenge → proof → welcome`:
 
 - **Enrollment.** The bridge checks that the code is live but does **not** consume it, issues a

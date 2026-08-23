@@ -6,7 +6,7 @@ import sqlite3
 from pathlib import Path
 
 _MIGRATIONS_DIR = Path(__file__).parent / "migrations"
-CURRENT_SCHEMA_VERSION = 1
+CURRENT_SCHEMA_VERSION = 2
 
 
 class SchemaTooNewError(RuntimeError):

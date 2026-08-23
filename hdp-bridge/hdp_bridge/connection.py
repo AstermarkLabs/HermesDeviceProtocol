@@ -19,6 +19,7 @@ import logging
 import sqlite3
 import time
 from collections import OrderedDict
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Protocol
 
 from aiohttp import WSCloseCode, WSMsgType, web
@@ -28,15 +29,17 @@ from hdp_proto.envelope import Envelope, EnvelopeError, UnsupportedVersionError
 from hdp_proto.messages import (
     CancelMsg,
     CapabilitiesMsg,
+    Challenge,
     ErrorMsg,
     Hello,
     InvokeMsg,
+    Proof,
     ResultMsg,
     Welcome,
 )
 from hdp_proto.version import HDP_VERSION
 
-from . import credentials, pairing
+from . import credentials, device_keys, pairing
 from .types import CapabilityRecord, DeviceRecord
 
 if TYPE_CHECKING:
@@ -54,6 +57,24 @@ Bridge→Node-only type (`welcome`, `invoke`, `cancel`, `revoke`) arriving from 
 message type used in the wrong direction — handled as a malformed frame (HDP-0.md §5), not a
 version/type rejection at the envelope layer, since `Envelope.from_wire` has no notion of
 direction."""
+
+
+@dataclass(frozen=True)
+class _PendingHandshake:
+    """A challenge awaiting its proof (HDP-0.md Amendments v0.4).
+
+    `pair_code` is set on an enrollment handshake and None on a reconnect; that distinction picks
+    the signing context, so a signature captured during enrollment cannot be replayed to
+    authenticate a later connection.
+    """
+
+    hello: Hello
+    nonce: str
+    public_key: str
+    context: bytes
+    pair_code: str | None
+    device_id: str | None
+
 
 _MALFORMED_WINDOW_S = 60.0
 _MALFORMED_LIMIT = 10
@@ -91,6 +112,11 @@ class NodeConnection:
         self._descriptors = descriptors
         self._audit = audit
         self.device_id: str | None = None
+        self._pending: _PendingHandshake | None = None
+        """Set between sending a `challenge` and verifying the matching `proof` (Amendments
+        v0.4). While non-None the connection accepts exactly one frame type — `proof` — and has
+        created no device state: a pairing code is not consumed and a credential is not issued
+        until possession of the private key has been demonstrated."""
         self._seen_ids: OrderedDict[str, None] = OrderedDict()
         self._malformed_times: list[float] = []
         self._dead_peer_timeout_s = dead_peer_timeout_s
@@ -217,6 +243,12 @@ class NodeConnection:
         self._remember_id(envelope.id)
 
         if self.device_id is None:
+            if self._pending is not None:
+                if envelope.type != "proof":
+                    await self._ws.close(code=WSCloseCode.PROTOCOL_ERROR, message=b"expected proof")
+                    return
+                await self._handle_proof(envelope)
+                return
             if envelope.type != "hello":
                 await self._ws.close(
                     code=WSCloseCode.PROTOCOL_ERROR, message=b"expected hello first"
@@ -277,31 +309,166 @@ class NodeConnection:
                 self._audit.record("auth_failed", reason="unknown_credential")
             return
 
+        enrolled_key = self._enrolled_public_key(device_id)
+        if enrolled_key:
+            # v0.4: the credential alone is no longer sufficient for a device that enrolled a
+            # key. Possession of the non-exportable private half must also be demonstrated, so a
+            # credential lifted off the device is useless anywhere else.
+            await self._begin_challenge(
+                hello,
+                public_key=enrolled_key,
+                context=device_keys.AUTH_CONTEXT,
+                pair_code=None,
+                device_id=device_id,
+            )
+            return
+
         self._register_device(device_id, hello)
         welcome = Welcome(hdp_version=int(HDP_VERSION), device_id=device_id)
         await self._send(Envelope.new("welcome", welcome.to_wire()))
 
     async def _handle_pairing_hello(self, hello: Hello) -> None:
         pair_code = hello.credential.removeprefix("pair:")  # type: ignore[union-attr]
-        device_id = ids.new()
-        if not pairing.consume_pairing_code(self._conn, pair_code, device_id):
-            await self._ws.close(code=WSCloseCode.POLICY_VIOLATION, message=b"auth_failed")
-            logger.warning("auth_failed reason=invalid_or_expired_pairing_code")
-            if self._audit is not None:
-                self._audit.record("auth_failed", reason="invalid_or_expired_pairing_code")
+
+        if hello.device_pubkey:
+            # v0.4: liveness is checked *without* consuming, because the code must survive until
+            # the node has proven possession of its private key. Consuming here would let anyone
+            # who guessed a code burn it while failing the proof.
+            if not pairing.code_is_live(self._conn, pair_code):
+                await self._fail_pairing("invalid_or_expired_pairing_code")
+                return
+            if not device_keys.key_is_usable(hello.device_pubkey):
+                await self._fail_pairing("unusable_device_pubkey")
+                return
+            await self._begin_challenge(
+                hello,
+                public_key=hello.device_pubkey,
+                context=device_keys.PAIR_CONTEXT,
+                pair_code=pair_code,
+                device_id=None,
+            )
             return
 
+        device_id = ids.new()
+        if not pairing.consume_pairing_code(self._conn, pair_code, device_id):
+            await self._fail_pairing("invalid_or_expired_pairing_code")
+            return
+
+        await self._complete_pairing(device_id, hello, pair_code=None)
+
+    async def _fail_pairing(self, reason: str) -> None:
+        """Every failed pairing handshake looks identical on the wire and charges the online-
+        guessing budget (Amendments v0.4).
+
+        Charging on *every* failure, not only on a code that matched, is what bounds guessing: a
+        wrong six-digit code matches no row, so a per-code counter would never fire. The reason
+        string reaches the audit log, never the peer — telling a guesser whether the code or the
+        signature was wrong would hand back exactly the oracle the budget exists to deny.
+        """
+        destroyed = pairing.burn_attempt(self._conn)
+        await self._ws.close(code=WSCloseCode.POLICY_VIOLATION, message=b"auth_failed")
+        logger.warning("auth_failed reason=%s codes_invalidated=%d", reason, destroyed)
+        if self._audit is not None:
+            self._audit.record("auth_failed", reason=reason, pairing_codes_invalidated=destroyed)
+
+    async def _begin_challenge(
+        self,
+        hello: Hello,
+        *,
+        public_key: str,
+        context: bytes,
+        pair_code: str | None,
+        device_id: str | None,
+    ) -> None:
+        nonce = device_keys.new_nonce()
+        self._pending = _PendingHandshake(
+            hello=hello,
+            nonce=nonce,
+            public_key=public_key,
+            context=context,
+            pair_code=pair_code,
+            device_id=device_id,
+        )
+        await self._send(Envelope.new("challenge", Challenge(nonce=nonce).to_wire()))
+
+    async def _handle_proof(self, envelope: Envelope) -> None:
+        pending = self._pending
+        if pending is None:  # pragma: no cover — guarded by _handle_frame's dispatch gate
+            raise RuntimeError("_handle_proof reached with no challenge outstanding")
+        # One challenge, one attempt. Clearing first means a peer cannot retry signatures against
+        # a nonce it has already seen; a second guess costs it a fresh connection and handshake.
+        self._pending = None
+
+        try:
+            proof = Proof.from_wire(envelope.payload)
+        except ValueError as exc:
+            await self._reject_proof(pending, f"malformed proof: {exc}")
+            return
+
+        if not device_keys.verify_proof(
+            pending.public_key, pending.context, pending.nonce, proof.signature
+        ):
+            await self._reject_proof(pending, "invalid_device_proof")
+            return
+
+        if pending.pair_code is not None:
+            device_id = ids.new()
+            if not pairing.consume_pairing_code(self._conn, pending.pair_code, device_id):
+                # Raced with expiry, another node, or an invalidating burst since the challenge.
+                await self._fail_pairing("invalid_or_expired_pairing_code")
+                return
+            await self._complete_pairing(device_id, pending.hello, pair_code=pending.pair_code)
+            return
+
+        if pending.device_id is None:  # pragma: no cover — set on every reconnect challenge
+            raise RuntimeError("reconnect proof reached with no resolved device_id")
+        self._register_device(pending.device_id, pending.hello)
+        welcome = Welcome(hdp_version=int(HDP_VERSION), device_id=pending.device_id)
+        await self._send(Envelope.new("welcome", welcome.to_wire()))
+
+    async def _reject_proof(self, pending: _PendingHandshake, reason: str) -> None:
+        """A failed proof on an enrollment burns budget like any other pairing failure; a failed
+        proof on a *reconnect* does not, because no pairing code is in play and burning one would
+        let a misbehaving paired device destroy an unrelated operator's pairing window."""
+        if pending.pair_code is not None:
+            await self._fail_pairing(reason)
+            return
+        await self._ws.close(code=WSCloseCode.POLICY_VIOLATION, message=b"auth_failed")
+        logger.warning("auth_failed device_id=%s reason=%s", pending.device_id, reason)
+        if self._audit is not None:
+            self._audit.record("auth_failed", device_id=pending.device_id, reason=reason)
+
+    async def _complete_pairing(
+        self, device_id: str, hello: Hello, *, pair_code: str | None
+    ) -> None:
         # `devices` must exist before `credentials` (FK constraint) — `_register_device` writes
         # the devices row (via `Registry`'s own connection to the same file; WAL mode makes the
         # commit visible to `self._conn` immediately) before `issue_credential` inserts against it.
         self._register_device(device_id, hello)
+        if hello.device_pubkey:
+            # Written here rather than carried on `DeviceRecord`, because `Registry.register`
+            # upserts and every reconnect calls it — routing the key through that path would
+            # clear an enrolled key on the first reconnect that omitted it.
+            with self._conn:
+                self._conn.execute(
+                    "UPDATE devices SET device_pubkey = ? WHERE device_id = ?",
+                    (hello.device_pubkey, device_id),
+                )
         new_credential = credentials.issue_credential(self._conn, device_id)
         welcome = Welcome(
             hdp_version=int(HDP_VERSION), device_id=device_id, credential=new_credential
         )
         await self._send(Envelope.new("welcome", welcome.to_wire()))
         if self._audit is not None:
-            self._audit.record("paired", device_id=device_id)
+            self._audit.record(
+                "paired", device_id=device_id, device_bound=bool(hello.device_pubkey)
+            )
+
+    def _enrolled_public_key(self, device_id: str) -> str:
+        row = self._conn.execute(
+            "SELECT device_pubkey FROM devices WHERE device_id = ?", (device_id,)
+        ).fetchone()
+        return row[0] if row and row[0] else ""
 
     def _register_device(self, device_id: str, hello: Hello) -> None:
         capability_infos = [

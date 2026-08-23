@@ -1,10 +1,10 @@
 """HDP wire version and the known-message-type boundary.
 
 The full HDP/0 type set, per `hdp-spec/HDP-0.md` §2: Node→Bridge (`hello`, `capabilities`,
-`ack`, `result`, `progress`, `heartbeat`, `error`) and Bridge→Node (`welcome`, `invoke`, `cancel`,
-`ack`, `revoke`, `heartbeat`, `error`), deduplicated into one set — the same envelope and type
-names are reused for the plugin↔bridge control plane too (ADR-0004), so a single receiver-side
-set covers both directions and both planes.
+`ack`, `result`, `progress`, `heartbeat`, `error`, `proof`) and Bridge→Node (`welcome`, `invoke`,
+`cancel`, `ack`, `revoke`, `heartbeat`, `error`, `challenge`), deduplicated into one set — the
+same envelope and type names are reused for the plugin↔bridge control plane too (ADR-0004), so
+a single receiver-side set covers both directions and both planes.
 
 The boundary this module exists to state: a receiver rejects an unknown *type* with an `error`
 reply (or refuses the connection, for the version itself); it must never reject an unknown
@@ -30,6 +30,9 @@ NODE_TYPES = frozenset(
         "revoke",
         "heartbeat",
         "error",
+        # Amendments (v0.4): the device-bound handshake's challenge-response pair.
+        "challenge",
+        "proof",
     }
 )
 """The full HDP/0 node-facing message-type set (hdp-spec/HDP-0.md §2). `progress` and `revoke`

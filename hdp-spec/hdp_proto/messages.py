@@ -61,13 +61,20 @@ class Hello:
     `platform` (Amendments v0.3) is an optional self-reported platform identifier, e.g.
     `"android"` or `"linux"`. It is advisory metadata for operator-facing device listings, never
     an authorization input. Absent means the bridge records `"unknown"`, which is what every
-    pre-v0.3 node produces — defaulted here so this stays an addition, not a wire break."""
+    pre-v0.3 node produces — defaulted here so this stays an addition, not a wire break.
+
+    `device_pubkey` (Amendments v0.4) is an optional base64 DER SubjectPublicKeyInfo for the
+    node's EC P-256 key. Present on a pairing `hello`, it opts the handshake into the
+    challenge-response exchange; the bridge binds the key to the new `device_id` only after the
+    node proves possession of the private half. This layer treats it as an opaque string — the
+    codec is stdlib-only and does no crypto."""
 
     hdp_versions: tuple[int, ...]
     device_name: str
     capabilities: tuple[CapabilityDescriptor, ...]
     credential: str | None = None
     platform: str | None = None
+    device_pubkey: str | None = None
 
     @classmethod
     def from_wire(cls, d: dict[str, Any]) -> Hello:
@@ -80,6 +87,7 @@ class Hello:
             capabilities=_capabilities_from_wire(d.get("capabilities", [])),
             credential=_require_str_or_none(d, "credential"),
             platform=_require_str_or_none(d, "platform"),
+            device_pubkey=_require_str_or_none(d, "device_pubkey"),
         )
 
     def to_wire(self) -> dict[str, Any]:
@@ -89,6 +97,7 @@ class Hello:
             "capabilities": [c.to_wire() for c in self.capabilities],
             "credential": self.credential,
             "platform": self.platform,
+            "device_pubkey": self.device_pubkey,
         }
 
 
@@ -241,6 +250,38 @@ class Heartbeat:
 
     def to_wire(self) -> dict[str, Any]:
         return {}
+
+
+@dataclass(frozen=True)
+class Challenge:
+    """Bridge → Node (Amendments v0.4). A fresh nonce the node must sign to prove it holds the
+    private key it enrolled with. Sent after a `hello` that carries a `device_pubkey` (pairing) or
+    resolves to a device with a stored key (reconnect), and always before `welcome`."""
+
+    nonce: str
+
+    @classmethod
+    def from_wire(cls, d: dict[str, Any]) -> Challenge:
+        return cls(nonce=_require_str(d, "nonce"))
+
+    def to_wire(self) -> dict[str, Any]:
+        return {"nonce": self.nonce}
+
+
+@dataclass(frozen=True)
+class Proof:
+    """Node → Bridge (Amendments v0.4). Base64 DER ECDSA-P256-SHA256 signature over the
+    context-prefixed challenge nonce. The context prefix differs between pairing and reconnect so
+    an enrollment signature cannot be replayed as an authentication one."""
+
+    signature: str
+
+    @classmethod
+    def from_wire(cls, d: dict[str, Any]) -> Proof:
+        return cls(signature=_require_str(d, "signature"))
+
+    def to_wire(self) -> dict[str, Any]:
+        return {"signature": self.signature}
 
 
 @dataclass(frozen=True)

@@ -39,6 +39,27 @@ metadata that makes the node distinguishable in `device_status_get` and `hermes 
 never an authorization input, and omitting it degrades to a `"unknown"` listing rather than failing
 the handshake.
 
+The Android node generates a non-exportable EC P-256 key pair in the Android Keystore before its
+first pairing and sends the public half as `device_pubkey` (base64 DER `SubjectPublicKeyInfo`).
+Doing so opts into the v0.4 device-bound handshake, which the Android profile requires:
+
+1. Node sends `hello` carrying `device_pubkey` and the `pair:`-prefixed code.
+2. Bridge replies `challenge` with a fresh nonce.
+3. Node signs `"HDP/0 pair-challenge\x00" + nonce` with the Keystore private key and returns
+   `proof`.
+4. Only then does the bridge consume the pairing code, bind the key to the new `device_id`, and
+   send `welcome`.
+
+Every later reconnect repeats the exchange with the `"HDP/0 auth-challenge\x00"` context, so
+authentication requires **both** the stored credential and possession of the Keystore key. The
+private key must never be exportable, never leave the Keystore, and never appear in a backup — the
+credential rules below apply to it in full. A credential copied off the device is useless without
+it, which is the point.
+
+The pairing code itself is six digits. A live code tolerates only a small number of failed attempts
+before the bridge destroys it permanently, so the node must not retry a rejected code automatically;
+surface the failure and let the user request a fresh code.
+
 On success, the bridge sends `welcome` with the negotiated `hdp_version` and `device_id`. The
 first pairing welcome contains the credential exactly once. The node writes it immediately to
 platform-protected storage and never logs it, includes it in diagnostics, or stores it in an

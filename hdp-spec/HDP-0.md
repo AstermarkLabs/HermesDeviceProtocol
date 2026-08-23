@@ -46,6 +46,9 @@ Rules:
 | `progress` | `revoke` |
 | `heartbeat` | `heartbeat` |
 | `error` | `error` |
+| `proof` | `challenge` |
+
+`challenge`/`proof` are the v0.4 device-bound handshake pair; see Amendments (v0.3, v0.4).
 
 The plugin↔bridge control plane reuses **the same envelope shape and the same type names** —
 in-process at M0/M1, a Unix socket at M2 (ADR-0004). That identity is what makes the M2 extraction
@@ -240,3 +243,63 @@ envelope field's value is unchanged (`"0"`); this is a document revision, not a 
 
   Both the pairing and returning-connection handshakes read it, so a node that changes its reported
   platform refreshes the stored value on its next reconnect.
+
+## Amendments (v0.4)
+
+Landed at M6, alongside the move to a six-digit pairing code. Additive: two new message types and
+one new optional `hello` field. The `hdp` envelope field's value is unchanged (`"0"`).
+
+### Six-digit pairing codes
+
+The pairing code is now six decimal digits (~20 bits) rather than 128 bits of base32, so that a
+person can read it off a terminal and type it on a phone keypad. Entropy alone no longer bounds an
+online guesser, so two controls replace it:
+
+- **A hard attempt budget.** Every failed pairing handshake decrements the budget of *every* live
+  code, and a code whose budget reaches zero is **permanently invalidated** — destroyed, not placed
+  on cooldown, with no reset and no expiry-driven recovery. The decrement deliberately is not
+  scoped to a code that matched: a guesser's wrong codes match no row at all, so a per-code counter
+  would bound nothing. A guesser therefore gets a handful of tries against a 1,000,000-code space
+  per pairing window.
+
+  Accepted trade-off: anyone who can reach the bridge can burn an operator's pairing window this
+  way. That is fail-closed by design — the window is already five minutes and re-minting is one
+  command, whereas the alternative leaves an open brute-force channel.
+
+- **Device binding**, below.
+
+Because the code space is now small enough for collisions to be ordinary, minting replaces the row
+of a dead (consumed, expired, or invalidated) code and resamples past a live one, rather than
+letting dead rows permanently consume the space.
+
+### Device-bound authentication
+
+- **`hello.device_pubkey`** (new, optional field): base64 DER `SubjectPublicKeyInfo` for the node's
+  EC P-256 key. Sending it opts the handshake into challenge-response.
+- **`challenge`** (Bridge → Node): `{"nonce": "<base64, 32 random bytes>"}`.
+- **`proof`** (Node → Bridge): `{"signature": "<base64 DER ECDSA-P256-SHA256>"}` over
+  `context || nonce`.
+
+Both handshakes become `hello → challenge → proof → welcome`:
+
+- **Enrollment.** The bridge checks that the code is live but does **not** consume it, issues a
+  challenge, and only after verifying the signature against the `device_pubkey` from `hello` does
+  it consume the code, bind the key to a new `device_id`, and issue the credential. Consuming
+  earlier would let anyone who guessed a code destroy it while failing the proof.
+- **Reconnect.** A device that enrolled a key must present **both** the 256-bit credential and a
+  signature over a fresh nonce, verified against the *stored* key. A credential lifted off a device
+  is therefore useless elsewhere, since the private half is non-exportable keystore material.
+
+Signing contexts are domain-separated — `"HDP/0 pair-challenge\x00"` versus
+`"HDP/0 auth-challenge\x00"` — so a signature captured during enrollment cannot be replayed to
+authenticate a later connection.
+
+A failed proof during *enrollment* charges the attempt budget; a failed proof on a *reconnect* does
+not, or a misbehaving paired device could destroy an unrelated operator's pairing window.
+
+**Backward compatibility.** The challenge step runs only when the node sent `device_pubkey`
+(enrollment) or the device has a stored key (reconnect). A node that never enrolled a key keeps the
+single-round-trip handshake, so pre-v0.4 nodes are unaffected.
+
+The codec carries the key, nonce, and signature as opaque base64 strings and performs no crypto —
+`hdp_proto` remains stdlib-only. Verification lives in the bridge.

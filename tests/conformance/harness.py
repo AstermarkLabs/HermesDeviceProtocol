@@ -10,11 +10,17 @@ suite. A uniquely-named module sidesteps it entirely.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import os
 import sys
 import uuid
 from pathlib import Path
 
+from hdp_bridge import device_keys
+from hdp_bridge.enrollment import EnrollmentCoordinator
+from hdp_bridge.host_identity import HostIdentityStore
+from hdp_bridge.store import db
+from hdp_reference_node.node import _load_or_create_key, _public_key_b64
 from hermes_device_plugin.transport.base import DeviceInfo
 from hermes_device_plugin.transport.socket import SocketTransport
 
@@ -33,11 +39,11 @@ def _console_script(name: str) -> list[str]:
 
 
 async def start_bridge(hermes_home: Path) -> asyncio.subprocess.Process:
-    """Launch the real `hdp-bridge serve` daemon as a subprocess, pointed at `hermes_home`. The
+    """Launch the real `hdp serve` daemon as a subprocess, pointed at `hermes_home`. The
     caller is responsible for calling `stop_bridge` on the result."""
     env = {**os.environ, "HERMES_HOME": str(hermes_home), "HDP_BIND_PORT": "0"}
     proc = await asyncio.create_subprocess_exec(
-        *_console_script("hdp-bridge"),
+        *_console_script("hdp"),
         "serve",
         env=env,
         stdout=asyncio.subprocess.PIPE,
@@ -50,7 +56,7 @@ async def start_bridge(hermes_home: Path) -> asyncio.subprocess.Process:
         if addr_path.exists():
             return proc
         await asyncio.sleep(0.05)
-    raise TimeoutError("hdp-bridge serve did not bind within 5s")
+    raise TimeoutError("hdp serve did not bind within 5s")
 
 
 async def stop_bridge(proc: asyncio.subprocess.Process) -> None:
@@ -63,23 +69,33 @@ async def stop_bridge(proc: asyncio.subprocess.Process) -> None:
             await proc.wait()
 
 
-async def mint_pairing_code() -> str:
-    """Run `hdp-bridge pair new` as a subprocess against the already-running bridge daemon
-    (`$HERMES_HOME` is already set for this test by the `_hermes_home` fixture, and both this
-    subprocess and the daemon's own connection see the same SQLite file — WAL mode makes that
-    safe) and return the minted pairing code. M2: every node connection now needs one of these
-    before it can complete a `hello` handshake — see `start_node`'s docstring."""
-    proc = await asyncio.create_subprocess_exec(
-        *_console_script("hdp-bridge"),
-        "pair",
-        "new",
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
-    stdout, stderr = await proc.communicate()
-    if proc.returncode != 0:
-        raise RuntimeError(f"hdp-bridge pair new failed: {stderr.decode(errors='replace')}")
-    return stdout.decode().strip()
+def prepare_usb_enrollment(public_key: str) -> str:
+    """Model a completed local USB bootstrap for a conformance peer.
+
+    The production bootstrap service owns USB discovery, local-owner authorization, and the
+    primary-device notification.  Socket-level conformance tests deliberately begin *after*
+    those physical approvals and receive only the opaque, device-bound enrollment identifier.
+    """
+    hermes_home = Path(os.environ["HERMES_HOME"])
+    enrollment_id = uuid.uuid4().hex + uuid.uuid4().hex
+    conn = db.connect(hermes_home / "hdp" / "registry.db")
+    try:
+        coordinator = EnrollmentCoordinator(conn)
+        coordinator.start(
+            enrollment_id,
+            host_key_fingerprint=HostIdentityStore.load_or_create(
+                hermes_home / "hdp" / "host-identity.pem"
+            ).fingerprint,
+            candidate_key_fingerprint=device_keys.fingerprint(public_key),
+        )
+        coordinator.approve_candidate(enrollment_id)
+        primary = conn.execute("SELECT device_id FROM devices WHERE role = 'primary'").fetchone()
+        if primary is not None:
+            # The conformance harness represents the already-completed signed primary approval.
+            coordinator.approve_primary(enrollment_id, primary[0])
+        return enrollment_id
+    finally:
+        conn.close()
 
 
 async def start_node(
@@ -93,9 +109,9 @@ async def start_node(
     """Launch the real `hdp-node` CLI as a subprocess with the given `--fault` flags, pointed at
     `bridge_url`. The caller is responsible for calling `stop_node` on the result.
 
-    M2: the bridge no longer accepts an unpaired `hello` (hdp-spec/HDP-0.md's Amendments (v0.2)),
-    so this mints a fresh one-time pairing code for every call via `mint_pairing_code()` and
-    passes it as `--pair-code`. `credential_file` defaults to a name unique to this call
+    USB bootstrap is modeled by `prepare_usb_enrollment()` before the process starts. The opaque
+    enrollment ID is bound to the generated device key. `credential_file` defaults to a name
+    unique to this call
     (`os.getpid()`-scoped) rather than the CLI's own `./.hdp-node-credential` default, so
     concurrent/sequential `start_node` calls in the same test working directory never share (or
     collide over) a stored credential."""
@@ -105,7 +121,11 @@ async def start_node(
         # test's node processes an isolated location regardless of run order.
         hermes_home = Path(os.environ["HERMES_HOME"])
         credential_file = hermes_home / f".hdp-node-credential.{uuid.uuid4().hex}"
-    pair_code = await mint_pairing_code()
+    hermes_home = Path(os.environ["HERMES_HOME"])
+    device_key_file = hermes_home / f".hdp-node-key.{uuid.uuid4().hex}.pem"
+    public_key = _public_key_b64(_load_or_create_key(device_key_file))
+    enrollment_id = prepare_usb_enrollment(public_key)
+    conn = db.connect(hermes_home / "hdp" / "registry.db")
     cmd = [
         *_console_script("hdp-node"),
         "connect",
@@ -113,18 +133,30 @@ async def start_node(
         name,
         "--url",
         bridge_url,
-        "--pair-code",
-        pair_code,
+        "--enrollment-id",
+        enrollment_id,
         "--credential-file",
         str(credential_file),
+        "--device-key-file",
+        str(device_key_file),
     ]
     for flag in faults:
         cmd += ["--fault", flag]
     for capability_version in capability_versions:
         cmd += ["--capability-version", capability_version]
-    return await asyncio.create_subprocess_exec(
+    proc = await asyncio.create_subprocess_exec(
         *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT
     )
+    for _ in range(100):
+        row = conn.execute(
+            "SELECT state FROM pending_enrollments WHERE identifier_hash = ?",
+            (hashlib.sha256(enrollment_id.encode("ascii")).hexdigest(),),
+        ).fetchone()
+        if row is not None and row[0] == "consumed":
+            return proc
+        await asyncio.sleep(0.05)
+    await stop_node(proc)
+    raise TimeoutError("reference node did not consume its USB enrollment within 5s")
 
 
 async def stop_node(proc: asyncio.subprocess.Process) -> None:
@@ -156,7 +188,7 @@ async def wait_for_log(
     *,
     timeout: float = 2.0,  # noqa: ASYNC109 — a polling deadline, not a cancellation scope
 ) -> None:
-    """Poll the `bridge_log` list (conftest.py's live-updated capture of the `hdp-bridge serve`
+    """Poll the `bridge_log` list (conftest.py's live-updated capture of the `hdp serve`
     subprocess's stdout) until `substring` appears, or raise on timeout.
 
     Exists because a bridge-side log line and an `invoke()` return value travel two *independent*

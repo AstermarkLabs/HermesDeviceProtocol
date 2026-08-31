@@ -9,6 +9,7 @@ importing this module and monkeypatching it (M1-4's review rule, m1-plan.md §9)
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 import logging
 import os
@@ -20,9 +21,11 @@ from pathlib import Path
 from typing import Any
 
 import aiohttp
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import ec
 from hdp_proto.capabilities import CapabilityDescriptor
 from hdp_proto.envelope import Envelope, EnvelopeError
-from hdp_proto.messages import Hello, ResultMsg, Welcome
+from hdp_proto.messages import Challenge, Hello, Proof, ResultMsg, Welcome
 
 from . import local_policy
 from .capabilities import device_status, diagnostics, notifications
@@ -120,9 +123,10 @@ async def run(
     name: str,
     faults: FaultConfig,
     *,
-    pair_code: str | None = None,
+    enrollment_id: str | None = None,
     credential: str | None = None,
     credential_file: Path = Path("./.hdp-node-credential"),
+    device_key_file: Path = Path("./.hdp-node-key.pem"),
     descriptors: tuple[CapabilityDescriptor, ...] = _DESCRIPTORS,
     max_reconnect_attempts: int | None = None,
 ) -> None:
@@ -132,13 +136,11 @@ async def run(
     call `run` again. `max_reconnect_attempts` is `None` for the real CLI (retry forever); tests
     pass a small number so a deliberately uncooperative bridge cannot hang a test suite.
 
-    M2 auth (hdp-spec/HDP-0.md's Amendments (v0.2)): an explicit `credential` is process-local
+    An explicit `credential` is process-local
     and bypasses `credential_file` for both reads and writes (M4 D6's multi-node escape hatch).
     Otherwise `credential_file` is checked first on every connect attempt, including reconnects.
-    If it already holds a stored credential, that credential is sent as-is and `pair_code` is
-    ignored. Only when no stored credential exists is `pair_code` used, prefixed `pair:`, to
-    complete a first-time pairing; the credential issued in response is written immediately so
-    every subsequent reconnect uses it instead of the consumed one-time pairing code.
+    A first connection requires a USB-delivered, device-bound `enrollment_id`; the credential
+    issued in response is written immediately so every subsequent reconnect uses it.
 
     Two M2 conditions end `run` for good rather than reconnecting, because reconnecting could
     only present a credential the bridge has already refused: an `auth_failed` close during the
@@ -153,9 +155,10 @@ async def run(
                 url,
                 name,
                 faults,
-                pair_code,
+                enrollment_id,
                 credential,
                 credential_file,
+                device_key_file,
                 descriptors,
             )
             return
@@ -192,9 +195,7 @@ def _backoff_delay(attempt: int) -> float:
     return base + jitter
 
 
-def _resolve_credential(
-    pair_code: str | None, credential: str | None, credential_file: Path
-) -> str:
+def _resolve_credential(credential: str | None, credential_file: Path) -> str:
     if credential is not None:
         if not credential:
             raise SystemExit("--credential must not be empty")
@@ -203,11 +204,9 @@ def _resolve_credential(
         stored = credential_file.read_text().strip()
         if stored:
             return stored
-    if pair_code:
-        return f"pair:{pair_code}"
     raise SystemExit(
-        f"no stored credential at {credential_file} and no --pair-code given; "
-        "a node's first connection requires one or the other"
+        f"no stored credential at {credential_file}; a node's first connection requires a "
+        "USB bootstrap enrollment ID"
     )
 
 
@@ -215,38 +214,60 @@ async def _connect_and_serve(
     url: str,
     name: str,
     faults: FaultConfig,
-    pair_code: str | None,
+    enrollment_id: str | None,
     credential: str | None,
     credential_file: Path,
+    device_key_file: Path,
     descriptors: tuple[CapabilityDescriptor, ...],
 ) -> None:
-    resolved_credential = _resolve_credential(pair_code, credential, credential_file)
+    resolved_credential = (
+        None if enrollment_id else _resolve_credential(credential, credential_file)
+    )
+    private_key = _load_or_create_key(device_key_file) if enrollment_id else None
     async with aiohttp.ClientSession() as session, session.ws_connect(url, heartbeat=15.0) as ws:
         hello = Hello(
             hdp_versions=(0,),
             device_name=name,
             capabilities=descriptors,
             credential=resolved_credential,
+            device_pubkey=_public_key_b64(private_key) if private_key else None,
+            enrollment_id=enrollment_id,
         )
         await ws.send_str(json.dumps(Envelope.new("hello", hello.to_wire()).to_wire()))
 
         welcome_msg = await ws.receive()
         if welcome_msg.type != aiohttp.WSMsgType.TEXT:
             # The bridge closes with `POLICY_VIOLATION` (1008) and no reply frame on every
-            # `auth_failed` path — no credential, unknown credential, invalid/expired pairing
-            # code (see `hdp_bridge/connection.py`'s `_handle_hello`). That is categorically
+            # `auth_failed` path — no credential, unknown credential, or refused enrollment
+            # (see `hdp_bridge/connection.py`'s `_handle_hello`). That is categorically
             # different from a dropped socket and must not be retried. Note 4001 is *revocation*
             # of an already-established session, handled on the frame path below, not here.
             if ws.close_code == aiohttp.WSCloseCode.POLICY_VIOLATION:
                 raise AuthFailed("the bridge rejected this node's credential")
             raise ConnectionError(f"expected a welcome frame, got {welcome_msg.type!r}")
         welcome_envelope = Envelope.from_wire(json.loads(welcome_msg.data))
+        if welcome_envelope.type == "challenge" and private_key is not None:
+            nonce = Challenge.from_wire(welcome_envelope.payload).nonce
+            signature = private_key.sign(
+                b"HDP/0 pair-challenge\x00" + base64.b64decode(nonce), ec.ECDSA(hashes.SHA256())
+            )
+            await ws.send_str(
+                json.dumps(
+                    Envelope.new(
+                        "proof", Proof(signature=base64.b64encode(signature).decode()).to_wire()
+                    ).to_wire()
+                )
+            )
+            reply = await ws.receive()
+            if reply.type != aiohttp.WSMsgType.TEXT:
+                raise AuthFailed("the bridge rejected this node's enrollment")
+            welcome_envelope = Envelope.from_wire(json.loads(reply.data))
         if welcome_envelope.type != "welcome":
             raise ConnectionError(f"expected welcome, got {welcome_envelope.type!r}")
         welcome = Welcome.from_wire(welcome_envelope.payload)
         logger.info("connected as device_id=%s", welcome.device_id)
         if welcome.credential is not None and credential is None:
-            # First-time pairing just completed — persist the newly-issued credential so every
+            # First-time enrollment just completed — persist the newly-issued credential so every
             # future connect (this run's own reconnects, and any later invocation of this CLI
             # against the same --credential-file) authenticates as a returning device instead.
             _write_credential(credential_file, welcome.credential)
@@ -263,6 +284,31 @@ async def _connect_and_serve(
                     return
             elif msg.type == aiohttp.WSMsgType.ERROR:
                 break
+
+
+def _load_or_create_key(path: Path) -> ec.EllipticCurvePrivateKey:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if path.exists():
+        return serialization.load_pem_private_key(path.read_bytes(), password=None)
+    key = ec.generate_private_key(ec.SECP256R1())
+    private_bytes = key.private_bytes(
+        serialization.Encoding.PEM,
+        serialization.PrivateFormat.PKCS8,
+        serialization.NoEncryption(),
+    )
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+    with os.fdopen(fd, "wb") as handle:
+        os.fchmod(handle.fileno(), 0o600)
+        handle.write(private_bytes)
+    return key
+
+
+def _public_key_b64(key: ec.EllipticCurvePrivateKey) -> str:
+    return base64.b64encode(
+        key.public_key().public_bytes(
+            serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo
+        )
+    ).decode()
 
 
 class _NodeSession:

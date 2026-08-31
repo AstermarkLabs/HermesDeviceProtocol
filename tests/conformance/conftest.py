@@ -1,7 +1,7 @@
 """Shared fixtures for the M2 conformance suite (m1-plan.md §7, m2-plan.md).
 
 HDP now runs as three real, separate OS processes in this suite: the test process (driving a
-`SocketTransport`), a real `hdp-bridge serve` subprocess (bound to an OS-assigned ephemeral TCP
+`SocketTransport`), a real `hdp serve` subprocess (bound to an OS-assigned ephemeral TCP
 port for nodes and a Unix control socket for the plugin side), and — where a fault needs a real
 uncooperative peer — a real `hdp-node` CLI subprocess. This proves the failure paths hold over
 actual sockets between separate OS processes (m1-plan.md's header risk statement), not an
@@ -56,8 +56,8 @@ async def _bridge_proc(_hermes_home):
 
 
 async def _managed_bridge_proc(_hermes_home):
-    """Starts the real `hdp-bridge serve` subprocess and continuously drains its stdout (stderr
-    is redirected into it, per `start_bridge`) into `lines` as it's produced. `hdp-bridge serve`
+    """Starts the real `hdp serve` subprocess and continuously drains its stdout (stderr
+    is redirected into it, per `start_bridge`) into `lines` as it's produced. `hdp serve`
     runs with `logging.basicConfig(level=INFO, ...)` (`daemon.main`), so bridge-side log records
     like `late_result`/`schema_drift` land here — they're emitted inside the daemon subprocess,
     not the test process, so `caplog` (which only captures the test process's own logging) can't

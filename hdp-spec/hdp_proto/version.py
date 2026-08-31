@@ -33,6 +33,8 @@ NODE_TYPES = frozenset(
         # Amendments (v0.4): the device-bound handshake's challenge-response pair.
         "challenge",
         "proof",
+        "sentinel_approval_request",
+        "sentinel_approval_decision",
     }
 )
 """The full HDP/0 node-facing message-type set (hdp-spec/HDP-0.md §2). `progress` and `revoke`
@@ -65,6 +67,8 @@ CONTROL_TYPES = frozenset(
         "ctl_policy_show_reply",
         "ctl_policy_reload",
         "ctl_policy_reload_reply",
+        "ctl_usb_bootstrap",
+        "ctl_usb_bootstrap_reply",
         # Always rejected with `auth_failed`, from any connection (control.py's `_REJECTED_VERBS`)
         # — still a *known* type so the rejection happens at the dispatch layer where it can be
         # audited, not silently at the codec layer as an unparseable frame.

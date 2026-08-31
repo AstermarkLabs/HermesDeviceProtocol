@@ -101,7 +101,7 @@ class AndroidNodeFixture:
         )
         return base64.b64encode(signature).decode("ascii")
 
-    async def connect(self, url: str, *, pair_code: str | None = None) -> Welcome:
+    async def connect(self, url: str, *, enrollment_id: str | None = None) -> Welcome:
         """Connect and complete pairing or credential authentication."""
         if self._reader_task is not None:
             await self.close()
@@ -110,8 +110,8 @@ class AndroidNodeFixture:
 
         self._session = aiohttp.ClientSession()
         self._ws = await self._session.ws_connect(url, heartbeat=15.0)
-        pairing = pair_code is not None
-        credential = f"pair:{pair_code}" if pairing else self.credential
+        pairing = enrollment_id is not None
+        credential = None if pairing else self.credential
         hello = Hello(
             hdp_versions=(0,),
             device_name=self.name,
@@ -123,6 +123,7 @@ class AndroidNodeFixture:
             # Amendments v0.4: only the enrolling `hello` carries the key; afterwards the bridge
             # challenges against the key it already stored.
             device_pubkey=self.public_key if pairing else None,
+            enrollment_id=enrollment_id,
         )
         await self._send(Envelope.new("hello", hello.to_wire()))
 

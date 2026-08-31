@@ -18,6 +18,7 @@ start/stop lifecycle explicitly.
 from __future__ import annotations
 
 import asyncio
+import ssl
 from collections.abc import Callable, Coroutine
 from pathlib import Path
 from typing import Any
@@ -77,6 +78,7 @@ class HdpServer:
         port: int,
         allow_remote: bool,
         bridge_addr_path: Path,
+        ssl_context: ssl.SSLContext | None = None,
     ) -> None:
         self._connection_factory = connection_factory
         self._host = host
@@ -84,6 +86,7 @@ class HdpServer:
         self._allow_remote = allow_remote
         self._bridge_addr_path = bridge_addr_path
         self._runner: web.AppRunner | None = None
+        self._ssl_context = ssl_context
 
     async def start(self) -> int:
         """Bind and start serving. Returns the actually-bound port. Refuses to bind a
@@ -102,7 +105,7 @@ class HdpServer:
         # `return` below (e.g. a caller's `close()` racing a not-yet-finished `start()`), the
         # already-created runner must still be reachable for cleanup rather than orphaned.
         self._runner = runner
-        site = web.TCPSite(runner, self._host, self._port)
+        site = web.TCPSite(runner, self._host, self._port, ssl_context=self._ssl_context)
         await site.start()
 
         bound_port = _bound_port(site)

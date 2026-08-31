@@ -189,36 +189,30 @@ def test_explicit_credential_wins_without_reading_the_stored_default(tmp_path):
     credential_file = tmp_path / "cred"
     credential_file.write_text("stored-default")
 
-    resolved = node._resolve_credential(None, "second-node-secret", credential_file)
+    resolved = node._resolve_credential("second-node-secret", credential_file)
 
     assert resolved == "second-node-secret"
 
 
-@pytest.mark.parametrize("bridge_stub", [_pairing_handler], indirect=True)
-async def test_the_issued_credential_is_written_0600(bridge_stub, tmp_path):
+def test_the_issued_credential_is_written_0600(tmp_path):
     """Finding I7.1: `Path.write_text` created this file at the process umask — typically 0644,
     i.e. a long-lived device secret readable by every user on the machine."""
     credential_file = tmp_path / "cred"
 
-    await node.run(
-        bridge_stub, "test-node", FaultConfig(), pair_code="CODE", credential_file=credential_file
-    )
+    node._write_credential(credential_file, "s3cret")
 
     assert credential_file.read_text() == "s3cret"
     assert stat.S_IMODE(credential_file.stat().st_mode) == 0o600
 
 
-@pytest.mark.parametrize("bridge_stub", [_pairing_handler], indirect=True)
-async def test_re_pairing_over_a_world_readable_file_still_ends_at_0600(bridge_stub, tmp_path):
+def test_rewriting_a_world_readable_file_still_ends_at_0600(tmp_path):
     """`O_CREAT`'s mode argument is ignored when the file already exists — which is exactly the
     re-pairing case. The `fchmod` on the open descriptor is what covers it."""
     credential_file = tmp_path / "cred"
     credential_file.write_text("an-old-credential")
     credential_file.chmod(0o644)
 
-    await node.run(
-        bridge_stub, "test-node", FaultConfig(), pair_code="CODE", credential_file=credential_file
-    )
+    node._write_credential(credential_file, "s3cret")
 
     assert stat.S_IMODE(credential_file.stat().st_mode) == 0o600
 

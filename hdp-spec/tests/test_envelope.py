@@ -85,7 +85,14 @@ def test_unknown_type_raises_the_specific_subclass(overrides):
 
 @pytest.mark.parametrize(
     "message_type",
-    ["ctl_policy_show", "ctl_policy_show_reply", "ctl_policy_reload", "ctl_policy_reload_reply"],
+    [
+        "ctl_policy_show",
+        "ctl_policy_show_reply",
+        "ctl_policy_reload",
+        "ctl_policy_reload_reply",
+        "ctl_usb_bootstrap",
+        "ctl_usb_bootstrap_reply",
+    ],
 )
 def test_operator_policy_control_types_are_known(message_type):
     """M3 policy inspection stays on the daemon control plane, never a plugin file read."""

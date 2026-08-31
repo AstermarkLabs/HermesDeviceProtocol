@@ -17,6 +17,11 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from hdp_bridge import credentials, device_keys, pairing
 from hdp_bridge.connection import NodeConnection
+from hdp_bridge.enrollment import (
+    EnrollmentCoordinator,
+    sentinel_approval_decision_bytes,
+    sentinel_approval_request_bytes,
+)
 from hdp_bridge.invocations import InvocationsMem
 from hdp_bridge.registry import Registry
 from hdp_bridge.store import db
@@ -57,7 +62,14 @@ def _sign(private, context: bytes, nonce: str) -> str:
     return base64.b64encode(signature).decode("ascii")
 
 
-def _connection(tmp_path, conn=None):
+def _connection(
+    tmp_path,
+    conn=None,
+    *,
+    enrollment_coordinator=None,
+    host_key_fingerprint=None,
+    host_signer=None,
+):
     db_path = tmp_path / "registry.db"
     conn = conn or db.connect(db_path)
     ws = _FakeWS()
@@ -71,6 +83,9 @@ def _connection(tmp_path, conn=None):
             invocations=InvocationsMem(),
             connections={},
             descriptors={},
+            enrollment_coordinator=enrollment_coordinator,
+            host_key_fingerprint=host_key_fingerprint,
+            host_signer=host_signer,
         ),
     )
 
@@ -141,6 +156,206 @@ async def test_valid_proof_completes_pairing_and_binds_the_key(tmp_path):
         "SELECT device_pubkey FROM devices WHERE device_id = ?", (device_id,)
     ).fetchone()[0]
     assert stored != ""
+
+
+async def test_approved_usb_enrollment_pairs_without_a_human_code(tmp_path):
+    db_path = tmp_path / "registry.db"
+    conn = db.connect(db_path)
+    conn.execute(
+        "INSERT INTO devices (device_id, friendly_name, platform, client_version, "
+        "first_paired_at, last_seen_at, state, role) "
+        "VALUES ('primary', 'sentinel', 'android', '', 0, 0, 'active', 'primary')"
+    )
+    private, pubkey = _new_key()
+    enrollment_id = "a" * 64
+    host_fingerprint = "host-fingerprint"
+    coordinator = EnrollmentCoordinator(conn)
+    coordinator.start(
+        enrollment_id,
+        host_key_fingerprint=host_fingerprint,
+        candidate_key_fingerprint=device_keys.fingerprint(pubkey),
+    )
+    coordinator.approve_candidate(enrollment_id)
+    coordinator.approve_primary(enrollment_id, "primary")
+    ws, _conn, connection = _connection(
+        tmp_path,
+        conn,
+        enrollment_coordinator=coordinator,
+        host_key_fingerprint=host_fingerprint,
+    )
+
+    await _send(
+        connection,
+        "hello",
+        Hello(
+            hdp_versions=(0,),
+            device_name="pixel",
+            capabilities=(),
+            enrollment_id=enrollment_id,
+            device_pubkey=pubkey,
+        ).to_wire(),
+    )
+    challenge = Challenge.from_wire(_last(ws).payload)
+    await _send(
+        connection,
+        "proof",
+        Proof(signature=_sign(private, device_keys.PAIR_CONTEXT, challenge.nonce)).to_wire(),
+    )
+
+    welcome = Welcome.from_wire(_last(ws).payload)
+    assert welcome.credential is not None
+    assert connection.device_id == welcome.device_id
+    assert conn.execute("SELECT state FROM pending_enrollments").fetchone()[0] == "consumed"
+
+
+async def test_first_approved_usb_enrollment_is_persisted_as_primary(tmp_path):
+    db_path = tmp_path / "registry.db"
+    conn = db.connect(db_path)
+    private, pubkey = _new_key()
+    enrollment_id = "first" * 16
+    host_fingerprint = "host-fingerprint"
+    coordinator = EnrollmentCoordinator(conn)
+    coordinator.start(
+        enrollment_id,
+        host_key_fingerprint=host_fingerprint,
+        candidate_key_fingerprint=device_keys.fingerprint(pubkey),
+    )
+    coordinator.approve_candidate(enrollment_id)
+    ws, _conn, connection = _connection(
+        tmp_path,
+        conn,
+        enrollment_coordinator=coordinator,
+        host_key_fingerprint=host_fingerprint,
+    )
+
+    await _send(
+        connection,
+        "hello",
+        Hello(
+            hdp_versions=(0,),
+            device_name="first pixel",
+            capabilities=(),
+            enrollment_id=enrollment_id,
+            device_pubkey=pubkey,
+        ).to_wire(),
+    )
+    challenge = Challenge.from_wire(_last(ws).payload)
+    await _send(
+        connection,
+        "proof",
+        Proof(signature=_sign(private, device_keys.PAIR_CONTEXT, challenge.nonce)).to_wire(),
+    )
+
+    role = conn.execute(
+        "SELECT role FROM devices WHERE device_id = ?", (connection.device_id,)
+    ).fetchone()[0]
+    assert role == "primary"
+
+
+async def test_security_mode_rejects_legacy_pairing_codes(tmp_path):
+    conn = db.connect(tmp_path / "registry.db")
+    coordinator = EnrollmentCoordinator(conn)
+    ws, _conn, connection = _connection(
+        tmp_path,
+        conn,
+        enrollment_coordinator=coordinator,
+        host_key_fingerprint="host-fingerprint",
+    )
+    code = pairing.mint_pairing_code(conn)
+
+    await _send(
+        connection,
+        "hello",
+        Hello(
+            hdp_versions=(0,), device_name="legacy", capabilities=(), credential=f"pair:{code}"
+        ).to_wire(),
+    )
+
+    assert ws.closed_with == WSCloseCode.POLICY_VIOLATION
+    assert pairing.code_is_live(conn, code) is True
+
+
+async def test_primary_signed_approval_unblocks_an_enrollment(tmp_path):
+    db_path = tmp_path / "registry.db"
+    conn = db.connect(db_path)
+    primary_private, primary_pubkey = _new_key()
+    _candidate_private, candidate_pubkey = _new_key()
+    conn.execute(
+        "INSERT INTO devices (device_id, friendly_name, platform, client_version, "
+        "first_paired_at, last_seen_at, state, role, device_pubkey) "
+        "VALUES ('primary', 'sentinel', 'android', '', 0, 0, 'active', 'primary', ?) ",
+        (primary_pubkey,),
+    )
+    enrollment_id = "b" * 64
+    coordinator = EnrollmentCoordinator(conn)
+    coordinator.start(
+        enrollment_id,
+        host_key_fingerprint="host-fingerprint",
+        candidate_key_fingerprint=device_keys.fingerprint(candidate_pubkey),
+    )
+    coordinator.approve_candidate(enrollment_id)
+    _host_fp, _candidate_fp, expires_at = coordinator.details(enrollment_id)
+    ws, _conn, connection = _connection(
+        tmp_path,
+        conn,
+        enrollment_coordinator=coordinator,
+        host_key_fingerprint="host-fingerprint",
+    )
+    connection.device_id = "primary"
+    payload = sentinel_approval_decision_bytes(enrollment_id, "approve", expires_at)
+    signature = base64.b64encode(primary_private.sign(payload, ec.ECDSA(hashes.SHA256()))).decode(
+        "ascii"
+    )
+
+    await _send(
+        connection,
+        "sentinel_approval_decision",
+        {"enrollment_id": enrollment_id, "decision": "approve", "signature": signature},
+    )
+
+    assert ws.closed_with is None
+    assert conn.execute("SELECT state FROM pending_enrollments").fetchone()[0] == "primary_approved"
+
+
+async def test_primary_receives_a_host_signed_enrollment_request(tmp_path):
+    db_path = tmp_path / "registry.db"
+    conn = db.connect(db_path)
+    host_private, host_pubkey = _new_key()
+    conn.execute(
+        "INSERT INTO devices (device_id, friendly_name, platform, client_version, "
+        "first_paired_at, last_seen_at, state, role) "
+        "VALUES ('primary', 'sentinel', 'android', '', 0, 0, 'active', 'primary')"
+    )
+    _candidate_private, candidate_pubkey = _new_key()
+    enrollment_id = "c" * 64
+    coordinator = EnrollmentCoordinator(conn)
+    coordinator.start(
+        enrollment_id,
+        host_key_fingerprint="host-fingerprint",
+        candidate_key_fingerprint=device_keys.fingerprint(candidate_pubkey),
+    )
+    ws, _conn, connection = _connection(
+        tmp_path,
+        conn,
+        enrollment_coordinator=coordinator,
+        host_key_fingerprint="host-fingerprint",
+        host_signer=lambda payload: host_private.sign(payload, ec.ECDSA(hashes.SHA256())),
+    )
+    connection.device_id = "primary"
+
+    await connection.send_sentinel_approval_request(enrollment_id, "Pixel")
+
+    request = Envelope.from_wire(json.loads(ws.sent[-1]))
+    assert request.type == "sentinel_approval_request"
+    signature = request.payload["host_signature"]
+    signed = sentinel_approval_request_bytes(
+        enrollment_id,
+        "host-fingerprint",
+        device_keys.fingerprint(candidate_pubkey),
+        "Pixel",
+        request.payload["expires_at"],
+    )
+    assert device_keys.verify_signature(host_pubkey, signed, signature)
 
 
 async def test_wrong_key_fails_pairing_and_burns_the_code(tmp_path):

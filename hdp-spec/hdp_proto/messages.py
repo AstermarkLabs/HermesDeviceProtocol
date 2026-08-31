@@ -75,6 +75,7 @@ class Hello:
     credential: str | None = None
     platform: str | None = None
     device_pubkey: str | None = None
+    enrollment_id: str | None = None
 
     @classmethod
     def from_wire(cls, d: dict[str, Any]) -> Hello:
@@ -88,6 +89,7 @@ class Hello:
             credential=_require_str_or_none(d, "credential"),
             platform=_require_str_or_none(d, "platform"),
             device_pubkey=_require_str_or_none(d, "device_pubkey"),
+            enrollment_id=_require_str_or_none(d, "enrollment_id"),
         )
 
     def to_wire(self) -> dict[str, Any]:
@@ -98,6 +100,7 @@ class Hello:
             "credential": self.credential,
             "platform": self.platform,
             "device_pubkey": self.device_pubkey,
+            "enrollment_id": self.enrollment_id,
         }
 
 
@@ -282,6 +285,66 @@ class Proof:
 
     def to_wire(self) -> dict[str, Any]:
         return {"signature": self.signature}
+
+
+@dataclass(frozen=True)
+class SentinelApprovalRequest:
+    """Bridge → primary device: a host-signed request to add one secondary device."""
+
+    enrollment_id: str
+    host_key_fingerprint: str
+    candidate_key_fingerprint: str
+    candidate_name: str
+    expires_at: int
+    host_signature: str
+
+    @classmethod
+    def from_wire(cls, d: dict[str, Any]) -> SentinelApprovalRequest:
+        return cls(
+            enrollment_id=_require_str(d, "enrollment_id"),
+            host_key_fingerprint=_require_str(d, "host_key_fingerprint"),
+            candidate_key_fingerprint=_require_str(d, "candidate_key_fingerprint"),
+            candidate_name=_require_str(d, "candidate_name"),
+            expires_at=_require_int(d, "expires_at"),
+            host_signature=_require_str(d, "host_signature"),
+        )
+
+    def to_wire(self) -> dict[str, Any]:
+        return {
+            "enrollment_id": self.enrollment_id,
+            "host_key_fingerprint": self.host_key_fingerprint,
+            "candidate_key_fingerprint": self.candidate_key_fingerprint,
+            "candidate_name": self.candidate_name,
+            "expires_at": self.expires_at,
+            "host_signature": self.host_signature,
+        }
+
+
+@dataclass(frozen=True)
+class SentinelApprovalDecision:
+    """Primary device → bridge: a device-key-signed sentinel decision."""
+
+    enrollment_id: str
+    decision: str
+    signature: str
+
+    @classmethod
+    def from_wire(cls, d: dict[str, Any]) -> SentinelApprovalDecision:
+        decision = _require_str(d, "decision")
+        if decision not in {"approve", "deny", "block"}:
+            raise ValueError(f"invalid sentinel decision: {decision!r}")
+        return cls(
+            enrollment_id=_require_str(d, "enrollment_id"),
+            decision=decision,
+            signature=_require_str(d, "signature"),
+        )
+
+    def to_wire(self) -> dict[str, Any]:
+        return {
+            "enrollment_id": self.enrollment_id,
+            "decision": self.decision,
+            "signature": self.signature,
+        }
 
 
 @dataclass(frozen=True)

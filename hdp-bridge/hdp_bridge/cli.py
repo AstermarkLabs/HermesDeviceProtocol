@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 
 from hdp_proto.envelope import Envelope
@@ -12,18 +13,29 @@ from . import daemon
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(prog="hdp-bridge")
+    if len(sys.argv) == 1:
+        _run_tui()
+        return
+
+    parser = argparse.ArgumentParser(prog="hdp")
     subparsers = parser.add_subparsers(dest="command", required=True)
     subparsers.add_parser("serve", help="Run the HDP bridge daemon in the foreground.")
 
     pair = subparsers.add_parser("pair", help="Pairing operations.")
     pair_sub = pair.add_subparsers(dest="pair_command", required=True)
-    pair_sub.add_parser("new", help="Mint a new pairing code.")
+    pair_sub.add_parser("new", help="Deprecated: pairing codes are disabled.")
+    usb_pair = pair_sub.add_parser("usb", help="Bootstrap a USB-connected Android accessory.")
+    usb_pair.add_argument(
+        "--serial", default="", help="Android USB serial; use with multiple devices."
+    )
 
     devices = subparsers.add_parser("devices", help="Device operations.")
     devices_sub = devices.add_subparsers(dest="devices_command", required=True)
+    devices_sub.add_parser("list", help="List successfully paired devices.")
     revoke_parser = devices_sub.add_parser("revoke", help="Revoke a paired device immediately.")
     revoke_parser.add_argument("device_id")
+    remove_parser = devices_sub.add_parser("remove", help="Remove a paired device immediately.")
+    remove_parser.add_argument("device_id")
 
     audit_parser = subparsers.add_parser("audit", help="Audit log operations.")
     audit_sub = audit_parser.add_subparsers(dest="audit_command", required=True)
@@ -55,7 +67,11 @@ def main() -> None:
         daemon.main()
     elif args.command == "pair" and args.pair_command == "new":
         _run_pair_new()
-    elif args.command == "devices" and args.devices_command == "revoke":
+    elif args.command == "pair" and args.pair_command == "usb":
+        _run_usb_pair(args.serial)
+    elif args.command == "devices" and args.devices_command == "list":
+        _run_devices_list()
+    elif args.command == "devices" and args.devices_command in {"revoke", "remove"}:
         _run_devices_revoke(args.device_id)
     elif args.command == "audit" and args.audit_command == "tail":
         _run_audit_tail()
@@ -78,7 +94,25 @@ def _run_pair_new() -> None:
 
     from . import operations
 
-    print(asyncio.run(operations.pair_new()))
+    try:
+        print(asyncio.run(operations.pair_new()))
+    except operations.PairingCodeRemovedError as exc:
+        print(str(exc), file=sys.stderr)
+        raise SystemExit(2) from exc
+
+
+def _run_usb_pair(serial: str) -> None:
+    reply = _control_request("ctl_usb_bootstrap", {"serial": serial})
+    if reply.type != "ctl_usb_bootstrap_reply":
+        print(reply.payload.get("message", "USB bootstrap was refused"), file=sys.stderr)
+        raise SystemExit(2)
+    print("USB bootstrap approved; complete the device network enrollment now.")
+
+
+def _run_tui() -> None:
+    from .tui import HDPApp
+
+    HDPApp().run()
 
 
 def _run_audit_tail() -> None:
@@ -97,7 +131,7 @@ def _run_devices_revoke(device_id: str) -> None:
     the audit record, and the did-anything-actually-happen check all live there, shared with
     `hermes hdp devices revoke` (final-review finding I5). Exits non-zero on a refused/no-op
     revoke rather than always exiting 0 (re-review finding I4, round 2) — a script that does
-    `hdp-bridge devices revoke $id && next-step` must not proceed past a revoke that did nothing.
+    `hdp devices revoke $id && next-step` must not proceed past a revoke that did nothing.
     """
     import asyncio
 
@@ -107,6 +141,38 @@ def _run_devices_revoke(device_id: str) -> None:
     print(message)
     if operations.revoke_failed(message):
         raise SystemExit(1)
+
+
+def _run_devices_list() -> None:
+    reply = _control_request("ctl_list_devices", {})
+    devices = reply.payload.get("devices", [])
+    if not devices:
+        print("No paired devices.")
+        return
+
+    headers = ("NAME", "PLATFORM", "DEVICE ID", "STATE", "ONLINE", "CAPS")
+    rows = [
+        (
+            str(device.get("friendly_name", "")),
+            str(device.get("platform", "")),
+            str(device.get("device_id", "")),
+            str(device.get("state", "active")),
+            "online" if device.get("online") else "offline",
+            str(len(device.get("capabilities", []))),
+        )
+        for device in devices
+    ]
+    widths = [
+        max(len(header), *(len(row[index]) for row in rows)) for index, header in enumerate(headers)
+    ]
+
+    def render(row: tuple[str, ...]) -> str:
+        return "  ".join(value.ljust(widths[index]) for index, value in enumerate(row)).rstrip()
+
+    print(render(headers))
+    print(render(tuple("-" * width for width in widths)))
+    for row in rows:
+        print(render(row))
 
 
 def _run_approvals_list() -> None:

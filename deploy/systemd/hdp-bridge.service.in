@@ -8,7 +8,7 @@ StartLimitBurst=5
 Type=simple
 Environment=HERMES_HOME=@HERMES_HOME@
 WorkingDirectory=@REPO_ROOT@
-ExecStart=@REPO_ROOT@/.venv/bin/hdp-bridge serve
+ExecStart=@REPO_ROOT@/.venv/bin/hdp serve
 Restart=on-failure
 RestartSec=2
 TimeoutStopSec=10

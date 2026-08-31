@@ -5,16 +5,16 @@ the same ones `test_android_node.py` makes against the in-process fixture — M5
 suite can be pointed at an Android endpoint *without changing its assertions*, so anything that
 had to be weakened to accommodate a real device would defeat the purpose.
 
-Run it against a live emulator or device:
+Run it against a live emulator or device after USB bootstrap has completed:
 
     # Terminal 1 — the operator's own bridge, already serving
-    HERMES_HOME=$HOME/.hermes uv run hdp-bridge serve
+    HERMES_HOME=$HOME/.hermes uv run hdp serve
 
     # Terminal 2
     HDP_EXTERNAL_NODE=1 HERMES_HOME=$HOME/.hermes uv run pytest \\
         tests/conformance/test_external_node.py -s
 
-The `-s` matters: the pairing code is printed for a human to type into the app.
+The `-s` matters: the test prints the USB-bootstrap wait state for the operator.
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ import os
 
 import pytest
 from conftest import external_node_mode
-from harness import mint_pairing_code, wait_for_device
+from harness import wait_for_device
 from hermes_device_plugin.transport.base import InvokeRequest
 
 pytestmark = [
@@ -32,7 +32,7 @@ pytestmark = [
         not external_node_mode(),
         reason="set HDP_EXTERNAL_NODE=1 and connect a real node to run these",
     ),
-    # Generous: a human has to read a code off the terminal and type it into a phone.
+    # Generous: the operator may need time to complete the physical USB bootstrap.
     pytest.mark.timeout(int(os.environ.get("HDP_EXTERNAL_TIMEOUT_S", "300"))),
 ]
 
@@ -42,16 +42,15 @@ _PAIRING_WINDOW_S = float(os.environ.get("HDP_EXTERNAL_PAIRING_WINDOW_S", "180")
 async def _await_paired_node(bridge):
     """Return the connected node, pairing one first if none is present.
 
-    Checks before minting so that a run against an already-paired device is silent and instant.
-    That matters more than it looks: these tests are meant to be re-run repeatedly during a gate,
-    and a code minted needlessly on every run is both noise and a wasted pairing window.
+    Checks before waiting so that a run against an already-paired device is silent and instant.
+    A fresh node must be enrolled through the real USB bootstrap; this test never creates a
+    remote pairing secret as a side channel.
     """
     for device in await bridge.list_devices():
         if device.online:
             return device
 
-    code = await mint_pairing_code()
-    print(f"\n\n    Pair the device now — enter this code in the app:  {code}\n", flush=True)
+    print("\n\n    Connect the device by USB and complete bootstrap now.\n", flush=True)
     device = await wait_for_device(bridge, timeout_s=_PAIRING_WINDOW_S)
     print(f"    Paired: device_id={device.device_id} platform={device.platform}\n", flush=True)
     return device

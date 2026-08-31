@@ -21,6 +21,7 @@ import json
 import logging
 import socket
 import sqlite3
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
@@ -248,6 +249,7 @@ class ControlServer:
         audit: AuditWriter | None = None,
         approvals: ApprovalManager | None = None,
         policy: PolicyEngine | None = None,
+        usb_bootstrap: Callable[[str], Awaitable[str]] | None = None,
     ) -> None:
         self._socket_path = socket_path
         self._registry = registry
@@ -259,6 +261,7 @@ class ControlServer:
         self._audit = audit
         self._approvals = approvals
         self._policy = policy
+        self._usb_bootstrap = usb_bootstrap
         # A raw `sqlite3.Connection`, distinct from `registry`'s own internal one (see
         # `daemon.py`'s NOTE on the two-connections deviation) — needed only by
         # `ctl_devices_revoke`, which operates below `Registry`'s device-record API via
@@ -515,6 +518,7 @@ class ControlServer:
             "ctl_resolve_approval": self._ctl_resolve_approval,
             "ctl_policy_show": self._ctl_policy_show,
             "ctl_policy_reload": self._ctl_policy_reload,
+            "ctl_usb_bootstrap": self._ctl_usb_bootstrap,
         }.get(envelope.type)
         if handler is None:
             detail = f"unknown control verb {envelope.type!r}"
@@ -1253,8 +1257,28 @@ class ControlServer:
             {"ok": reloaded, "policy_seq": self._policy.table.policy_seq},
         )
 
+    async def _ctl_usb_bootstrap(self, envelope: Envelope) -> Envelope:
+        if self._usb_bootstrap is None:
+            return Envelope.new(
+                "error", err(ErrorCode.NOT_IMPLEMENTED, "USB bootstrap is unavailable")["error"]
+            )
+        serial = envelope.payload.get("serial", "")
+        if not isinstance(serial, str):
+            return Envelope.new(
+                "error",
+                err(ErrorCode.AUTH_FAILED, "USB serial must be a string")["error"],
+            )
+        try:
+            enrollment_id = await self._usb_bootstrap(serial)
+        except Exception as exc:  # noqa: BLE001 -- USB/Polkit failures are local operator feedback
+            logger.warning("USB bootstrap failed: %s", exc)
+            return Envelope.new(
+                "error", err(ErrorCode.AUTH_FAILED, f"USB bootstrap refused: {exc}")["error"]
+            )
+        return Envelope.new("ctl_usb_bootstrap_reply", {"ok": True, "enrollment_id": enrollment_id})
+
     async def _ctl_devices_revoke(self, envelope: Envelope) -> Envelope:
-        """Operator-only verb (FR-15, §4.4) — the CLI's `hdp-bridge devices revoke` reaches this
+        """Operator-only verb (FR-15, §4.4) — the CLI's `hdp devices revoke` reaches this
         when a daemon is running, so the revoke frame and socket close happen against a live
         connection rather than the CLI's DB-only fallback (`cli.py`'s `_run_devices_revoke`)."""
         device_id = envelope.payload.get("device_id")

@@ -14,11 +14,13 @@ one `EmbeddedTransport` (embedded.py constructs them once and passes the same ob
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 import logging
 import sqlite3
 import time
 from collections import OrderedDict
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Protocol
 
@@ -35,11 +37,19 @@ from hdp_proto.messages import (
     InvokeMsg,
     Proof,
     ResultMsg,
+    SentinelApprovalDecision,
+    SentinelApprovalRequest,
     Welcome,
 )
 from hdp_proto.version import HDP_VERSION
 
 from . import credentials, device_keys, pairing
+from .enrollment import (
+    EnrollmentCoordinator,
+    EnrollmentError,
+    sentinel_approval_decision_bytes,
+    sentinel_approval_request_bytes,
+)
 from .types import CapabilityRecord, DeviceRecord
 
 if TYPE_CHECKING:
@@ -50,7 +60,16 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 _NODE_TO_BRIDGE_TYPES = frozenset(
-    {"hello", "capabilities", "ack", "result", "progress", "heartbeat", "error"}
+    {
+        "hello",
+        "capabilities",
+        "ack",
+        "result",
+        "progress",
+        "heartbeat",
+        "error",
+        "sentinel_approval_decision",
+    }
 )
 """The subset of `hdp_proto.version.KNOWN_TYPES` a *node* may legally send. A frame with a
 Bridge→Node-only type (`welcome`, `invoke`, `cancel`, `revoke`) arriving from a node is a known
@@ -73,6 +92,7 @@ class _PendingHandshake:
     public_key: str
     context: bytes
     pair_code: str | None
+    enrollment_id: str | None
     device_id: str | None
 
 
@@ -103,6 +123,9 @@ class NodeConnection:
         descriptors: dict[str, dict[tuple[str, int], CapabilityDescriptor]],
         dead_peer_timeout_s: float = _DEAD_PEER_TIMEOUT_S,
         audit: AuditWriter | None = None,
+        enrollment_coordinator: EnrollmentCoordinator | None = None,
+        host_key_fingerprint: str | None = None,
+        host_signer: Callable[[bytes], bytes] | None = None,
     ) -> None:
         self._ws = ws
         self._conn = conn
@@ -111,6 +134,9 @@ class NodeConnection:
         self._connections = connections
         self._descriptors = descriptors
         self._audit = audit
+        self._enrollment_coordinator = enrollment_coordinator
+        self._host_key_fingerprint = host_key_fingerprint
+        self._host_signer = host_signer
         self.device_id: str | None = None
         self._pending: _PendingHandshake | None = None
         """Set between sending a `challenge` and verifying the matching `proof` (Amendments
@@ -268,11 +294,81 @@ class NodeConnection:
             "progress": self._handle_progress,
             "heartbeat": self._handle_heartbeat,
             "error": self._handle_error,
+            "sentinel_approval_decision": self._handle_sentinel_approval_decision,
         }.get(envelope.type)
         if handler is None:  # pragma: no cover — "hello" is the only member excluded above
             await self._reject_malformed(f"unhandled type: {envelope.type!r}")
             return
         await handler(envelope)
+
+    async def _handle_sentinel_approval_decision(self, envelope: Envelope) -> None:
+        """Accept a signed decision only from the currently enrolled primary device."""
+        if self._enrollment_coordinator is None or self.device_id is None:
+            await self._reject_malformed("sentinel approval is unavailable")
+            return
+        try:
+            decision = SentinelApprovalDecision.from_wire(envelope.payload)
+            _host_fingerprint, _candidate_fingerprint, expires_at = (
+                self._enrollment_coordinator.details(decision.enrollment_id)
+            )
+        except (EnrollmentError, ValueError) as exc:
+            await self._reject_malformed(f"invalid sentinel approval: {exc}")
+            return
+
+        primary_key = self._enrolled_public_key(self.device_id)
+        if primary_key is None or not device_keys.verify_signature(
+            primary_key,
+            sentinel_approval_decision_bytes(decision.enrollment_id, decision.decision, expires_at),
+            decision.signature,
+        ):
+            await self._reject_malformed("invalid sentinel approval signature")
+            return
+
+        try:
+            if decision.decision == "approve":
+                self._enrollment_coordinator.approve_primary(decision.enrollment_id, self.device_id)
+            elif decision.decision == "deny":
+                self._enrollment_coordinator.deny(decision.enrollment_id, self.device_id)
+            else:
+                self._enrollment_coordinator.block(decision.enrollment_id, self.device_id)
+        except EnrollmentError as exc:
+            await self._reject_malformed(f"rejected sentinel approval: {exc}")
+
+    async def send_sentinel_approval_request(self, enrollment_id: str, candidate_name: str) -> None:
+        """Deliver a host-signed secondary-enrollment prompt to the connected primary."""
+        if (
+            self._enrollment_coordinator is None
+            or self._host_key_fingerprint is None
+            or self._host_signer is None
+            or self.device_id is None
+        ):
+            raise EnrollmentError("sentinel approval transport is unavailable")
+        primary = self._conn.execute(
+            "SELECT 1 FROM devices WHERE device_id = ? AND role = 'primary'", (self.device_id,)
+        ).fetchone()
+        if primary is None:
+            raise EnrollmentError("approval requests may only be sent to the primary device")
+        host_fingerprint, candidate_fingerprint, expires_at = self._enrollment_coordinator.details(
+            enrollment_id
+        )
+        if host_fingerprint != self._host_key_fingerprint:
+            raise EnrollmentError("enrollment is bound to another host identity")
+        payload = sentinel_approval_request_bytes(
+            enrollment_id,
+            host_fingerprint,
+            candidate_fingerprint,
+            candidate_name,
+            expires_at,
+        )
+        request = SentinelApprovalRequest(
+            enrollment_id=enrollment_id,
+            host_key_fingerprint=host_fingerprint,
+            candidate_key_fingerprint=candidate_fingerprint,
+            candidate_name=candidate_name,
+            expires_at=expires_at,
+            host_signature=base64.b64encode(self._host_signer(payload)).decode("ascii"),
+        )
+        await self._send(Envelope.new("sentinel_approval_request", request.to_wire()))
 
     async def _handle_hello(self, envelope: Envelope) -> None:
         """M2 auth (§3, §4.3): a `hello` must carry a credential — either an existing device's
@@ -288,7 +384,14 @@ class NodeConnection:
             await self._reject_malformed(f"malformed hello: {exc}")
             return
 
+        if hello.enrollment_id:
+            await self._handle_enrollment_hello(hello)
+            return
+
         if hello.credential and hello.credential.startswith("pair:"):
+            if self._enrollment_coordinator is not None:
+                await self._fail_pairing("legacy_pairing_code_rejected")
+                return
             await self._handle_pairing_hello(hello)
             return
 
@@ -319,6 +422,7 @@ class NodeConnection:
                 public_key=enrolled_key,
                 context=device_keys.AUTH_CONTEXT,
                 pair_code=None,
+                enrollment_id=None,
                 device_id=device_id,
             )
             return
@@ -326,6 +430,26 @@ class NodeConnection:
         self._register_device(device_id, hello)
         welcome = Welcome(hdp_version=int(HDP_VERSION), device_id=device_id)
         await self._send(Envelope.new("welcome", welcome.to_wire()))
+
+    async def _handle_enrollment_hello(self, hello: Hello) -> None:
+        if (
+            self._enrollment_coordinator is None
+            or self._host_key_fingerprint is None
+            or not hello.device_pubkey
+        ):
+            await self._fail_enrollment("enrollment_unavailable")
+            return
+        if not device_keys.key_is_usable(hello.device_pubkey):
+            await self._fail_enrollment("unusable_device_pubkey")
+            return
+        await self._begin_challenge(
+            hello,
+            public_key=hello.device_pubkey,
+            context=device_keys.PAIR_CONTEXT,
+            pair_code=None,
+            enrollment_id=hello.enrollment_id,
+            device_id=None,
+        )
 
     async def _handle_pairing_hello(self, hello: Hello) -> None:
         pair_code = hello.credential.removeprefix("pair:")  # type: ignore[union-attr]
@@ -345,6 +469,7 @@ class NodeConnection:
                 public_key=hello.device_pubkey,
                 context=device_keys.PAIR_CONTEXT,
                 pair_code=pair_code,
+                enrollment_id=None,
                 device_id=None,
             )
             return
@@ -371,6 +496,18 @@ class NodeConnection:
         if self._audit is not None:
             self._audit.record("auth_failed", reason=reason, pairing_codes_invalidated=destroyed)
 
+    async def _fail_enrollment(self, reason: str) -> None:
+        """Refuse an opaque-token enrollment without touching legacy code state.
+
+        USB enrollment identifiers have 256 bits of entropy and are never guessed by a peer, so
+        applying the old six-digit pairing-code rate-limit here would create an unrelated denial
+        of service against any transitional installations which still have code rows on disk.
+        """
+        await self._ws.close(code=WSCloseCode.POLICY_VIOLATION, message=b"auth_failed")
+        logger.warning("enrollment_failed reason=%s", reason)
+        if self._audit is not None:
+            self._audit.record("enrollment_failed", reason=reason)
+
     async def _begin_challenge(
         self,
         hello: Hello,
@@ -378,6 +515,7 @@ class NodeConnection:
         public_key: str,
         context: bytes,
         pair_code: str | None,
+        enrollment_id: str | None,
         device_id: str | None,
     ) -> None:
         nonce = device_keys.new_nonce()
@@ -387,6 +525,7 @@ class NodeConnection:
             public_key=public_key,
             context=context,
             pair_code=pair_code,
+            enrollment_id=enrollment_id,
             device_id=device_id,
         )
         await self._send(Envelope.new("challenge", Challenge(nonce=nonce).to_wire()))
@@ -420,6 +559,22 @@ class NodeConnection:
             await self._complete_pairing(device_id, pending.hello, pair_code=pending.pair_code)
             return
 
+        if pending.enrollment_id is not None:
+            if self._enrollment_coordinator is None or self._host_key_fingerprint is None:
+                await self._fail_enrollment("enrollment_unavailable")
+                return
+            try:
+                role = self._enrollment_coordinator.consume(
+                    pending.enrollment_id,
+                    host_key_fingerprint=self._host_key_fingerprint,
+                    candidate_key_fingerprint=device_keys.fingerprint(pending.public_key),
+                )
+            except EnrollmentError:
+                await self._fail_enrollment("enrollment_not_approved")
+                return
+            await self._complete_pairing(ids.new(), pending.hello, pair_code=None, role=role)
+            return
+
         if pending.device_id is None:  # pragma: no cover — set on every reconnect challenge
             raise RuntimeError("reconnect proof reached with no resolved device_id")
         self._register_device(pending.device_id, pending.hello)
@@ -427,11 +582,15 @@ class NodeConnection:
         await self._send(Envelope.new("welcome", welcome.to_wire()))
 
     async def _reject_proof(self, pending: _PendingHandshake, reason: str) -> None:
-        """A failed proof on an enrollment burns budget like any other pairing failure; a failed
-        proof on a *reconnect* does not, because no pairing code is in play and burning one would
-        let a misbehaving paired device destroy an unrelated operator's pairing window."""
+        """A failed legacy-code proof burns its online-guessing budget.
+
+        USB-enrollment and reconnect proofs never affect that legacy state.
+        """
         if pending.pair_code is not None:
             await self._fail_pairing(reason)
+            return
+        if pending.enrollment_id is not None:
+            await self._fail_enrollment(reason)
             return
         await self._ws.close(code=WSCloseCode.POLICY_VIOLATION, message=b"auth_failed")
         logger.warning("auth_failed device_id=%s reason=%s", pending.device_id, reason)
@@ -439,12 +598,12 @@ class NodeConnection:
             self._audit.record("auth_failed", device_id=pending.device_id, reason=reason)
 
     async def _complete_pairing(
-        self, device_id: str, hello: Hello, *, pair_code: str | None
+        self, device_id: str, hello: Hello, *, pair_code: str | None, role: str = "secondary"
     ) -> None:
         # `devices` must exist before `credentials` (FK constraint) — `_register_device` writes
         # the devices row (via `Registry`'s own connection to the same file; WAL mode makes the
         # commit visible to `self._conn` immediately) before `issue_credential` inserts against it.
-        self._register_device(device_id, hello)
+        self._register_device(device_id, hello, role=role)
         if hello.device_pubkey:
             # Written here rather than carried on `DeviceRecord`, because `Registry.register`
             # upserts and every reconnect calls it — routing the key through that path would
@@ -470,7 +629,7 @@ class NodeConnection:
         ).fetchone()
         return row[0] if row and row[0] else ""
 
-    def _register_device(self, device_id: str, hello: Hello) -> None:
+    def _register_device(self, device_id: str, hello: Hello, *, role: str = "secondary") -> None:
         capability_infos = [
             CapabilityRecord(
                 name=c.name,
@@ -491,6 +650,11 @@ class NodeConnection:
                 capabilities=capability_infos,
             )
         )
+        if role != "secondary":
+            with self._conn:
+                self._conn.execute(
+                    "UPDATE devices SET role = ? WHERE device_id = ?", (role, device_id)
+                )
         self._descriptors[device_id] = {(c.name, c.version): c for c in hello.capabilities}
         self._connections[device_id] = self
         self.device_id = device_id

@@ -20,6 +20,8 @@ import hashlib
 import secrets
 import sqlite3
 import time
+from dataclasses import dataclass
+from typing import Literal
 
 _TTL_MS = 5 * 60 * 1000
 _CODE_DIGITS = 6
@@ -47,6 +49,15 @@ class NoPairingCodeAvailableError(RuntimeError):
     """Every sampled code collided with a code that is still live. Only reachable with an absurd
     number of concurrent outstanding pairings; surfaces as an operator error rather than handing
     back a code that is not actually the caller's."""
+
+
+@dataclass(frozen=True)
+class PairingStatus:
+    """Read-only lifecycle state for an operator-owned pairing code."""
+
+    state: Literal["pending", "consumed", "expired", "invalidated", "unknown"]
+    issued_device_id: str | None
+    expires_at: int | None
 
 
 def mint_pairing_code(conn: sqlite3.Connection, *, now_ms: int | None = None) -> str:
@@ -98,6 +109,28 @@ def code_is_live(conn: sqlite3.Connection, code: str, *, now_ms: int | None = No
         (_hash_code(code), now_ms),
     ).fetchone()
     return row is not None
+
+
+def pairing_status(
+    conn: sqlite3.Connection, code: str, *, now_ms: int | None = None
+) -> PairingStatus:
+    """Return a code's lifecycle state without exposing its stored hash."""
+    now_ms = now_ms if now_ms is not None else int(time.time() * 1000)
+    row = conn.execute(
+        "SELECT expires_at, consumed_at, invalidated_at, issued_device_id FROM pairing_codes "
+        "WHERE code_hash = ?",
+        (_hash_code(code),),
+    ).fetchone()
+    if row is None:
+        return PairingStatus("unknown", None, None)
+    expires_at, consumed_at, invalidated_at, issued_device_id = row
+    if consumed_at is not None:
+        return PairingStatus("consumed", issued_device_id, expires_at)
+    if invalidated_at is not None:
+        return PairingStatus("invalidated", None, expires_at)
+    if expires_at <= now_ms:
+        return PairingStatus("expired", None, expires_at)
+    return PairingStatus("pending", None, expires_at)
 
 
 def burn_attempt(conn: sqlite3.Connection, *, now_ms: int | None = None) -> int:

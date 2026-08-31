@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import base64
 import binascii
+import hashlib
 import secrets
 
 from cryptography.exceptions import InvalidSignature
@@ -73,6 +74,16 @@ def key_is_usable(encoded: str) -> bool:
     return True
 
 
+def fingerprint(encoded: str) -> str:
+    """Return the SHA-256 fingerprint of a validated P-256 public key's canonical DER form."""
+    key = load_public_key(encoded)
+    der = key.public_bytes(
+        serialization.Encoding.DER,
+        serialization.PublicFormat.SubjectPublicKeyInfo,
+    )
+    return hashlib.sha256(der).hexdigest()
+
+
 def verify_proof(encoded_key: str, context: bytes, nonce: str, signature: str) -> bool:
     """Is `signature` a valid ECDSA-SHA256 signature over `context + nonce` by `encoded_key`?
 
@@ -81,18 +92,23 @@ def verify_proof(encoded_key: str, context: bytes, nonce: str, signature: str) -
     same `auth_failed`, and a more talkative return value would invite it to branch on why.
     """
     try:
-        key = load_public_key(encoded_key)
-    except InvalidDeviceKeyError:
-        return False
-
-    try:
-        raw_signature = base64.b64decode(signature, validate=True)
         raw_nonce = base64.b64decode(nonce, validate=True)
     except (binascii.Error, ValueError):
         return False
 
+    return verify_signature(encoded_key, context + raw_nonce, signature)
+
+
+def verify_signature(encoded_key: str, payload: bytes, signature: str) -> bool:
+    """Verify a base64 ECDSA-SHA256 signature over canonical protocol bytes."""
     try:
-        key.verify(raw_signature, context + raw_nonce, ec.ECDSA(hashes.SHA256()))
-    except InvalidSignature:
+        key = load_public_key(encoded_key)
+        raw_signature = base64.b64decode(signature, validate=True)
+    except (InvalidDeviceKeyError, binascii.Error, ValueError):
+        return False
+
+    try:
+        key.verify(raw_signature, payload, ec.ECDSA(hashes.SHA256()))
+    except (InvalidSignature, ValueError):
         return False
     return True

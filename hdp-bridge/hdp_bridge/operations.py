@@ -1,6 +1,6 @@
 """Operator-surface orchestration, owned by `hdp_bridge` and shared by both operator CLIs.
 
-`hdp-bridge pair new` / `hdp-bridge devices revoke` (`hdp_bridge/cli.py`) and `hermes hdp pair
+`hdp pair new` / `hdp devices revoke` (`hdp_bridge/cli.py`) and `hermes hdp pair
 --new` / `hermes hdp devices revoke` (`hermes_device_plugin/cli.py`) are two *renderers* of the
 same two operations (FR-18's surface-independence claim). Before this module they were also two
 *implementations*: each one separately decided whether a daemon was reachable, separately fell
@@ -28,22 +28,22 @@ from hdp_proto.envelope import Envelope
 from . import config, credentials
 from .audit import AuditWriter
 from .control import read_frame, write_frame
-from .pairing import mint_pairing_code
 from .store import db as store_db
 
 
-async def pair_new() -> str:
-    """Mint a pairing code and return it in plaintext.
+class PairingCodeRemovedError(RuntimeError):
+    """Human-readable pairing codes are not part of USB-sentinel enrollment."""
 
-    There is no control-plane verb for this — `ctl_pair_mint` is always rejected (`control.py`'s
-    `_REJECTED_VERBS`), because minting must work whether or not a daemon happens to be running
-    (§4.2). No code and no hash ever reaches the audit log: only the fact that a code was minted
-    (no-plaintext rule, §3.5).
+
+async def pair_new() -> str:
+    """Reject the retired human-code flow.
+
+    Pairing now starts only through a physically attached USB bootstrap adapter after fresh local
+    owner authorization. Keeping a programmatic code mint would recreate the remote-attack path.
     """
-    conn = store_db.connect(config.registry_db_path())
-    code = mint_pairing_code(conn)
-    AuditWriter(config.hdp_home() / "audit").record("pairing_code_minted")
-    return code
+    raise PairingCodeRemovedError(
+        "Pair by USB after local owner authorization; pairing codes are disabled."
+    )
 
 
 async def control_request(verb: str, payload: dict) -> Envelope:

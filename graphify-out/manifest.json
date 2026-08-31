@@ -15,24 +15,24 @@
     "semantic_hash": "9c68267da7f18a7283f898d418282847"
   },
   "hdp-bridge/hdp_bridge/cli.py": {
-    "mtime": 1787276856.5658429,
-    "ast_hash": "6c2af3b3bbe6af3c76042902dd7b1391",
-    "semantic_hash": "6c2af3b3bbe6af3c76042902dd7b1391"
+    "mtime": 1787932484.984334,
+    "ast_hash": "bc11af1bd2f01e7614c2421407aaef5e",
+    "semantic_hash": ""
   },
   "hdp-bridge/hdp_bridge/config.py": {
-    "mtime": 1787276856.5668428,
-    "ast_hash": "6e22653fcaa9867b0378511deefe3c65",
-    "semantic_hash": "6e22653fcaa9867b0378511deefe3c65"
+    "mtime": 1787951441.371559,
+    "ast_hash": "3772e8b4a7b956ea5cdc3b32926b7434",
+    "semantic_hash": ""
   },
   "hdp-bridge/hdp_bridge/connection.py": {
-    "mtime": 1787447942.1465843,
-    "ast_hash": "840a1ac59e8d371ad16dbbd2d0a30a8e",
+    "mtime": 1787696364.9919422,
+    "ast_hash": "01a3c0e08bdfeeef68a04357c8da03e1",
     "semantic_hash": ""
   },
   "hdp-bridge/hdp_bridge/control.py": {
-    "mtime": 1787276856.568843,
-    "ast_hash": "e3d6a13e51d8a735e1c77338bdc20044",
-    "semantic_hash": "e3d6a13e51d8a735e1c77338bdc20044"
+    "mtime": 1787934305.2236955,
+    "ast_hash": "892d74af8a569912d337a5550baf98fe",
+    "semantic_hash": ""
   },
   "hdp-bridge/hdp_bridge/credentials.py": {
     "mtime": 1787065946.4933324,
@@ -40,8 +40,8 @@
     "semantic_hash": "cc67a52abc221a7db3d2eac2ba2dac5a"
   },
   "hdp-bridge/hdp_bridge/daemon.py": {
-    "mtime": 1787428838.635039,
-    "ast_hash": "220cf53bda3b041096d78534f826a2f4",
+    "mtime": 1787951441.7385736,
+    "ast_hash": "d79f97362d4def735a4148b52a78c614",
     "semantic_hash": ""
   },
   "hdp-bridge/hdp_bridge/invocations.py": {
@@ -50,13 +50,13 @@
     "semantic_hash": "9c9f3f7f6321b7fb172b7012572d2b77"
   },
   "hdp-bridge/hdp_bridge/operations.py": {
-    "mtime": 1787276856.5988443,
-    "ast_hash": "1b07dfb4f6ca40290c83d4b7a8b54cc4",
-    "semantic_hash": "1b07dfb4f6ca40290c83d4b7a8b54cc4"
+    "mtime": 1787696327.5544505,
+    "ast_hash": "4cac02244c462df6a7a3aca2227e21e6",
+    "semantic_hash": ""
   },
   "hdp-bridge/hdp_bridge/pairing.py": {
-    "mtime": 1787447928.2847507,
-    "ast_hash": "8b951efd97c87e9f41e991252a8b4aec",
+    "mtime": 1787587275.7953455,
+    "ast_hash": "c32e5cadb166ed2d933db48e9f6df7c4",
     "semantic_hash": ""
   },
   "hdp-bridge/hdp_bridge/policy.py": {
@@ -75,9 +75,9 @@
     "semantic_hash": "5a82d0faa053b2b937ce45478df53425"
   },
   "hdp-bridge/hdp_bridge/server.py": {
-    "mtime": 1787065946.5453346,
-    "ast_hash": "2e6aca0377ca5f7a516e96ccd85bf8a0",
-    "semantic_hash": "2e6aca0377ca5f7a516e96ccd85bf8a0"
+    "mtime": 1787951176.57002,
+    "ast_hash": "9cdd43119855fe5c703d27428e11b709",
+    "semantic_hash": ""
   },
   "hdp-bridge/hdp_bridge/store/__init__.py": {
     "mtime": 1786730023.9870791,
@@ -85,8 +85,8 @@
     "semantic_hash": "ea53386385cc64e362c91fc2842dbf65"
   },
   "hdp-bridge/hdp_bridge/store/db.py": {
-    "mtime": 1787447653.411122,
-    "ast_hash": "410e912d62867f85cccf9d4d83c6e469",
+    "mtime": 1787696047.7763028,
+    "ast_hash": "a2d13a2260c6b1230a24dbec9109d2ad",
     "semantic_hash": ""
   },
   "hdp-bridge/hdp_bridge/store/migrations/001_initial.sql": {
@@ -100,8 +100,8 @@
     "semantic_hash": "f21e75571454ada1ad10a997f792e4d0"
   },
   "hdp-bridge/pyproject.toml": {
-    "mtime": 1787447772.938505,
-    "ast_hash": "411bf5fe7cbc85d4cf3be101d7d263ff",
+    "mtime": 1787932423.5869255,
+    "ast_hash": "d2c0122befd80806ee919a692b8f22e3",
     "semantic_hash": ""
   },
   "hdp-bridge/tests/test_audit.py": {
@@ -115,12 +115,12 @@
     "semantic_hash": "8f7bd4d97a18bd54e4c4290b69c9c42e"
   },
   "hdp-bridge/tests/test_cli.py": {
-    "mtime": 1787276856.6148448,
-    "ast_hash": "d155d521b57c3a6eb2b7836d96ddc297",
-    "semantic_hash": "d155d521b57c3a6eb2b7836d96ddc297"
+    "mtime": 1787930422.213952,
+    "ast_hash": "ed7ebdd55d92ba2a100d90a7e46a1c00",
+    "semantic_hash": ""
   },
   "hdp-bridge/tests/test_connection_auth.py": {
-    "mtime": 1787445294.8813004,
+    "mtime": 1787582607.9562323,
     "ast_hash": "281c6f49e5d7df20f9b92605962d4380",
     "semantic_hash": ""
   },
@@ -145,8 +145,8 @@
     "semantic_hash": "d92438a7daa7313664b8eab1fc9b0fba"
   },
   "hdp-bridge/tests/test_pairing.py": {
-    "mtime": 1787448406.3747106,
-    "ast_hash": "9c0a164483105d2ea9d96aca2ada3d76",
+    "mtime": 1787586530.7671485,
+    "ast_hash": "b8a1c290a1dcf5083297a3d4807a7361",
     "semantic_hash": ""
   },
   "hdp-bridge/tests/test_presence.py": {
@@ -185,8 +185,8 @@
     "semantic_hash": "fd2bab9bc7f3d377623f6854582076b4"
   },
   "hdp-bridge/tests/test_store_db.py": {
-    "mtime": 1787448374.4876287,
-    "ast_hash": "66d27b8b2f17f35f88e9b908e55714aa",
+    "mtime": 1787696115.8400147,
+    "ast_hash": "1b6781f79d309e141e4ab17bf262d620",
     "semantic_hash": ""
   },
   "hdp-bridge/tests/test_types.py": {
@@ -225,9 +225,9 @@
     "semantic_hash": "d59bc96e1f1420e46a67dea6492e06c3"
   },
   "hdp-reference-node/hdp_reference_node/cli.py": {
-    "mtime": 1787276856.6538465,
-    "ast_hash": "c8e12604197075a606e1a4a92f995876",
-    "semantic_hash": "c8e12604197075a606e1a4a92f995876"
+    "mtime": 1787890843.5748878,
+    "ast_hash": "a8421b922b223323bb633da844d1d7dc",
+    "semantic_hash": ""
   },
   "hdp-reference-node/hdp_reference_node/faults.py": {
     "mtime": 1786748563.7799406,
@@ -240,9 +240,9 @@
     "semantic_hash": "3050c3497ebd2ecdec05559acd5368a2"
   },
   "hdp-reference-node/hdp_reference_node/node.py": {
-    "mtime": 1787276856.6558466,
-    "ast_hash": "9f24375a0ec6e46c1164a0e891290be3",
-    "semantic_hash": "9f24375a0ec6e46c1164a0e891290be3"
+    "mtime": 1787890866.4777985,
+    "ast_hash": "c46365285f9daa55a72e7a1646f93d43",
+    "semantic_hash": ""
   },
   "hdp-reference-node/pyproject.toml": {
     "mtime": 1786729866.3737044,
@@ -250,9 +250,9 @@
     "semantic_hash": "b9809039a671dd48264f5352a643cca8"
   },
   "hdp-reference-node/tests/test_node_auth.py": {
-    "mtime": 1787276856.6568465,
-    "ast_hash": "d8f4b0443194133e765fe4986308f57f",
-    "semantic_hash": "d8f4b0443194133e765fe4986308f57f"
+    "mtime": 1787890855.4053583,
+    "ast_hash": "e043a3f836b3a78dde7c6c9be051b8d6",
+    "semantic_hash": ""
   },
   "hdp-spec/hdp_proto/__init__.py": {
     "mtime": 1786730023.985079,
@@ -280,13 +280,13 @@
     "semantic_hash": "9010bdeaad08aeafc6991eb0758f2af5"
   },
   "hdp-spec/hdp_proto/messages.py": {
-    "mtime": 1787447807.1741347,
-    "ast_hash": "ad3712ff35ba292160d3048dd753d0a0",
+    "mtime": 1787672907.743703,
+    "ast_hash": "e1f36deede9b10b3201d28406b750630",
     "semantic_hash": ""
   },
   "hdp-spec/hdp_proto/version.py": {
-    "mtime": 1787447934.8406997,
-    "ast_hash": "e590b1ba8071f240d7e7f61e480e7592",
+    "mtime": 1787932831.116999,
+    "ast_hash": "d741bd269052c0ab354957b0c171b12a",
     "semantic_hash": ""
   },
   "hdp-spec/pyproject.toml": {
@@ -300,9 +300,9 @@
     "semantic_hash": "5c8ecdd580af46a2d963f05c862bbe9c"
   },
   "hdp-spec/tests/test_envelope.py": {
-    "mtime": 1787276856.6588466,
-    "ast_hash": "ad0228cd70284e517329eff9f469467c",
-    "semantic_hash": "ad0228cd70284e517329eff9f469467c"
+    "mtime": 1787932832.428051,
+    "ast_hash": "423749a6d92931e5bfd66124f8606e0a",
+    "semantic_hash": ""
   },
   "hdp-spec/tests/test_errors.py": {
     "mtime": 1787276856.6598465,
@@ -320,8 +320,8 @@
     "semantic_hash": "966ae5313d5f7bacb2c5eee4a2da9b1d"
   },
   "hdp-spec/tests/test_messages.py": {
-    "mtime": 1787445251.1337233,
-    "ast_hash": "0d255c757dcd739c9401be875b9e42c6",
+    "mtime": 1787672872.2177608,
+    "ast_hash": "4b1647a37940b695c0b47a0346e638a7",
     "semantic_hash": ""
   },
   "hermes-device-plugin/hermes_device_plugin/__init__.py": {
@@ -335,9 +335,9 @@
     "semantic_hash": "de9c08c6077898878f108d6a8bc501bc"
   },
   "hermes-device-plugin/hermes_device_plugin/cli.py": {
-    "mtime": 1787276856.6598465,
-    "ast_hash": "492d193735d1495637b96746bee2ee96",
-    "semantic_hash": "492d193735d1495637b96746bee2ee96"
+    "mtime": 1787890997.4490056,
+    "ast_hash": "6e479b9e58d42ce8d59c25d89b8a3832",
+    "semantic_hash": ""
   },
   "hermes-device-plugin/hermes_device_plugin/commands.py": {
     "mtime": 1787276856.6608467,
@@ -410,9 +410,9 @@
     "semantic_hash": "aad5cb705e535fe897145368670f065c"
   },
   "hermes-device-plugin/tests/test_plugin_cli.py": {
-    "mtime": 1787065946.962351,
-    "ast_hash": "bf1540f710b1b96f421879be68173f24",
-    "semantic_hash": "bf1540f710b1b96f421879be68173f24"
+    "mtime": 1787890997.7450173,
+    "ast_hash": "6092868f8bf910d0a776d12f370408ff",
+    "semantic_hash": ""
   },
   "hermes-device-plugin/tests/test_plugin_commands.py": {
     "mtime": 1787065946.962351,
@@ -450,18 +450,18 @@
     "semantic_hash": "e14eeba80bc8d250da0c8ac01da421cd"
   },
   "tests/conformance/conftest.py": {
-    "mtime": 1787448537.3564556,
-    "ast_hash": "104ff719a3a3a03331ce96a8e286502f",
+    "mtime": 1787587146.9408965,
+    "ast_hash": "f443613d065dfc14af12949e6ba2d6b4",
     "semantic_hash": ""
   },
   "tests/conformance/harness.py": {
-    "mtime": 1787428144.2510276,
-    "ast_hash": "b8141ccca3c120637996bfa9731080b0",
+    "mtime": 1787890779.370335,
+    "ast_hash": "e68a7df614b97671878e634f2f969b85",
     "semantic_hash": ""
   },
   "tests/conformance/test_faults.py": {
-    "mtime": 1787276856.6788476,
-    "ast_hash": "7b547780f8088475a386d13d3f1de902",
+    "mtime": 1787587146.9400926,
+    "ast_hash": "b06e1902c3c66e98b6e9a2c491732367",
     "semantic_hash": ""
   },
   "tests/conformance/test_runtime_composition.py": {
@@ -490,12 +490,12 @@
     "semantic_hash": "9d328221e1c3c161f53631718bd0c336"
   },
   "README.md": {
-    "mtime": 1787448241.595106,
-    "ast_hash": "e4865fd99e9f5f67f87bc0d8f80aa461",
+    "mtime": 1787588074.172668,
+    "ast_hash": "f361998acf50737c10b5d71cc98e04f8",
     "semantic_hash": ""
   },
   "hdp-spec/HDP-0.md": {
-    "mtime": 1787448235.4009416,
+    "mtime": 1787582607.972233,
     "ast_hash": "eff1882a49470158d2a9ed242802d12d",
     "semantic_hash": ""
   },
@@ -550,9 +550,9 @@
     "semantic_hash": "1ba43ce320c564b1776a2e34349d766c"
   },
   "hdp-reference-node/tests/test_node_cli.py": {
-    "mtime": 1787276856.6568465,
-    "ast_hash": "81091475f514b2827f153efa4c2c3d2d",
-    "semantic_hash": "81091475f514b2827f153efa4c2c3d2d"
+    "mtime": 1787890855.095346,
+    "ast_hash": "64e33dc79b160c953ea57c9dbbd3a103",
+    "semantic_hash": ""
   },
   "hdp-reference-node/tests/test_node_invocation_logging.py": {
     "mtime": 1787276856.6578467,
@@ -565,48 +565,123 @@
     "semantic_hash": "546cfc00fe23cdae3a4f97aaae5e81fa"
   },
   "tests/acceptance/test_seed_success_criterion.py": {
-    "mtime": 1787276856.6758473,
-    "ast_hash": "7c2f08cabc19f779a3dd6f200439ce2e",
-    "semantic_hash": "7c2f08cabc19f779a3dd6f200439ce2e"
+    "mtime": 1787587208.2637658,
+    "ast_hash": "cdbda8405ac4af8b62a6c68b77560702",
+    "semantic_hash": ""
   },
   "tests/conformance/test_lifecycle.py": {
-    "mtime": 1787276856.6788476,
-    "ast_hash": "66711e708032029dc0ad1238c0f51710",
-    "semantic_hash": "66711e708032029dc0ad1238c0f51710"
+    "mtime": 1787890775.3221743,
+    "ast_hash": "896ccdf93faaf50f571f2890adef2da4",
+    "semantic_hash": ""
   },
   "tests/conformance/android_node_fixture.py": {
-    "mtime": 1787448273.711259,
-    "ast_hash": "6191d8d61efc34413a1e34d94721282d",
+    "mtime": 1787696440.6879582,
+    "ast_hash": "53b670840564d42a4be07d630592d979",
     "semantic_hash": ""
   },
   "tests/conformance/test_android_node.py": {
-    "mtime": 1787448319.8644402,
-    "ast_hash": "d26f6c7512951ff15060d1ebcf8ecaf5",
+    "mtime": 1787696498.7772727,
+    "ast_hash": "4c2435463567be3d947558cfbcf519f1",
     "semantic_hash": ""
   },
   "docs/android-node-contract.md": {
-    "mtime": 1787448089.0539985,
-    "ast_hash": "ccd1593fd79c4e60f6d9dc5a68eb334c",
+    "mtime": 1787587275.6739833,
+    "ast_hash": "c0b7ba0371c4a60e4d165221c11fe464",
     "semantic_hash": ""
   },
   "hdp-bridge/hdp_bridge/device_keys.py": {
-    "mtime": 1787447920.1475232,
-    "ast_hash": "39086982efe0c976af469a2f6a1f9651",
+    "mtime": 1787695545.0752797,
+    "ast_hash": "c4b73e62e54456d138d69180f1e5fc8e",
     "semantic_hash": ""
   },
   "hdp-bridge/hdp_bridge/store/migrations/002_device_bound_pairing.sql": {
-    "mtime": 1787447653.4067347,
+    "mtime": 1787582607.9552324,
     "ast_hash": "bf29a23e06b8897d87cd0e24765b8df7",
     "semantic_hash": ""
   },
   "hdp-bridge/tests/test_device_bound_pairing.py": {
-    "mtime": 1787448394.329247,
-    "ast_hash": "97143f9d91c1e5428c865b7d4290eef7",
+    "mtime": 1787696162.729883,
+    "ast_hash": "9e464126d9086780c9ccfa93c331855e",
     "semantic_hash": ""
   },
   "tests/conformance/test_external_node.py": {
-    "mtime": 1787448692.6755064,
-    "ast_hash": "5f1f48e1690ef803fc9a56ebd2cb27f8",
+    "mtime": 1787890770.637988,
+    "ast_hash": "9a38b7873adc4a6f8d08486f3ebcef25",
+    "semantic_hash": ""
+  },
+  "hdp-bridge/hdp_bridge/tui.py": {
+    "mtime": 1787940212.7592201,
+    "ast_hash": "3bce7cc892a6a8b430e5d44735fc7156",
+    "semantic_hash": ""
+  },
+  "hdp-bridge/tests/test_tui.py": {
+    "mtime": 1787932612.9073522,
+    "ast_hash": "c2950f4f2923fd9efce41bd29843fa92",
+    "semantic_hash": ""
+  },
+  "hdp-bridge/hdp_bridge/enrollment.py": {
+    "mtime": 1787891226.3221061,
+    "ast_hash": "3a810f27e0dc783849cdf910bc810b69",
+    "semantic_hash": ""
+  },
+  "hdp-bridge/hdp_bridge/host_identity.py": {
+    "mtime": 1787695032.6308713,
+    "ast_hash": "4f06ecde3c44ec5d3131277649732369",
+    "semantic_hash": ""
+  },
+  "hdp-bridge/hdp_bridge/store/migrations/003_usb_sentinel_pairing.sql": {
+    "mtime": 1787639170.985743,
+    "ast_hash": "6cdec12e58bbdbafd7f2e0dba035433c",
+    "semantic_hash": ""
+  },
+  "hdp-bridge/tests/test_enrollment.py": {
+    "mtime": 1787696364.988942,
+    "ast_hash": "036306d9dc4a6d623d94ae7fac112fb7",
+    "semantic_hash": ""
+  },
+  "hdp-bridge/tests/test_host_identity.py": {
+    "mtime": 1787695067.4392576,
+    "ast_hash": "1f046dd279b15c9622476d6b9a23b10c",
+    "semantic_hash": ""
+  },
+  "hdp-bridge/hdp_bridge/usb_bootstrap.py": {
+    "mtime": 1787951458.7472506,
+    "ast_hash": "770409bd3afbac1646705d45e54aab40",
+    "semantic_hash": ""
+  },
+  "hdp-bridge/tests/test_usb_bootstrap.py": {
+    "mtime": 1787948973.0898185,
+    "ast_hash": "3d8634b5539076c16970aebcd69b198c",
+    "semantic_hash": ""
+  },
+  "hdp-bridge/hdp_bridge/store/migrations/004_enrollment_target_role.sql": {
+    "mtime": 1787696114.7559717,
+    "ast_hash": "dd254b4c76abd99e3129b5ae59765b2c",
+    "semantic_hash": ""
+  },
+  "hdp-bridge/hdp_bridge/device_roles.py": {
+    "mtime": 1787891330.273242,
+    "ast_hash": "70c33a799a0fb186e85fed055ef4f15a",
+    "semantic_hash": ""
+  },
+  "hdp-bridge/tests/test_device_roles.py": {
+    "mtime": 1787891330.6152558,
+    "ast_hash": "bc987ac3637301ff9b793792b1476592",
+    "semantic_hash": ""
+  },
+  "hdp-bridge/hdp_bridge/owner_auth.py": {
+    "mtime": 1787930352.2831752,
+    "ast_hash": "393a82eb1abbe038c80cf880df7bba7a",
+    "semantic_hash": ""
+  },
+  "hdp-bridge/hdp_bridge/usb_accessory.py": {
+    "mtime": 1787951177.1840446,
+    "ast_hash": "b5a6cb087c37ebb93155729000108d70",
+    "semantic_hash": ""
+  },
+  "hdp-bridge/hdp_bridge/tls_identity.py": {
+    "mtime": 1787951450.6109266,
+    "ast_hash": "4da25a724d9ca7e4ecac8da32eddd790",
     "semantic_hash": ""
   }
 }

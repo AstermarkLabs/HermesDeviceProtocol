@@ -8,10 +8,12 @@ dependencies = [
   "cryptography",
   "hdp-proto",
   "pyyaml",
+  "pyusb",
+  "textual",
 ]
 
 [project.scripts]
-hdp-bridge = "hdp_bridge.cli:main"
+hdp = "hdp_bridge.cli:main"
 
 [tool.uv.sources]
 hdp-proto = { workspace = true }

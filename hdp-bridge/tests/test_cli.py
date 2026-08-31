@@ -7,12 +7,67 @@ No pre-existing `test_cli.py` covered `cli.py` before this task; this file's `pa
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
 import pytest
 from hdp_bridge import cli
 from hdp_bridge.store import db as store_db
 from hdp_proto.envelope import Envelope
+
+
+def test_bare_hdp_launches_the_operator_tui(monkeypatch):
+    launched = []
+    monkeypatch.setattr(cli, "_run_tui", lambda: launched.append(True))
+    monkeypatch.setattr(sys, "argv", ["hdp"])
+
+    cli.main()
+
+    assert launched == [True]
+
+
+def test_devices_list_renders_paired_devices_from_the_daemon(monkeypatch, capsys):
+    async def request(verb, payload):
+        assert (verb, payload) == ("ctl_list_devices", {})
+        return Envelope.new(
+            "ctl_list_devices_reply",
+            {
+                "devices": [
+                    {
+                        "device_id": "dev_1",
+                        "friendly_name": "desk-node",
+                        "platform": "android",
+                        "state": "active",
+                        "online": True,
+                        "capabilities": [{"name": "diagnostics.echo"}],
+                    }
+                ]
+            },
+        )
+
+    monkeypatch.setattr("hdp_bridge.operations.control_request", request)
+
+    cli._run_devices_list()
+
+    output = capsys.readouterr().out
+    assert "NAME" in output
+    assert "PLATFORM" in output
+    assert "DEVICE ID" in output
+    assert "desk-node" in output
+    assert "android" in output
+    assert "dev_1" in output
+    assert "online" in output
+    assert output.lstrip()[0] != "["
+
+
+def test_devices_remove_dispatches_the_existing_revoke_operation(monkeypatch):
+    removed = []
+    monkeypatch.setattr(cli, "_run_devices_revoke", lambda device_id: removed.append(device_id))
+    monkeypatch.setattr(sys, "argv", ["hdp", "devices", "remove", "dev_1"])
+
+    cli.main()
+
+    assert removed == ["dev_1"]
 
 
 def test_approvals_list_renders_daemon_held_pending_records(monkeypatch, capsys):
@@ -99,24 +154,15 @@ def test_policy_validate_checks_a_file_without_replacing_daemon_policy(
     assert json.loads(capsys.readouterr().out) == {"ok": True, "policy_seq": 1}
 
 
-def test_pair_new_records_pairing_code_minted_with_no_code_or_hash(tmp_path, monkeypatch, capsys):
+def test_pair_new_is_rejected_without_minting_a_code(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("HERMES_HOME", str(tmp_path))
-    # `_run_pair_new` connects to the registry DB directly (no daemon needed for this path) —
-    # touch it via the same helper the CLI uses so the schema exists first.
     store_db.connect(tmp_path / "hdp" / "registry.db")
 
-    cli._run_pair_new()
+    with pytest.raises(SystemExit, match="2"):
+        cli._run_pair_new()
 
-    printed_code = capsys.readouterr().out.strip()
-    assert printed_code  # the plaintext code still goes to stdout, exactly once
-
-    audit_files = list((tmp_path / "hdp" / "audit").glob("audit-*.jsonl"))
-    assert len(audit_files) == 1
-    record = json.loads(audit_files[0].read_text().strip())
-    assert record["event"] == "pairing_code_minted"
-    # No code, no hash — literally nothing about *which* code (no-plaintext rule).
-    assert printed_code not in json.dumps(record)
-    assert set(record.keys()) == {"event", "ts"}
+    assert "pairing codes are disabled" in capsys.readouterr().err
+    assert not list((tmp_path / "hdp" / "audit").glob("audit-*.jsonl"))
 
 
 def test_audit_tail_prints_todays_audit_file(tmp_path, monkeypatch, capsys):
@@ -188,7 +234,7 @@ def test_devices_revoke_of_an_unknown_device_reports_no_such_device_and_audits_n
     """Finding I4: the offline fallback used to print "revoked <id>" unconditionally, even when
     the UPDATE touched zero rows. An operator typo now says so, and no `revoked` audit record is
     written for a revocation that did not happen. Round 2 of I4: the process also exits non-zero,
-    so a caller scripting `hdp-bridge devices revoke $id && next-step` can't proceed past this."""
+    so a caller scripting `hdp devices revoke $id && next-step` can't proceed past this."""
     monkeypatch.setenv("HERMES_HOME", str(tmp_path))
     store_db.connect(tmp_path / "hdp" / "registry.db")
 

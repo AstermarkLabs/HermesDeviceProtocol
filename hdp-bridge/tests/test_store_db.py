@@ -28,6 +28,19 @@ def test_connect_creates_schema_and_sets_pragmas(tmp_path):
     assert version_row[0] == db.CURRENT_SCHEMA_VERSION
 
 
+def test_connect_creates_usb_sentinel_pairing_schema(tmp_path):
+    conn = db.connect(tmp_path / "registry.db")
+
+    tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
+    assert {"pending_enrollments", "pairing_locks"} <= tables
+
+    device_columns = {row[1] for row in conn.execute("PRAGMA table_info(devices)")}
+    assert "role" in device_columns
+
+    indexes = {row[1] for row in conn.execute("PRAGMA index_list(devices)")}
+    assert "one_primary_device" in indexes
+
+
 def test_connect_refuses_a_newer_schema_version_than_it_knows(tmp_path):
     db_path = tmp_path / "registry.db"
     db.connect(db_path).close()
@@ -59,12 +72,13 @@ def test_migrating_a_populated_v1_database_preserves_rows_and_defaults(tmp_path)
 
     conn = db.connect(db_path)
 
-    assert conn.execute("SELECT version FROM schema_version").fetchone()[0] == 2
+    assert conn.execute("SELECT version FROM schema_version").fetchone()[0] == 4
     device = conn.execute(
-        "SELECT friendly_name, platform, device_pubkey FROM devices WHERE device_id = 'dev_legacy'"
+        "SELECT friendly_name, platform, device_pubkey, role FROM devices "
+        "WHERE device_id = 'dev_legacy'"
     ).fetchone()
-    # Existing data survives, and the pre-v0.4 device lands on the legacy (unbound) auth path.
-    assert device == ("workshop", "linux", "")
+    # Existing data survives and all previously enrolled devices start as secondaries.
+    assert device == ("workshop", "linux", "", "secondary")
     code = conn.execute(
         "SELECT attempts_remaining, invalidated_at FROM pairing_codes WHERE code_hash = 'abc123'"
     ).fetchone()
@@ -83,7 +97,7 @@ def test_migrating_an_already_current_database_is_a_no_op(tmp_path):
     conn.close()
 
     reopened = db.connect(db_path)
-    assert reopened.execute("SELECT version FROM schema_version").fetchone()[0] == 2
+    assert reopened.execute("SELECT version FROM schema_version").fetchone()[0] == 4
     assert (
         reopened.execute("SELECT device_pubkey FROM devices WHERE device_id = 'dev_1'").fetchone()[
             0

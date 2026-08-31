@@ -262,7 +262,7 @@ def _wait_for_online_device(hermes: Path, env: Mapping[str, str], home: Path) ->
 
 def _wait_for_approval(env: Mapping[str, str]) -> str:
     def probe() -> str | None:
-        result = _run(["uv", "run", "hdp-bridge", "approvals", "list"], env=env)
+        result = _run(["uv", "run", "hdp", "approvals", "list"], env=env)
         return _parse_pending_invocation_id(result.stdout)
 
     return _wait_for(probe, timeout=90, description="the ASK invocation to become pending")
@@ -348,7 +348,7 @@ def test_seed_success_criterion_clause_by_clause(tmp_path: Path) -> None:
         credential_file = tmp_path / "node.credential"
 
         with _logged_process(
-            ["uv", "run", "hdp-bridge", "serve"], env=env, log_path=bridge_log
+            ["uv", "run", "hdp", "serve"], env=env, log_path=bridge_log
         ) as bridge:
             _wait_for(
                 lambda: True if (home / "hdp" / "bridge.addr").exists() else None,
@@ -356,7 +356,7 @@ def test_seed_success_criterion_clause_by_clause(tmp_path: Path) -> None:
                 description="hdp-bridge to publish bridge.addr",
             )
             assert bridge.poll() is None, bridge_log.read_text(encoding="utf-8")
-            pair_code = _run(["uv", "run", "hdp-bridge", "pair", "new"], env=env).stdout.strip()
+            pair_code = _run(["uv", "run", "hdp", "pair", "new"], env=env).stdout.strip()
 
             with _logged_process(
                 [
@@ -437,7 +437,7 @@ def test_seed_success_criterion_clause_by_clause(tmp_path: Path) -> None:
                         [
                             "uv",
                             "run",
-                            "hdp-bridge",
+                            "hdp",
                             "approvals",
                             "approve",
                             invocation_id,

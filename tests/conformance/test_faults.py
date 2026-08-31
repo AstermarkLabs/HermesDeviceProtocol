@@ -1,7 +1,7 @@
 """M1 conformance suite v1 (m1-plan.md §7) — one test per in-scope failure-matrix row, each
 driving the real `hdp-node` CLI as a subprocess (except the two rows that need a hand-crafted raw
 frame, and the zero-node row that needs no node at all) against a real `SocketTransport` (M2)
-talking over a Unix control socket to a real `hdp-bridge serve` subprocess, which in turn binds a
+talking over a Unix control socket to a real `hdp serve` subprocess, which in turn binds a
 real TCP socket for nodes.
 
 Explicitly deferred rows — not silently omitted: `bridge_unavailable` (needs the M2 control
@@ -80,7 +80,7 @@ async def test_ignore_cancel_leaves_clean_state_and_logs_the_late_result(
     silent, the bridge side logs `late_result`) — the second is the direct consequence of the
     first for this fault combination, over the real socket.
 
-    `bridge_log` reads the real `hdp-bridge serve` subprocess's own stdout/stderr — `caplog` only
+    `bridge_log` reads the real `hdp serve` subprocess's own stdout/stderr — `caplog` only
     captures logging within the test process, and as of M2 the bridge is a separate OS process,
     so the `late_result` log record it emits (`hdp_bridge/connection.py`) is invisible to
     `caplog` entirely."""
@@ -105,7 +105,7 @@ async def test_ignore_cancel_leaves_clean_state_and_logs_the_late_result(
         await wait_for_log(bridge_log, "late_result", timeout=8.0)
 
         # `bridge._invocations` was `EmbeddedTransport`'s private pending-invocation table,
-        # readable in-process. As of M2 the bridge is a separate `hdp-bridge serve` subprocess —
+        # readable in-process. As of M2 the bridge is a separate `hdp serve` subprocess —
         # that table now lives inside the daemon, unreachable from the test process. The
         # nothing-leaks invariant (m1-plan.md §6/§7) is instead asserted the only way it can be
         # from outside: a second `invoke()` against the same device, now that the node is free to

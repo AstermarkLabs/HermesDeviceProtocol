@@ -11,6 +11,8 @@ from hdp_proto.messages import (
     ProgressMsg,
     ResultMsg,
     RevokeMsg,
+    SentinelApprovalDecision,
+    SentinelApprovalRequest,
     Welcome,
 )
 
@@ -63,6 +65,21 @@ _CASES = [
     (Heartbeat(), "extra"),
     (ErrorMsg(code="bridge_unavailable", message="m", hint="h"), "extra"),
     (RevokeMsg(reason="credential rotated"), "extra"),
+    (
+        SentinelApprovalRequest(
+            enrollment_id="e" * 64,
+            host_key_fingerprint="host",
+            candidate_key_fingerprint="candidate",
+            candidate_name="tablet",
+            expires_at=123,
+            host_signature="signature",
+        ),
+        "extra",
+    ),
+    (
+        SentinelApprovalDecision(enrollment_id="e" * 64, decision="approve", signature="signature"),
+        "extra",
+    ),
 ]
 
 
@@ -108,6 +125,18 @@ def test_hello_without_platform_key_parses_as_none():
     wire = Hello(hdp_versions=(0,), device_name="n", capabilities=(), credential="c").to_wire()
     del wire["platform"]
     assert Hello.from_wire(wire).platform is None
+
+
+def test_hello_round_trips_an_opaque_usb_enrollment_identifier():
+    hello = Hello(
+        hdp_versions=(0,),
+        device_name="n",
+        capabilities=(),
+        credential=None,
+        enrollment_id="a" * 64,
+    )
+
+    assert Hello.from_wire(hello.to_wire()).enrollment_id == "a" * 64
 
 
 def test_hello_rejects_non_string_platform():

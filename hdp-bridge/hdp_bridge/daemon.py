@@ -1,4 +1,4 @@
-"""`hdp-bridge serve` — the foreground daemon entrypoint (§5.5). PID-file lifecycle hardening
+"""`hdp serve` — the foreground daemon entrypoint (§5.5). PID-file lifecycle hardening
 (stale-socket cleanup, single-instance guard) lands in Task 15; this task is the minimal
 bind/serve/shutdown loop so every task after it has a real daemon to talk to."""
 
@@ -14,11 +14,17 @@ from .approvals import ApprovalManager
 from .audit import AuditWriter
 from .connection import NodeConnection
 from .control import ControlServer
+from .enrollment import EnrollmentCoordinator
+from .host_identity import HostIdentityStore
 from .invocations import InvocationsMem
+from .owner_auth import PolkitOwnerAuthorizer
 from .policy import PolicyEngine
 from .registry import Registry
 from .server import HdpServer
 from .store import db as store_db
+from .tls_identity import load_or_create as load_tls_identity
+from .usb_accessory import UsbAccessoryPeer
+from .usb_bootstrap import UsbBootstrapService
 
 logger = logging.getLogger(__name__)
 
@@ -123,6 +129,15 @@ async def _serve_claimed(pid_path: Path, stop_event: asyncio.Event | None) -> No
     # opening its own from a `Path`), this second `connect()` call collapses away and everything
     # converges on the single-shared-connection design the plan originally described.
     conn = store_db.connect(config.registry_db_path())
+    host_identity = HostIdentityStore.load_or_create(config.host_identity_path())
+    endpoint = config.advertised_wss_endpoint()
+    if endpoint is None:
+        tls_context, tls_pin = None, ""
+    else:
+        tls_context, tls_pin = load_tls_identity(
+            config.tls_certificate_path(), config.tls_private_key_path(), endpoint
+        )
+    enrollments = EnrollmentCoordinator(conn)
     invocations = InvocationsMem()
     connections: dict[str, NodeConnection] = {}
     descriptors: dict = {}
@@ -136,6 +151,27 @@ async def _serve_claimed(pid_path: Path, stop_event: asyncio.Event | None) -> No
     policy.reload(force=True, initial=True)
     approvals = ApprovalManager(conn)
 
+    def primary_notifier() -> NodeConnection | None:
+        row = conn.execute("SELECT device_id FROM devices WHERE role = 'primary'").fetchone()
+        return connections.get(row[0]) if row is not None else None
+
+    bootstrap = UsbBootstrapService(
+        enrollments,
+        host_key_fingerprint=host_identity.fingerprint,
+        host_public_key=host_identity.public_key,
+        host_signer=host_identity.sign,
+        owner_authorizer=PolkitOwnerAuthorizer(),
+        primary_notifier=primary_notifier,
+        endpoint=endpoint,
+        tls_pin=tls_pin,
+    )
+
+    async def usb_bootstrap(serial: str) -> str:
+        # Avoid USB enumeration or interface claims until host-owner authentication passes.
+        await bootstrap.authorize_owner()
+        peer = await asyncio.to_thread(UsbAccessoryPeer.open_android_accessory, serial or None)
+        return await bootstrap.begin_secondary(peer, owner_authorized=True)
+
     def make_connection(ws: object) -> NodeConnection:
         return NodeConnection(
             ws,  # type: ignore[arg-type]
@@ -145,6 +181,9 @@ async def _serve_claimed(pid_path: Path, stop_event: asyncio.Event | None) -> No
             connections=connections,
             descriptors=descriptors,
             audit=audit,
+            enrollment_coordinator=enrollments,
+            host_key_fingerprint=host_identity.fingerprint,
+            host_signer=host_identity.sign,
         )
 
     hdp_server = HdpServer(
@@ -153,6 +192,7 @@ async def _serve_claimed(pid_path: Path, stop_event: asyncio.Event | None) -> No
         port=config.hdp_bind_port(),
         allow_remote=config.hdp_allow_remote(),
         bridge_addr_path=config.bridge_addr_path(),
+        ssl_context=tls_context,
     )
     control = ControlServer(
         config.control_socket_path(),
@@ -164,6 +204,7 @@ async def _serve_claimed(pid_path: Path, stop_event: asyncio.Event | None) -> No
         audit=audit,
         approvals=approvals,
         policy=policy,
+        usb_bootstrap=usb_bootstrap,
     )
 
     await hdp_server.start()

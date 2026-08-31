@@ -3,14 +3,17 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 
 import aiohttp
 import pytest
-from harness import mint_pairing_code, start_node, stop_node
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import ec
+from harness import prepare_usb_enrollment, start_node, stop_node
 from hdp_proto.capabilities import CapabilityDescriptor
 from hdp_proto.envelope import Envelope
-from hdp_proto.messages import CapabilitiesMsg, Hello, ResultMsg
+from hdp_proto.messages import CapabilitiesMsg, Challenge, Hello, Proof, ResultMsg, Welcome
 from hermes_device_plugin import engine, runtime, tools
 from hermes_device_plugin.transport.base import BridgeStatus, InvokeRequest
 
@@ -32,6 +35,77 @@ _NOTIFY_V1 = CapabilityDescriptor(
     input_schema={"type": "object"},
     output_schema={"type": "object"},
 )
+
+_PAIR_CONTEXT = b"HDP/0 pair-challenge\x00"
+_AUTH_CONTEXT = b"HDP/0 auth-challenge\x00"
+
+
+def _new_device_key() -> tuple[ec.EllipticCurvePrivateKey, str]:
+    private_key = ec.generate_private_key(ec.SECP256R1())
+    public_key = base64.b64encode(
+        private_key.public_key().public_bytes(
+            serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo
+        )
+    ).decode("ascii")
+    return private_key, public_key
+
+
+def _sign(private_key: ec.EllipticCurvePrivateKey, context: bytes, nonce: str) -> str:
+    signature = private_key.sign(context + base64.b64decode(nonce), ec.ECDSA(hashes.SHA256()))
+    return base64.b64encode(signature).decode("ascii")
+
+
+async def _receive_envelope(ws: aiohttp.ClientWebSocketResponse) -> Envelope:
+    return Envelope.from_wire(json.loads((await ws.receive(timeout=5)).data))
+
+
+async def _enroll_raw_node(
+    ws: aiohttp.ClientWebSocketResponse,
+    *,
+    name: str,
+    capabilities: tuple[CapabilityDescriptor, ...],
+) -> tuple[Welcome, ec.EllipticCurvePrivateKey]:
+    private_key, public_key = _new_device_key()
+    hello = Hello(
+        hdp_versions=(0,),
+        device_name=name,
+        capabilities=capabilities,
+        device_pubkey=public_key,
+        enrollment_id=prepare_usb_enrollment(public_key),
+    )
+    await ws.send_str(json.dumps(Envelope.new("hello", hello.to_wire()).to_wire()))
+    challenge = Challenge.from_wire((await _receive_envelope(ws)).payload)
+    await ws.send_str(
+        json.dumps(
+            Envelope.new(
+                "proof", Proof(_sign(private_key, _PAIR_CONTEXT, challenge.nonce)).to_wire()
+            ).to_wire()
+        )
+    )
+    return Welcome.from_wire((await _receive_envelope(ws)).payload), private_key
+
+
+async def _authenticate_raw_node(
+    ws: aiohttp.ClientWebSocketResponse,
+    *,
+    name: str,
+    capabilities: tuple[CapabilityDescriptor, ...],
+    credential: str,
+    private_key: ec.EllipticCurvePrivateKey,
+) -> Welcome:
+    hello = Hello(
+        hdp_versions=(0,), device_name=name, capabilities=capabilities, credential=credential
+    )
+    await ws.send_str(json.dumps(Envelope.new("hello", hello.to_wire()).to_wire()))
+    challenge = Challenge.from_wire((await _receive_envelope(ws)).payload)
+    await ws.send_str(
+        json.dumps(
+            Envelope.new(
+                "proof", Proof(_sign(private_key, _AUTH_CONTEXT, challenge.nonce)).to_wire()
+            ).to_wire()
+        )
+    )
+    return Welcome.from_wire((await _receive_envelope(ws)).payload)
 
 
 def _echo_request(
@@ -82,20 +156,12 @@ async def test_multiple_candidates_are_structured_then_one_policy_default_select
 ):
     proc_a = await start_node(bridge_url, name="Alpha")
     proc_b = await start_node(bridge_url, name="Beta")
-    pair_code = await mint_pairing_code()
     try:
         async with aiohttp.ClientSession() as session, session.ws_connect(bridge_url) as ws:
-            noncandidate_hello = Hello(
-                hdp_versions=(0,),
-                device_name="Notifications only",
-                capabilities=(_NOTIFY_V1,),
-                credential=f"pair:{pair_code}",
+            welcome, _ = await _enroll_raw_node(
+                ws, name="Notifications only", capabilities=(_NOTIFY_V1,)
             )
-            await ws.send_str(
-                json.dumps(Envelope.new("hello", noncandidate_hello.to_wire()).to_wire())
-            )
-            welcome = Envelope.from_wire(json.loads((await ws.receive(timeout=5)).data))
-            noncandidate_id = welcome.payload["device_id"]
+            noncandidate_id = welcome.device_id
             all_devices = await _wait_for_online_devices(bridge, 3)
             devices = [
                 device
@@ -150,17 +216,11 @@ async def test_highest_mutual_version_is_dispatched_and_no_overlap_carries_both_
         input_schema=_ECHO_V1.input_schema,
         output_schema=_ECHO_V1.output_schema,
     )
-    pair_code = await mint_pairing_code()
     async with aiohttp.ClientSession() as session, session.ws_connect(bridge_url) as ws:
-        hello = Hello(
-            hdp_versions=(0,),
-            device_name="version-node",
-            capabilities=(_ECHO_V1, echo_v2),
-            credential=f"pair:{pair_code}",
+        welcome, _ = await _enroll_raw_node(
+            ws, name="version-node", capabilities=(_ECHO_V1, echo_v2)
         )
-        await ws.send_str(json.dumps(Envelope.new("hello", hello.to_wire()).to_wire()))
-        welcome = Envelope.from_wire(json.loads((await ws.receive(timeout=5)).data))
-        device_id = welcome.payload["device_id"]
+        device_id = welcome.device_id
         invoke_task = asyncio.create_task(
             bridge.invoke(_echo_request(acceptable_versions=(1, 2), requested_device_id=device_id))
         )
@@ -236,17 +296,9 @@ async def test_highest_mutual_version_is_dispatched_and_no_overlap_carries_both_
 async def test_readvertisement_is_full_set_and_inflight_validation_uses_dispatch_schema(
     bridge, bridge_url
 ):
-    pair_code = await mint_pairing_code()
     async with aiohttp.ClientSession() as session, session.ws_connect(bridge_url) as ws:
-        hello = Hello(
-            hdp_versions=(0,),
-            device_name="raw-lifecycle-node",
-            capabilities=(_ECHO_V1,),
-            credential=f"pair:{pair_code}",
-        )
-        await ws.send_str(json.dumps(Envelope.new("hello", hello.to_wire()).to_wire()))
-        welcome = Envelope.from_wire(json.loads((await ws.receive(timeout=5)).data))
-        device_id = welcome.payload["device_id"]
+        welcome, _ = await _enroll_raw_node(ws, name="raw-lifecycle-node", capabilities=(_ECHO_V1,))
+        device_id = welcome.device_id
         await _wait_for_online_devices(bridge, 1)
 
         invoke_task = asyncio.create_task(
@@ -279,17 +331,9 @@ async def test_readvertisement_is_full_set_and_inflight_validation_uses_dispatch
 
 
 async def test_disconnect_midflight_fails_immediately(bridge, bridge_url):
-    pair_code = await mint_pairing_code()
     async with aiohttp.ClientSession() as session, session.ws_connect(bridge_url) as ws:
-        hello = Hello(
-            hdp_versions=(0,),
-            device_name="disconnecting-node",
-            capabilities=(_ECHO_V1,),
-            credential=f"pair:{pair_code}",
-        )
-        await ws.send_str(json.dumps(Envelope.new("hello", hello.to_wire()).to_wire()))
-        welcome = Envelope.from_wire(json.loads((await ws.receive(timeout=5)).data))
-        device_id = welcome.payload["device_id"]
+        welcome, _ = await _enroll_raw_node(ws, name="disconnecting-node", capabilities=(_ECHO_V1,))
+        device_id = welcome.device_id
 
         loop = asyncio.get_running_loop()
         started = loop.time()
@@ -308,19 +352,14 @@ async def test_disconnect_midflight_fails_immediately(bridge, bridge_url):
 async def test_same_device_reconnect_replaces_connection_without_cross_failing_calls(
     bridge, bridge_url
 ):
-    pair_code = await mint_pairing_code()
     async with aiohttp.ClientSession() as session:
         async with session.ws_connect(bridge_url) as old_ws:
-            hello = Hello(
-                hdp_versions=(0,),
-                device_name="reconnecting-node",
-                capabilities=(_ECHO_V1,),
-                credential=f"pair:{pair_code}",
+            old_welcome, private_key = await _enroll_raw_node(
+                old_ws, name="reconnecting-node", capabilities=(_ECHO_V1,)
             )
-            await old_ws.send_str(json.dumps(Envelope.new("hello", hello.to_wire()).to_wire()))
-            old_welcome = Envelope.from_wire(json.loads((await old_ws.receive(timeout=5)).data))
-            device_id = old_welcome.payload["device_id"]
-            credential = old_welcome.payload["credential"]
+            device_id = old_welcome.device_id
+            credential = old_welcome.credential
+            assert credential is not None
 
             old_task = asyncio.create_task(
                 bridge.invoke(_echo_request(requested_device_id=device_id, deadline_ms=30_000))
@@ -331,19 +370,14 @@ async def test_same_device_reconnect_replaces_connection_without_cross_failing_c
             )
 
             async with session.ws_connect(bridge_url) as replacement_ws:
-                replacement_hello = Hello(
-                    hdp_versions=(0,),
-                    device_name="reconnecting-node",
+                replacement_welcome = await _authenticate_raw_node(
+                    replacement_ws,
+                    name="reconnecting-node",
                     capabilities=(_ECHO_V1,),
                     credential=credential,
+                    private_key=private_key,
                 )
-                await replacement_ws.send_str(
-                    json.dumps(Envelope.new("hello", replacement_hello.to_wire()).to_wire())
-                )
-                replacement_welcome = Envelope.from_wire(
-                    json.loads((await replacement_ws.receive(timeout=5)).data)
-                )
-                assert replacement_welcome.payload["device_id"] == device_id
+                assert replacement_welcome.device_id == device_id
 
                 new_task = asyncio.create_task(
                     bridge.invoke(_echo_request(requested_device_id=device_id))

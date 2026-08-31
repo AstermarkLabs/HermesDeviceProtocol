@@ -50,16 +50,6 @@ def build_parser() -> argparse.ArgumentParser:
     )
     credentials = connect.add_mutually_exclusive_group()
     credentials.add_argument(
-        "--pair-code",
-        default=None,
-        dest="pair_code",
-        help=(
-            "First-time pairing code (M2, m2-plan.md §4). Required on a node's very first "
-            "connection unless --credential-file already holds a stored credential from a "
-            "previous pairing."
-        ),
-    )
-    credentials.add_argument(
         "--credential",
         default=None,
         help=(
@@ -67,6 +57,11 @@ def build_parser() -> argparse.ArgumentParser:
             "credential file is neither read nor written, allowing multiple nodes to run "
             "without changing the stored default credential."
         ),
+    )
+    credentials.add_argument(
+        "--enrollment-id",
+        default=None,
+        help="Opaque identifier received through the physical USB bootstrap.",
     )
     connect.add_argument(
         "--credential-file",
@@ -78,6 +73,7 @@ def build_parser() -> argparse.ArgumentParser:
             "./.hdp-node-credential for the reference implementation's convenience."
         ),
     )
+    connect.add_argument("--device-key-file", default="./.hdp-node-key.pem")
     connect.add_argument(
         "--capability-version",
         action="append",
@@ -120,23 +116,24 @@ def main(argv: list[str] | None = None) -> None:
                     url,
                     args.name,
                     faults,
-                    pair_code=args.pair_code,
+                    enrollment_id=args.enrollment_id,
                     credential=args.credential,
                     credential_file=Path(args.credential_file),
+                    device_key_file=Path(args.device_key_file),
                     descriptors=descriptors,
                 )
             )
         except node.AuthFailed as exc:
-            # A terminal, operator-actionable condition (revoked or unknown credential, expired
-            # pairing code) — a one-line diagnosis and a nonzero exit, not a traceback.
+            # A terminal, operator-actionable condition — a one-line diagnosis and a nonzero
+            # exit, not a traceback.
             if args.credential is not None:
                 remediation = (
-                    "Verify the process-only `--credential` value or re-pair this node; "
+                    "Verify the process-only `--credential` value or enroll this node again; "
                     "the shared credential file was not used or changed."
                 )
             else:
                 remediation = (
-                    "Re-pair with `hdp-bridge pair new` and `--pair-code`, "
+                    "Connect the device by USB and run local bootstrap, "
                     f"after removing {args.credential_file}."
                 )
             raise SystemExit(f"{exc}. {remediation}") from exc

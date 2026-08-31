@@ -87,23 +87,11 @@ async def test_render_devices_reports_no_paired_devices_when_daemon_has_none(bri
     assert out == "no paired devices"
 
 
-async def test_render_pair_new_mints_a_code_and_records_no_plaintext_audit_entry(
-    tmp_path, monkeypatch
-):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
-    from hdp_bridge.config import registry_db_path
-    from hdp_bridge.store import db as store_db
+async def test_render_pair_new_explains_usb_only_enrollment():
+    message = await cli.render_pair_new()
 
-    store_db.connect(registry_db_path())  # ensure schema exists, same as hdp-bridge's own test
-
-    code = await cli.render_pair_new()
-
-    assert code  # a plaintext code is returned, exactly once
-    audit_files = list((tmp_path / "hdp" / "audit").glob("audit-*.jsonl"))
-    assert len(audit_files) == 1
-    record = json.loads(audit_files[0].read_text().strip())
-    assert record["event"] == "pairing_code_minted"
-    assert code not in json.dumps(record)  # no-plaintext rule
+    assert "Pairing codes are disabled" in message
+    assert "USB" in message
 
 
 async def test_render_devices_revoke_offline_fallback_records_via_marker(tmp_path, monkeypatch):

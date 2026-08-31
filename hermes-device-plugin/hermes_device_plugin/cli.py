@@ -78,14 +78,11 @@ async def render_devices() -> str:
 
 
 async def render_pair_new() -> str:
-    """CLI-only (finding I1) — `/hdp pair --new` no longer reaches this; see `commands.py`.
-
-    A thin renderer over `hdp_bridge.operations.pair_new`, which owns the decision logic and the
-    audit record (finding I5). No code, no hash, ever reaches the audit log (no-plaintext rule,
-    §3.5) — only the fact that a code was minted."""
-    from hdp_bridge import operations
-
-    return await operations.pair_new()
+    """Explain the physical bootstrap requirement without creating a remote pairing path."""
+    return (
+        "Pairing codes are disabled. Connect the device by USB and complete fresh local owner "
+        "authentication; a primary device must approve secondary enrollment."
+    )
 
 
 async def render_devices_revoke(device_id: str) -> str:

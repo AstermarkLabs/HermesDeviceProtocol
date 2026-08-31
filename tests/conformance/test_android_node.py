@@ -13,7 +13,11 @@ import pytest
 from android_node_fixture import _ECHO_DESCRIPTOR, ANDROID_CAPABILITIES, AndroidNodeFixture
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec
-from harness import mint_pairing_code, wait_for_device
+from harness import wait_for_device
+from hdp_bridge import device_keys
+from hdp_bridge.enrollment import EnrollmentCoordinator
+from hdp_bridge.host_identity import HostIdentityStore
+from hdp_bridge.store import db
 from hermes_device_plugin.transport.base import InvokeRequest
 
 pytestmark = pytest.mark.timeout(30)
@@ -30,13 +34,29 @@ async def _wait_for_capabilities(bridge, expected: set[str]) -> None:
     raise TimeoutError(f"capability set did not become {expected!r}")
 
 
+def _usb_approved_enrollment(node: AndroidNodeFixture, hermes_home) -> str:
+    """Model the already-completed physical USB + local-owner ceremony for wire conformance."""
+    conn = db.connect(hermes_home / "hdp" / "registry.db")
+    identifier = "android-" + "a" * 56
+    coordinator = EnrollmentCoordinator(conn)
+    coordinator.start(
+        identifier,
+        host_key_fingerprint=HostIdentityStore.load_or_create(
+            hermes_home / "hdp" / "host-identity.pem"
+        ).fingerprint,
+        candidate_key_fingerprint=device_keys.fingerprint(node.public_key),
+    )
+    coordinator.approve_candidate(identifier)
+    return identifier
+
+
 async def test_android_profile_pair_invoke_reconnect_and_local_policy(
     bridge, bridge_url, _hermes_home
 ):
     node = AndroidNodeFixture()
-    pair_code = await mint_pairing_code()
+    enrollment_id = _usb_approved_enrollment(node, _hermes_home)
     try:
-        welcome = await node.connect(bridge_url, pair_code=pair_code)
+        welcome = await node.connect(bridge_url, enrollment_id=enrollment_id)
         device = await wait_for_device(bridge)
         assert welcome.device_id == device.device_id
         # Amendments v0.3 — what `device_status_get` surfaces for an Android node.
@@ -96,9 +116,9 @@ async def test_android_profile_is_device_bound_end_to_end(bridge, bridge_url, _h
     before anything is issued, and the reconnect is challenged against the stored key rather
     than trusting the credential alone."""
     node = AndroidNodeFixture()
-    pair_code = await mint_pairing_code()
+    enrollment_id = _usb_approved_enrollment(node, _hermes_home)
     try:
-        welcome = await node.connect(bridge_url, pair_code=pair_code)
+        welcome = await node.connect(bridge_url, enrollment_id=enrollment_id)
         device = await wait_for_device(bridge)
         assert welcome.credential is not None
 
@@ -112,7 +132,7 @@ async def test_android_profile_is_device_bound_end_to_end(bridge, bridge_url, _h
         await node.close()
 
 
-async def test_a_node_that_cannot_sign_the_challenge_never_pairs(bridge, bridge_url):
+async def test_a_node_that_cannot_sign_the_challenge_never_pairs(bridge, bridge_url, _hermes_home):
     """The stolen-code case: presenting a valid pairing code alongside a public key whose private
     half you do not hold gets no device_id and no credential."""
 
@@ -125,10 +145,10 @@ async def test_a_node_that_cannot_sign_the_challenge_never_pairs(bridge, bridge_
             return base64.b64encode(signature).decode("ascii")
 
     node = _ImpostorNode()
-    pair_code = await mint_pairing_code()
+    enrollment_id = _usb_approved_enrollment(node, _hermes_home)
     try:
         with pytest.raises(Exception):  # noqa: B017 — the bridge closes the socket outright
-            await node.connect(bridge_url, pair_code=pair_code)
+            await node.connect(bridge_url, enrollment_id=enrollment_id)
         assert await bridge.list_devices() == []
     finally:
         await node.close()

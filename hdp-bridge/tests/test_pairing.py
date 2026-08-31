@@ -170,3 +170,44 @@ def test_minting_gives_up_rather_than_returning_a_live_code(tmp_path, monkeypatc
     mint_pairing_code(conn)
     with pytest.raises(pairing.NoPairingCodeAvailableError):
         mint_pairing_code(conn)
+
+
+def test_pairing_status_reports_a_pending_code(tmp_path):
+    conn = db.connect(tmp_path / "registry.db")
+    code = mint_pairing_code(conn)
+
+    status = pairing.pairing_status(conn, code)
+
+    assert status.state == "pending"
+    assert status.issued_device_id is None
+
+
+def test_pairing_status_reports_the_device_that_consumed_a_code(tmp_path):
+    conn = db.connect(tmp_path / "registry.db")
+    code = mint_pairing_code(conn)
+    assert consume_pairing_code(conn, code, "dev_paired") is True
+
+    status = pairing.pairing_status(conn, code)
+
+    assert status.state == "consumed"
+    assert status.issued_device_id == "dev_paired"
+
+
+@pytest.mark.parametrize(
+    ("setup", "expected_state"),
+    [
+        (lambda conn, code: burn_attempt(conn, now_ms=0), "invalidated"),
+        (lambda conn, code: None, "expired"),
+    ],
+)
+def test_pairing_status_reports_terminal_unsuccessful_codes(tmp_path, setup, expected_state):
+    conn = db.connect(tmp_path / "registry.db")
+    code = mint_pairing_code(conn, now_ms=0)
+    if expected_state == "invalidated":
+        for _ in range(5):
+            setup(conn, code)
+
+    status = pairing.pairing_status(conn, code, now_ms=6 * 60 * 1000)
+
+    assert status.state == expected_state
+    assert status.issued_device_id is None

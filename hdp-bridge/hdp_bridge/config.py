@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from urllib.parse import urlparse
 
 DEFAULT_HDP_BIND_HOST = "127.0.0.1"
 DEFAULT_HDP_BIND_PORT = 8765
@@ -56,6 +57,17 @@ def hdp_allow_remote() -> bool:
     return os.environ.get("HDP_ALLOW_REMOTE") == "1"
 
 
+def advertised_wss_endpoint() -> str | None:
+    """The explicit, TLS-protected endpoint given to a USB-approved node."""
+    value = os.environ.get("HDP_ADVERTISED_ENDPOINT", "")
+    if not value:
+        return None
+    parsed = urlparse(value)
+    if parsed.scheme != "wss" or not parsed.hostname or parsed.path != "/hdp/v0/socket":
+        raise ValueError("HDP_ADVERTISED_ENDPOINT must be wss://host[:port]/hdp/v0/socket")
+    return value
+
+
 def bridge_addr_path() -> Path:
     """`$HERMES_HOME/hdp/bridge.addr` — a plaintext `host:port` file the running server writes on
     start and removes on close, so `hdp-node connect` can discover the bound address without a
@@ -76,6 +88,19 @@ def pid_path() -> Path:
 
 def registry_db_path() -> Path:
     return hdp_home() / "registry.db"
+
+
+def host_identity_path() -> Path:
+    """`$HERMES_HOME/hdp/host-identity.pem`, the profile-scoped USB-enrollment signer."""
+    return hdp_home() / "host-identity.pem"
+
+
+def tls_certificate_path() -> Path:
+    return hdp_home() / "bridge-tls-cert.pem"
+
+
+def tls_private_key_path() -> Path:
+    return hdp_home() / "bridge-tls-key.pem"
 
 
 def policy_path() -> Path:

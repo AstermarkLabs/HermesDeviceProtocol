@@ -9,7 +9,7 @@ from hdp_reference_node import cli, node
 from hdp_reference_node.faults import FaultConfig
 
 
-def test_pair_code_and_explicit_credential_are_mutually_exclusive() -> None:
+def test_pair_code_is_not_a_reference_node_option() -> None:
     parser = cli.build_parser()
 
     with pytest.raises(SystemExit):
@@ -20,8 +20,6 @@ def test_pair_code_and_explicit_credential_are_mutually_exclusive() -> None:
                 "node-a",
                 "--pair-code",
                 "PAIR",
-                "--credential",
-                "device-secret",
             ]
         )
 
